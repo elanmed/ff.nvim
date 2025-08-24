@@ -1,2 +1,5 @@
+ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
+ff-table-of-contents	ff.txt	/*ff-table-of-contents*
+ff-todo	ff.txt	/*ff-todo*
 ff.txt	ff.txt	/*ff.txt*
