@@ -1,0 +1,17 @@
+{
+  "runtime.path": [
+    "?.lua"
+  ],
+  "workspace.ignoreSubmodules": false,
+  "diagnostics.globals": [
+    "vim",
+    "MiniTest"
+  ],
+  "diagnostics.disable": [
+    "missing-fields"
+  ],
+  "workspace.library": [
+    "$VIMRUNTIME",
+    "${3rd}/luv/library"
+  ]
+}
