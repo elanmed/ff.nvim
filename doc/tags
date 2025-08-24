@@ -1,3 +1,4 @@
+ff-deps	ff.txt	/*ff-deps*
 ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
 ff-table-of-contents	ff.txt	/*ff-table-of-contents*

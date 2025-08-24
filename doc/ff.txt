@@ -3,6 +3,7 @@
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
 
+Deps ............................................................... |ff-deps|
 TODO ............................................................... |ff-todo|
 Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
 
@@ -14,6 +15,12 @@ A simple fuzzy finder with intelligent weights (WIP)
 
 
 ------------------------------------------------------------------------------
+DEPS                                                                 *ff-deps*
+
+
+-
+
+------------------------------------------------------------------------------
 TODO                                                                 *ff-todo*
 
 
@@ -21,9 +28,13 @@ TODO                                                                 *ff-todo*
 - [ ] Configuration options - [ ] Remaps (multiple per action?) - [ ] Weights
   - [ ] Horizontal, vertical
 - [ ] Remove dep on `cwd`
-- [ ] Remove dep on `fzf-lua-frecency`
+- [x] Remove dep on `fzf-lua-frecency`
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?
+- [ ] Support alternatives to `fd`
+- [ ] Support Windows
+- [ ] Healthcheck
+- [ ] Set up autocommand
 
 ------------------------------------------------------------------------------
 FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*
