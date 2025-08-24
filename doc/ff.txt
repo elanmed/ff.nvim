@@ -1,0 +1,10 @@
+*ff.txt*                                           Last change: 2025 August 24
+
+==============================================================================
+`FF.NVIM`                                                         *ff-ff.nvim*
+
+
+A simple fuzzy finder with intelligent weights (WIP)
+
+
+vim:tw=78:ts=8:ft=help:norl:
