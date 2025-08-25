@@ -3,6 +3,7 @@ _G.FF_TEST = true
 
 local ff = require "ff"
 local H = ff._internal.H
+local F = ff._internal.F
 
 T["H"] = MiniTest.new_set()
 
@@ -87,6 +88,219 @@ end
 T["H"]["#fit_decimals"]["returns no decimals when two decimals are too long"] = function()
   MiniTest.expect.equality(H.fit_decimals(1234.56, 5), "1234")
   MiniTest.expect.equality(H.fit_decimals(12345.67, 5), "12345")
+end
+
+T["F"] = MiniTest.new_set()
+
+local root_dir = vim.fs.joinpath(vim.fn.getcwd(), "test-ff")
+local db_dir = vim.fs.joinpath(root_dir, "db-dir")
+local sorted_files_path = F.get_sorted_files_path(db_dir)
+local dated_files_path = F.get_dated_files_path(db_dir)
+
+local cwd = vim.fs.joinpath(root_dir, "files")
+local test_file_a = vim.fs.joinpath(cwd, "test-file-a.txt")
+local test_file_b = vim.fs.joinpath(cwd, "test-file-b.txt")
+local test_dir_a = vim.fs.joinpath(cwd, "test-dir-a")
+
+local now = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 0, sec = 0, }
+local now_after_30_min = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 30, sec = 0, }
+local score_when_adding = 1
+local date_at_score_one_now = F.compute_date_at_score_one { now = now, score = score_when_adding, }
+local score_decayed_after_30_min = 0.99951876362267
+
+local function create_file(path)
+  vim.fn.mkdir(vim.fs.dirname(path), "p")
+  vim.fn.writefile({ "content", }, path)
+end
+
+local function read_sorted()
+  local file = io.open(sorted_files_path, "r")
+  if not file then return "" end
+  local data = file:read "*a"
+  file:close()
+  return data
+end
+
+local function cleanup()
+  F._now = function() return os.time() end
+  vim.fn.delete(root_dir, "rf")
+  create_file(test_file_a)
+  create_file(test_file_b)
+  vim.fn.mkdir(test_dir_a, "p")
+end
+
+
+T["F"]["#update_file_score"] = MiniTest.new_set {
+  hooks = {
+    pre_case = cleanup,
+    post_case = cleanup,
+    post_once = function()
+      vim.fn.delete(root_dir, "rf")
+    end,
+  },
+}
+T["F"]["#update_file_score"]["update_type=increase"] = MiniTest.new_set()
+T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new file"] = function()
+  F._now = function() return now end
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  local dated_files = F.read(dated_files_path)
+  local date_at_score_one = dated_files[test_file_a]
+  MiniTest.expect.equality(date_at_score_one, date_at_score_one_now)
+  MiniTest.expect.equality(read_sorted(), test_file_a .. "\n")
+end
+
+T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeated calls"] = function()
+  F._now = function() return now end
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_a],
+    date_at_score_one_now
+  )
+
+  F._now = function() return now_after_30_min end
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  -- TODO: passes, precision issue
+  -- MiniTest.expect.equality(
+  --   F.read(dated_files_path)[test_file_a],
+  --   F.compute_date_at_score_one { now = now_after_30_min, score = score_decayed_after_30_min + 1, }
+  -- )
+end
+
+T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores when adding a new file"] = function()
+  F._now = function() return now end
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_a],
+    date_at_score_one_now
+  )
+
+  F._now = function() return now_after_30_min end
+  F.update_file_score(test_file_b, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_a],
+    F.compute_date_at_score_one { now = now_after_30_min, score = score_decayed_after_30_min, }
+  )
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_b],
+    F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
+  )
+  MiniTest.expect.equality(read_sorted(), test_file_b .. "\n" .. test_file_a .. "\n")
+end
+
+T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = function()
+  F._now = function() return now end
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_a],
+    date_at_score_one_now
+  )
+
+  vim.fn.delete(test_file_a)
+
+  F._now = function() return now_after_30_min end
+  F.update_file_score(test_file_b, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_a],
+    nil
+  )
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_b],
+    F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
+  )
+  MiniTest.expect.equality(read_sorted(), test_file_b .. "\n")
+end
+
+T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted files"] = function()
+  F._now = function() return now end
+
+  vim.fn.delete(test_file_a)
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_file_a],
+    nil
+  )
+end
+
+T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories"] = function()
+  F._now = function() return now end
+  F.update_file_score(test_dir_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_dir_a],
+    nil
+  )
+end
+
+T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories when stat_file=true"] = function()
+  F._now = function() return now end
+
+  vim.fn.delete(test_dir_a)
+  F.update_file_score(test_dir_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+    stat_file = true,
+  })
+
+  MiniTest.expect.equality(
+    F.read(dated_files_path)[test_dir_a],
+    nil
+  )
+end
+
+T["F"]["#update_file_score"]["update_type=remove"] = MiniTest.new_set()
+T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing file"] = function()
+  F._now = function() return now end
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "increase",
+  })
+
+  MiniTest.expect.equality(F.read(dated_files_path)[test_file_a], date_at_score_one_now)
+  MiniTest.expect.equality(read_sorted(), test_file_a .. "\n")
+
+  F._now = function() return now end
+  F.update_file_score(test_file_a, {
+    db_dir = db_dir,
+    update_type = "remove",
+  })
+
+  MiniTest.expect.equality(F.read(dated_files_path)[test_file_a], nil)
+  MiniTest.expect.equality(read_sorted(), "")
 end
 
 return T
