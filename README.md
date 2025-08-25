@@ -5,7 +5,7 @@ A small, simple fuzzy finder with intelligent weights.
 - **Small**: ~900 LOC
 - **Simple**: 1 source file, 1 test file
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
-- **Intelligent weights**: Sorts the results by weighin ...
+- **Intelligent weights**: Sorts the results by weighing:
     - Frecent (frequently + recently opened) files
     - Open buffers
     - Modified buffers
