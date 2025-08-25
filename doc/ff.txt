@@ -19,14 +19,12 @@ Similar plugins ......................................... |ff-similar-plugins|
 
 A small, simple fuzzy finder with intelligent weights.
 
-Sorts the results by weighing:
-
-- The fuzzy score of the current input
-- Frecent (frequently + recently opened) files
-- Open buffers
-- Modified buffers
-- The alternate buffer
-- The current buffer
+- **Small**: ~900 LOC
+- **Simple**: 1 source file, 1 test file
+- **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
+- **Intelligent weights**: Sorts the results by weighin ... - Frecent
+  (frequently + recently opened) files - Open buffers - Modified buffers - The
+  alternate buffer - The current buffer
 
 ------------------------------------------------------------------------------
 EXAMPLE                                                           *ff-example*
