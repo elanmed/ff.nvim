@@ -19,7 +19,8 @@ ff.setup {
   -- defaults to:
   refresh_fd_cache = "module-load",
   refresh_frecency_scores_cache = "find-call",
-  refresh_open_buffers_cache = "find-call"
+  refresh_open_buffers_cache = "find-call",
+  benchmark = false,
 }
 
 vim.keymap.set("n", "<leader>f", function()
@@ -55,6 +56,8 @@ vim.keymap.set("n", "<leader>f", function()
     icons_enabled = true,
     -- defaults to:
     hi_enabled = true,
+    -- defaults to:
+    max_results = 200,
   }
 end)
 ```
@@ -81,6 +84,7 @@ M.setup = function(opts) end
 --- @field batch_size number
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
+--- @field max_results number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -113,7 +117,6 @@ TODO
     - [ ] `fd` command
     - [ ] Max displayed results
     - [ ] Ratio between fuzzy and file scores
-    - [ ] Logging
 - [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?

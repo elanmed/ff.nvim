@@ -491,6 +491,7 @@ end
 --- @field batch_size number
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
+--- @field max_results number
 
 --- @param opts GetSmartFilesOpts
 P.get_smart_files = function(opts)
@@ -625,7 +626,7 @@ P.get_smart_files = function(opts)
     --- @type string[]
     local formatted_files = {}
     for idx, weighted_entry in ipairs(weighted_files) do
-      if idx > 200 then break end
+      if idx > opts.max_results then break end
 
       local formatted = P.format_filename(weighted_entry.file, weighted_entry.score, weighted_entry.icon_char)
       table.insert(formatted_files, formatted)
@@ -772,6 +773,7 @@ end
 --- @field batch_size number
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
+--- @field max_results number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -805,6 +807,7 @@ P.find = function(opts)
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
+  opts.max_results = H.default(opts.max_results, 200)
 
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
@@ -851,6 +854,7 @@ P.find = function(opts)
         batch_size = opts.batch_size,
         hi_enabled = opts.hi_enabled,
         icons_enabled = opts.icons_enabled,
+        max_results = opts.max_results,
         callback = function(results)
           vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
         end,
@@ -917,6 +921,7 @@ P.find = function(opts)
           batch_size = opts.batch_size,
           hi_enabled = opts.hi_enabled,
           icons_enabled = opts.icons_enabled,
+          max_results = opts.max_results,
           callback = function(results)
             vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
           end,
