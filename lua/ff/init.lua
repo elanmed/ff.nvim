@@ -826,4 +826,14 @@ M.smart = function()
   })
 end
 
+if _G.FF_TEST then
+  M._internal = {
+    H = H,
+    N = N,
+    F = F,
+    L = L,
+    P = P,
+  }
+end
+
 return M
