@@ -305,7 +305,7 @@ end
 -- ======================================================
 
 local L = {}
-local LOG = true
+L.LOG = true
 
 --- @param content string
 L.log = function(content)
@@ -320,7 +320,7 @@ L.LOG_LEN = 50
 
 --- @param type "start"|"middle"|"end"
 L.benchmark_line = function(type)
-  if not LOG then return end
+  if not L.LOG then return end
 
   if type == "start" then
     L.log("┌" .. ("─"):rep(L.LOG_LEN - 2) .. "┐")
@@ -334,7 +334,7 @@ end
 
 --- @param content string
 L.benchmark_start = function(content)
-  if not LOG then return end
+  if not L.LOG then return end
 
   L.benchmark_line "start"
   L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
@@ -345,7 +345,7 @@ L.ongoing_benchmarks = {}
 --- @param type "start"|"end"
 --- @param label string
 L.benchmark = function(type, label)
-  if not LOG then return end
+  if not L.LOG then return end
 
   if type == "start" then
     L.ongoing_benchmarks[label] = os.clock()
@@ -706,6 +706,7 @@ end
 --- @field refresh_fd_cache "module-load"|"find-call"
 --- @field refresh_frecency_scores_cache "module-load"|"find-call"
 --- @field refresh_open_buffers_cache "module-load"|"find-call"
+--- @field benchmark boolean
 
 F.setup_opts = {}
 F.setup_opts_defaults = {
@@ -722,6 +723,8 @@ M.setup = function(opts)
   F.setup_called = true
 
   opts = H.default(opts, {})
+  opts.benchmark = H.default(opts.benchmark, false)
+  L.LOG = opts.benchmark
   opts.refresh_fd_cache = H.default(
     opts.refresh_fd_cache,
     F.setup_opts_defaults.refresh_fd_cache

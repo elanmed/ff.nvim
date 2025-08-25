@@ -67,6 +67,7 @@ end)
 --- @field refresh_fd_cache "module-load"|"find-call"
 --- @field refresh_frecency_scores_cache "module-load"|"find-call"
 --- @field refresh_open_buffers_cache "module-load"|"find-call"
+--- @field benchmark boolean
 
 --- @param opts? FFSetupOpts
 M.setup = function(opts) end
@@ -112,6 +113,7 @@ TODO
     - [ ] `fd` command
     - [ ] Max displayed results
     - [ ] Ratio between fuzzy and file scores
+    - [ ] Logging
 - [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?
