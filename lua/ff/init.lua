@@ -17,6 +17,22 @@ H.default = function(val, default_val)
   return val
 end
 
+--- @param abs_file string
+H.get_rel_file = function(abs_file)
+  local cwd = vim.uv.cwd()
+  return abs_file:sub(#cwd + 2)
+end
+
+--- @param file string
+H.get_extension = function(file)
+  local dot_pos = file:find "%.[^.]+$"
+
+  if dot_pos then
+    return file:sub(dot_pos + 1)
+  end
+  return nil
+end
+
 H.vimscript_true = 1
 H.vimscript_false = 0
 
@@ -286,7 +302,65 @@ FR.update_file_score = function(filename, opts)
 end
 
 -- ======================================================
--- == Picker ============================================
+-- == Bencharking =======================================
+-- ======================================================
+
+local LO = {}
+local LOG = true
+
+--- @param content string
+LO.log = function(content)
+  local file = io.open("log.txt", "a")
+  if not file then return end
+  file:write(content)
+  file:write "\n"
+  file:close()
+end
+
+LO.LOG_LEN = 50
+
+--- @param type "start"|"middle"|"end"
+LO.benchmark_line = function(type)
+  if not LOG then return end
+
+  if type == "start" then
+    LO.log("┌" .. ("─"):rep(LO.LOG_LEN - 2) .. "┐")
+  elseif type == "middle" then
+    LO.log("├" .. ("─"):rep(LO.LOG_LEN - 2) .. "┤")
+  else
+    LO.log("└" .. ("─"):rep(LO.LOG_LEN - 2) .. "┘")
+  end
+end
+
+
+--- @param content string
+LO.benchmark_start = function(content)
+  if not LOG then return end
+
+  LO.benchmark_line "start"
+  LO.log("│" .. content .. (" "):rep(LO.LOG_LEN - #content - 2) .. "│")
+  LO.benchmark_line "middle"
+end
+
+LO.ongoing_benchmarks = {}
+--- @param type "start"|"end"
+--- @param label string
+LO.benchmark = function(type, label)
+  if not LOG then return end
+
+  if type == "start" then
+    LO.ongoing_benchmarks[label] = os.clock()
+  else
+    local end_time = os.clock()
+    local start_time = LO.ongoing_benchmarks[label]
+    local elapsed_ms = (end_time - start_time) * 1000
+    local content = ("%.3f : %s"):format(elapsed_ms, label)
+    LO.log("│" .. content .. (" "):rep(LO.LOG_LEN - #content - 2) .. "│")
+  end
+end
+
+-- ======================================================
+-- == File finder =======================================
 -- ======================================================
 
 local tick = 0
@@ -295,134 +369,72 @@ local mini_icons = require "mini.icons"
 local fzy = require "fzy-lua-native"
 local ns_id = vim.api.nvim_create_namespace "SmartHighlight"
 
---- @type string
-local cwd = vim.uv.cwd()
+local FF = {}
 
-local LOG = true
+FF.weights = {
+  OPEN_BUF_BOOST = 10,
+  CHANGED_BUF_BOOST = 20,
+  ALT_BUF_BOOST = 30,
+  CURR_BUF_BOOST = -1000,
+}
+
 local ICONS_ENABLED = true
 local HL_ENABLED = true
-local BATCH_SIZE = 500
-
-local OPEN_BUF_BOOST = 10
-local CHANGED_BUF_BOOST = 20
-local ALT_BUF_BOOST = 30
-local CURR_BUF_BOOST = -1000
+FF.BATCH_SIZE = 500
 
 -- [-math.huge, math.huge]
 -- just below math.huge is aprox the length of the string
 -- just above -math.huge is aprox 0
-local MAX_FZY_SCORE = 20
-local MAX_FRECENCY_SCORE = 99
+FF.MAX_FZY_SCORE = 20
+FF.MAX_FRECENCY_SCORE = 99
 
-local max_score_len = #FO.exact_decimals(MAX_FRECENCY_SCORE, 2)
-local formatted_score_last_idx = #FO.pad_str(
-  FO.fit_decimals(MAX_FRECENCY_SCORE, max_score_len),
-  max_score_len
-)
-local icon_char_idx = formatted_score_last_idx + 2
-
---- @param abs_file string
-local function get_rel_file(abs_file)
-  return abs_file:sub(#cwd + 2)
-end
+FF.max_score_len = #FO.exact_decimals(FF.MAX_FRECENCY_SCORE, 2)
+FF.icon_char_idx = (function()
+  local formatted_score_last_idx = #FO.pad_str(
+    FO.fit_decimals(FF.MAX_FRECENCY_SCORE, FF.max_score_len),
+    FF.max_score_len
+  )
+  return formatted_score_last_idx + 2
+end)()
 
 --- @param rel_file string
 --- @param score number
 --- @param icon string
-local function format_filename(rel_file, score, icon)
+FF.format_filename = function(rel_file, score, icon)
   local formatted_score = FO.pad_str(
-    FO.fit_decimals(score or 0, max_score_len),
-    max_score_len
+    FO.fit_decimals(score or 0, FF.max_score_len),
+    FF.max_score_len
   )
   local formatted = ("%s %s|%s"):format(formatted_score, icon, rel_file)
   return formatted
 end
 
 --- @param fzy_score number
-local function scale_fzy_to_frecency(fzy_score)
-  if fzy_score == math.huge then return MAX_FRECENCY_SCORE end
+FF.scale_fzy_to_frecency = function(fzy_score)
+  if fzy_score == math.huge then return FF.MAX_FRECENCY_SCORE end
   if fzy_score == -math.huge then return 0 end
-  return (fzy_score) / (MAX_FZY_SCORE) * MAX_FRECENCY_SCORE
+  return (fzy_score) / (FF.MAX_FZY_SCORE) * FF.MAX_FRECENCY_SCORE
 end
 
---- @param file string
-local function get_extension(file)
-  local dot_pos = file:find "%.[^.]+$"
+FF.caches = {
+  --- @type string[]
+  fd_files = {},
 
-  if dot_pos then
-    return file:sub(dot_pos + 1)
-  end
-  return nil
-end
+  --- @type string[]
+  frecency_files = {},
 
---- @param content string
-local function log(content)
-  local file = io.open("log.txt", "a")
-  if not file then return end
-  file:write(content)
-  file:write "\n"
-  file:close()
-end
+  --- @type table<string, number>
+  frecency_file_to_score = {},
 
-local LOG_LEN = 50
+  --- @type table<string, {icon_char: string, icon_hl: string|nil}>
+  icon_cache = {},
 
---- @param type "start"|"middle"|"end"
-local function benchmark_line(type)
-  if not LOG then return end
+  --- @type table<string, number>
+  open_buffer_to_score = {},
+}
 
-  if type == "start" then
-    log("┌" .. ("─"):rep(LOG_LEN - 2) .. "┐")
-  elseif type == "middle" then
-    log("├" .. ("─"):rep(LOG_LEN - 2) .. "┤")
-  else
-    log("└" .. ("─"):rep(LOG_LEN - 2) .. "┘")
-  end
-end
-
-
---- @param content string
-local function benchmark_start(content)
-  if not LOG then return end
-
-  benchmark_line "start"
-  log("│" .. content .. (" "):rep(LOG_LEN - #content - 2) .. "│")
-  benchmark_line "middle"
-end
-
-local ongoing_benchmarks = {}
---- @param type "start"|"end"
---- @param label string
-local function benchmark(type, label)
-  if not LOG then return end
-
-  if type == "start" then
-    ongoing_benchmarks[label] = os.clock()
-  else
-    local end_time = os.clock()
-    local start_time = ongoing_benchmarks[label]
-    local elapsed_ms = (end_time - start_time) * 1000
-    local content = ("%.3f : %s"):format(elapsed_ms, label)
-    log("│" .. content .. (" "):rep(LOG_LEN - #content - 2) .. "│")
-  end
-end
-
---- @type string[]
-local fd_files = {}
-
---- @type string[]
-local frecency_files = {}
-
---- @type table<string, number>
-local frecency_file_to_score = {}
-
---- @type table<string, {icon_char: string, icon_hl: string|nil}>
-local icon_cache = {}
-
---- @type table<string, number>
-local open_buffer_to_score = {}
-
-local function populate_fd_cache()
-  benchmark("start", "fd")
+FF.populate_fd_cache = function()
+  LO.benchmark("start", "fd")
   local fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
   local fd_handle = io.popen(fd_cmd)
   if not fd_handle then
@@ -431,16 +443,18 @@ local function populate_fd_cache()
   end
 
   for abs_file in fd_handle:lines() do
-    table.insert(fd_files, abs_file)
+    table.insert(FF.caches.fd_files, abs_file)
   end
   fd_handle:close()
-  benchmark("end", "fd")
+  LO.benchmark("end", "fd")
 end
 
-local function populate_frecency_files_cwd_cache()
+FF.populate_frecency_files_cwd_cache = function()
+  --- @type string
+  local cwd = vim.uv.cwd()
   local sorted_files_path = FR.get_sorted_files_path()
 
-  benchmark("start", "sorted_files_path fs read")
+  LO.benchmark("start", "sorted_files_path fs read")
   if vim.fn.filereadable(sorted_files_path) == H.vimscript_false then
     return
   end
@@ -449,35 +463,32 @@ local function populate_frecency_files_cwd_cache()
     if not vim.startswith(abs_file, cwd) then goto continue end
     if vim.fn.filereadable(abs_file) == H.vimscript_false then goto continue end
 
-    table.insert(frecency_files, abs_file)
+    table.insert(FF.caches.frecency_files, abs_file)
 
     ::continue::
   end
-  benchmark("end", "sorted_files_path fs read")
+  LO.benchmark("end", "sorted_files_path fs read")
 end
 
-local function populate_frecency_scores_cache()
-  benchmark("start", "dated_files fs read")
+FF.populate_frecency_scores_cache = function()
+  LO.benchmark("start", "dated_files fs read")
   local dated_files_path = FR.get_dated_files_path()
   local dated_files = FR.read(dated_files_path)
-  local db_index = 1 -- backwards compat reasons
-  if not dated_files[db_index] then
-    dated_files[db_index] = {}
-  end
-  benchmark("end", "dated_files fs read")
+  LO.benchmark("end", "dated_files fs read")
 
   local now = os.time()
-  benchmark("start", "calculate frecency_file_to_score")
-  for _, abs_file in ipairs(frecency_files) do
-    local date_at_score_one = dated_files[db_index][abs_file]
+  LO.benchmark("start", "calculate frecency_file_to_score")
+  for _, abs_file in ipairs(FF.caches.frecency_files) do
+    local date_at_score_one = dated_files[abs_file]
     local score = FR.compute_score { now = now, date_at_score_one = date_at_score_one, }
-    frecency_file_to_score[abs_file] = score
+    FF.caches.frecency_file_to_score[abs_file] = score
   end
-  benchmark("end", "calculate frecency_file_to_score")
+  LO.benchmark("end", "calculate frecency_file_to_score")
 end
 
-local function populate_open_buffers_cache()
-  benchmark("start", "open_buffer_to_score loop")
+FF.populate_open_buffers_cache = function()
+  LO.benchmark("start", "open_buffer_to_score loop")
+  local cwd = vim.uv.cwd()
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
     if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then goto continue end
@@ -486,13 +497,12 @@ local function populate_open_buffers_cache()
     if buf_name == "" then goto continue end
     if not vim.startswith(buf_name, cwd) then goto continue end
 
-    open_buffer_to_score[buf_name] = 0
+    FF.caches.open_buffer_to_score[buf_name] = 0
 
     ::continue::
   end
-  benchmark("end", "open_buffer_to_score loop")
+  LO.benchmark("end", "open_buffer_to_score loop")
 end
-
 
 --- @class GetSmartFilesOpts
 --- @field query string
@@ -503,10 +513,10 @@ end
 
 --- @param opts GetSmartFilesOpts
 --- @param callback function
-local function get_smart_files(opts, callback)
+FF.get_smart_files = function(opts, callback)
   local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
-  benchmark_start(("query: '%s'"):format(query))
-  benchmark("start", "entire script")
+  LO.benchmark_start(("query: '%s'"):format(query))
+  LO.benchmark("start", "entire script")
 
   --- @class AnnotatedFile
   --- @field file string
@@ -522,8 +532,8 @@ local function get_smart_files(opts, callback)
     -- TODO: change type, only need file and score
     --- @type AnnotatedFile[]
     local fuzzy_files = {}
-    benchmark("start", "calculate fuzzy_files")
-    for idx, abs_file in ipairs(fd_files) do
+    LO.benchmark("start", "calculate fuzzy_files")
+    for idx, abs_file in ipairs(FF.caches.fd_files) do
       if query == "" then
         table.insert(fuzzy_files, {
           file = abs_file,
@@ -533,10 +543,10 @@ local function get_smart_files(opts, callback)
           icon_hl = nil,
         })
       else
-        local rel_file = get_rel_file(abs_file)
+        local rel_file = H.get_rel_file(abs_file)
         if fzy.has_match(query, rel_file) then
           local fzy_score = fzy.score(query, rel_file)
-          local scaled_fzy_score = scale_fzy_to_frecency(fzy_score)
+          local scaled_fzy_score = FF.scale_fzy_to_frecency(fzy_score)
           local hl_idxs = {}
           if HL_ENABLED then
             hl_idxs = fzy.positions(query, rel_file)
@@ -553,55 +563,55 @@ local function get_smart_files(opts, callback)
         end
       end
 
-      if idx % BATCH_SIZE == 0 then
+      if idx % FF.BATCH_SIZE == 0 then
         coroutine.yield()
       end
     end
-    benchmark("end", "calculate fuzzy_files")
+    LO.benchmark("end", "calculate fuzzy_files")
 
-    benchmark("start", "calculate weighted_files")
+    LO.benchmark("start", "calculate weighted_files")
     for idx, fuzzy_entry in ipairs(fuzzy_files) do
       local buf_score = 0
 
       local abs_file = fuzzy_entry.file
 
-      if open_buffer_to_score[abs_file] ~= nil then
+      if FF.caches.open_buffer_to_score[abs_file] ~= nil then
         local bufnr = vim.fn.bufnr(abs_file)
         local changed = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
 
         if abs_file == opts.curr_bufname then
-          buf_score = CURR_BUF_BOOST
+          buf_score = FF.weights.CURR_BUF_BOOST
         elseif abs_file == opts.alt_bufname then
-          buf_score = ALT_BUF_BOOST
+          buf_score = FF.weights.ALT_BUF_BOOST
         elseif changed == H.vimscript_true then
-          buf_score = CHANGED_BUF_BOOST
+          buf_score = FF.weights.CHANGED_BUF_BOOST
         else
-          buf_score = OPEN_BUF_BOOST
+          buf_score = FF.weights.OPEN_BUF_BOOST
         end
       end
 
       local frecency_and_buf_score = buf_score
-      if frecency_file_to_score[abs_file] ~= nil then
-        frecency_and_buf_score = frecency_and_buf_score + frecency_file_to_score[abs_file]
+      if FF.caches.frecency_file_to_score[abs_file] ~= nil then
+        frecency_and_buf_score = frecency_and_buf_score + FF.caches.frecency_file_to_score[abs_file]
       end
 
       local weighted_score = 0.7 * fuzzy_entry.score + 0.3 * frecency_and_buf_score
 
-      local rel_file = get_rel_file(abs_file)
+      local rel_file = H.get_rel_file(abs_file)
       local icon_char = ""
       local icon_hl = nil
 
-      local ext = get_extension(rel_file)
+      local ext = H.get_extension(rel_file)
       if ICONS_ENABLED then
-        if icon_cache[ext] then
-          icon_char = icon_cache[ext].icon_char .. " "
-          icon_hl = icon_cache[ext].icon_hl
+        if FF.caches.icon_cache[ext] then
+          icon_char = FF.caches.icon_cache[ext].icon_char .. " "
+          icon_hl = FF.caches.icon_cache[ext].icon_hl
         else
           local _, icon_char_res, icon_hl_res = pcall(mini_icons.get, "file", rel_file)
           icon_char = (icon_char_res or "?") .. " "
           icon_hl = icon_hl_res or nil
           if ext then
-            icon_cache[ext] = { icon_char = icon_char_res or "?", icon_hl = icon_hl, }
+            FF.caches.icon_cache[ext] = { icon_char = icon_char_res or "?", icon_hl = icon_hl, }
           end
         end
       end
@@ -617,48 +627,48 @@ local function get_smart_files(opts, callback)
         }
       )
 
-      if idx % BATCH_SIZE == 0 then
+      if idx % FF.BATCH_SIZE == 0 then
         coroutine.yield()
       end
     end
-    benchmark("end", "calculate weighted_files")
+    LO.benchmark("end", "calculate weighted_files")
 
-    benchmark("start", "sort weighted_files")
+    LO.benchmark("start", "sort weighted_files")
     table.sort(weighted_files, function(a, b)
       return a.score > b.score
     end)
-    benchmark("end", "sort weighted_files")
+    LO.benchmark("end", "sort weighted_files")
 
-    benchmark("start", "format weighted_files")
+    LO.benchmark("start", "format weighted_files")
     --- @type string[]
     local formatted_files = {}
     for idx, weighted_entry in ipairs(weighted_files) do
       if idx > 200 then break end
 
-      local formatted = format_filename(weighted_entry.file, weighted_entry.score, weighted_entry.icon_char)
+      local formatted = FF.format_filename(weighted_entry.file, weighted_entry.score, weighted_entry.icon_char)
       table.insert(formatted_files, formatted)
-      if idx % BATCH_SIZE == 0 then
+      if idx % FF.BATCH_SIZE == 0 then
         coroutine.yield()
       end
     end
-    benchmark("end", "format weighted_files")
+    LO.benchmark("end", "format weighted_files")
 
-    benchmark("start", "callback")
+    LO.benchmark("start", "callback")
     callback(formatted_files)
-    benchmark("end", "callback")
+    LO.benchmark("end", "callback")
 
     if not HL_ENABLED then
-      benchmark("end", "entire script")
-      benchmark_line "end"
+      LO.benchmark("end", "entire script")
+      LO.benchmark_line "end"
       return
     end
 
-    benchmark("start", "highlight loop")
+    LO.benchmark("start", "highlight loop")
     for idx, formatted_file in ipairs(formatted_files) do
       local row_0_indexed = idx - 1
 
       if weighted_files[idx].icon_hl then
-        local icon_hl_col_1_indexed = icon_char_idx
+        local icon_hl_col_1_indexed = FF.icon_char_idx
         local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
 
         vim.hl.range(
@@ -683,13 +693,13 @@ local function get_smart_files(opts, callback)
         )
       end
 
-      if idx % BATCH_SIZE == 0 then
+      if idx % FF.BATCH_SIZE == 0 then
         coroutine.yield()
       end
     end
-    benchmark("end", "highlight loop")
-    benchmark("end", "entire script")
-    benchmark_line "end"
+    LO.benchmark("end", "highlight loop")
+    LO.benchmark("end", "entire script")
+    LO.benchmark_line "end"
   end)
 
   local function continue_processing()
@@ -704,10 +714,10 @@ local function get_smart_files(opts, callback)
   continue_processing()
 end
 
-benchmark_start "Populate file-level caches"
-populate_fd_cache()
-populate_frecency_files_cwd_cache()
-benchmark_line "end"
+LO.benchmark_start "Populate file-level caches"
+FF.populate_fd_cache()
+FF.populate_frecency_files_cwd_cache()
+LO.benchmark_line "end"
 
 M.smart = function()
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
@@ -732,12 +742,12 @@ M.smart = function()
 
   vim.schedule(
     function()
-      benchmark_start "Populate function-level caches"
-      populate_frecency_scores_cache()
-      populate_open_buffers_cache()
-      benchmark_line "end"
+      LO.benchmark_start "Populate function-level caches"
+      FF.populate_frecency_scores_cache()
+      FF.populate_open_buffers_cache()
+      LO.benchmark_line "end"
 
-      get_smart_files({
+      FF.get_smart_files({
         query = "",
         results_buf = results_buf,
         curr_bufname = curr_bufname or "",
@@ -781,7 +791,7 @@ M.smart = function()
     vim.cmd "stopinsert"
 
     vim.schedule(function()
-      local abs_file = vim.fs.joinpath(cwd, file)
+      local abs_file = vim.fs.joinpath(vim.uv.cwd(), file)
       FR.update_file_score(abs_file, { update_type = "increase", })
     end)
   end, { buffer = input_buf, })
@@ -804,7 +814,7 @@ M.smart = function()
       tick = tick + 1
       vim.schedule(function()
         local query = vim.api.nvim_get_current_line()
-        get_smart_files({
+        FF.get_smart_files({
           query = query,
           results_buf = results_buf,
           curr_bufname = curr_bufname or "",
