@@ -52,7 +52,7 @@ vim.keymap.set("n", "<leader>f", function()
     -- defaults to:
     icons_enabled = true,
     -- defaults to:
-    hl_enabled = true,
+    hi_enabled = true,
   }
 end)
 ```
@@ -77,7 +77,7 @@ M.setup = function(opts) end
 --- @field weights FindWeights
 --- @field batch_size number
 --- @field icons_enabled boolean
---- @field hl_enabled boolean
+--- @field hi_enabled boolean
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -102,20 +102,14 @@ M.find = function(opts) end
 - [`fd`](https://github.com/sharkdp/fd)
 
 ## TODO
-- [x] Modularize within single file
 - [ ] Configuration options
-    - [x] Remaps (multiple per action?)
-    - [x] Weights
     - [ ] Horizontal, vertical
 - [ ] Enable global search
-- [x] Remove dep on `fzf-lua-frecency`
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
 - [ ] Healthcheck
-- [x] Set up autocommand
-- [ ] Remove `|`
 
 ## Features excluded for simplicity
 - Multi-select

@@ -379,13 +379,13 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @param rel_file string
 --- @param score number
---- @param icon string
-P.format_filename = function(rel_file, score, icon)
+--- @param icon_char string|nil
+P.format_filename = function(rel_file, score, icon_char)
   local formatted_score = H.pad_str(
     H.fit_decimals(score or 0, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
   )
-  local formatted = ("%s %s|%s"):format(formatted_score, icon, rel_file)
+  local formatted = ("%s %s%s"):format(formatted_score, icon_char and icon_char .. " " or "", rel_file)
   return formatted
 end
 
@@ -494,7 +494,7 @@ end
 --- @field weights FindWeights
 --- @field batch_size number
 --- @field icons_enabled boolean
---- @field hl_enabled boolean
+--- @field hi_enabled boolean
 
 --- @param opts GetSmartFilesOpts
 P.get_smart_files = function(opts)
@@ -523,7 +523,7 @@ P.get_smart_files = function(opts)
           file = abs_file,
           score = 0,
           hl_idxs = {},
-          icon_char = "",
+          icon_char = nil,
           icon_hl = nil,
         })
       else
@@ -532,7 +532,7 @@ P.get_smart_files = function(opts)
           local fzy_score = fzy.score(query, rel_file)
           local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
           local hl_idxs = {}
-          if opts.hl_enabled then
+          if opts.hi_enabled then
             hl_idxs = fzy.positions(query, rel_file)
           end
 
@@ -541,7 +541,7 @@ P.get_smart_files = function(opts)
               file = abs_file,
               score = scaled_fzy_score,
               hl_idxs = hl_idxs,
-              icon_char = "",
+              icon_char = nil,
               icon_hl = nil,
             })
         end
@@ -582,17 +582,17 @@ P.get_smart_files = function(opts)
       local weighted_score = 0.7 * fuzzy_entry.score + 0.3 * frecency_and_buf_score
 
       local rel_file = H.get_rel_file(abs_file)
-      local icon_char = ""
+      local icon_char = nil
       local icon_hl = nil
 
       local ext = H.get_extension(rel_file)
       if opts.icons_enabled then
         if P.caches.icon_cache[ext] then
-          icon_char = P.caches.icon_cache[ext].icon_char .. " "
+          icon_char = P.caches.icon_cache[ext].icon_char
           icon_hl = P.caches.icon_cache[ext].icon_hl
         else
           local _, icon_char_res, icon_hl_res = pcall(mini_icons.get, "file", rel_file)
-          icon_char = (icon_char_res or "?") .. " "
+          icon_char = icon_char_res or "?"
           icon_hl = icon_hl_res or nil
           if ext then
             P.caches.icon_cache[ext] = { icon_char = icon_char_res or "?", icon_hl = icon_hl, }
@@ -641,7 +641,7 @@ P.get_smart_files = function(opts)
     opts.callback(formatted_files)
     L.benchmark("end", "callback")
 
-    if not opts.hl_enabled then
+    if not opts.hi_enabled then
       L.benchmark("end", "entire script")
       L.benchmark_line "end"
       return
@@ -670,7 +670,7 @@ P.get_smart_files = function(opts)
         )
       end
 
-      local file_offset = string.find(formatted_file, "|")
+      local file_offset = #formatted_file - formatted_file:reverse():find " " + 1
       for _, hl_idx in ipairs(weighted_files[idx].hl_idxs) do
         local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
 
@@ -770,7 +770,7 @@ end
 --- @field weights FindWeights
 --- @field batch_size number
 --- @field icons_enabled boolean
---- @field hl_enabled boolean
+--- @field hi_enabled boolean
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -803,7 +803,7 @@ P.find = function(opts)
 
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
-  opts.hl_enabled = H.default(opts.hl_enabled, true)
+  opts.hi_enabled = H.default(opts.hi_enabled, true)
 
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
@@ -848,7 +848,7 @@ P.find = function(opts)
         curr_tick = tick,
         weights = opts.weights,
         batch_size = opts.batch_size,
-        hl_enabled = opts.hl_enabled,
+        hi_enabled = opts.hi_enabled,
         icons_enabled = opts.icons_enabled,
         callback = function(results)
           vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
@@ -867,7 +867,7 @@ P.find = function(opts)
     select = function()
       vim.api.nvim_set_current_win(results_win)
       local entry = vim.api.nvim_get_current_line()
-      local file = vim.split(entry, "|")[2]
+      local file = vim.split(vim.trim(entry), "%s+")[opts.icons_enabled and 3 or 2]
 
       close()
       vim.cmd("edit " .. file)
@@ -914,7 +914,7 @@ P.find = function(opts)
           curr_tick = tick,
           weights = opts.weights,
           batch_size = opts.batch_size,
-          hl_enabled = opts.hl_enabled,
+          hi_enabled = opts.hi_enabled,
           icons_enabled = opts.icons_enabled,
           callback = function(results)
             vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
@@ -937,3 +937,5 @@ end
 
 M.find = P.find
 return M
+
+-- 0.59  |tests/test_ff.lua

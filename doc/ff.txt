@@ -72,7 +72,7 @@ EXAMPLE                                                           *ff-example*
         -- defaults to:
         icons_enabled = true,
         -- defaults to:
-        hl_enabled = true,
+        hi_enabled = true,
       }
     end)
 <
@@ -104,7 +104,7 @@ API                                                                   *ff-api*
     --- @field weights FindWeights
     --- @field batch_size number
     --- @field icons_enabled boolean
-    --- @field hl_enabled boolean
+    --- @field hi_enabled boolean
     
     --- @class FindWeights
     --- @field open_buf_boost number
@@ -135,18 +135,13 @@ DEPS                                                                 *ff-deps*
 TODO                                                                 *ff-todo*
 
 
-- [x] Modularize within single file
-- [ ] Configuration options - [x] Remaps (multiple per action?) - [x] Weights
-  - [ ] Horizontal, vertical
+- [ ] Configuration options - [ ] Horizontal, vertical
 - [ ] Enable global search
-- [x] Remove dep on `fzf-lua-frecency`
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
 - [ ] Healthcheck
-- [x] Set up autocommand
-- [ ] Remove `|`
 
 ------------------------------------------------------------------------------
 FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*
