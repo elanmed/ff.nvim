@@ -19,7 +19,9 @@ end
 
 --- @param abs_file string
 H.get_rel_file = function(abs_file)
+  --- @type string
   local cwd = vim.uv.cwd()
+  if not vim.startswith(abs_file, cwd) then return abs_file end
   return abs_file:sub(#cwd + 2)
 end
 
