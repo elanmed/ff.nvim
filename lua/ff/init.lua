@@ -224,16 +224,16 @@ end
 
 --- @class UpdateFileScoreOpts
 --- @field update_type "increase" | "remove"
---- @field db_dir? string
+--- @field _db_dir? string
 
 --- @param filename string
 --- @param opts UpdateFileScoreOpts
 F.update_file_score = function(filename, opts)
   local now = F._now()
 
-  local db_dir = H.default(opts.db_dir, F.default_db_dir)
-  local sorted_files_path = F.get_sorted_files_path(db_dir)
-  local dated_files_path = F.get_dated_files_path(db_dir)
+  opts._db_dir = H.default(opts._db_dir, F.default_db_dir)
+  local sorted_files_path = F.get_sorted_files_path(opts._db_dir)
+  local dated_files_path = F.get_dated_files_path(opts._db_dir)
   local dated_files = F.read(dated_files_path)
 
   local updated_date_at_score_one = (function()
