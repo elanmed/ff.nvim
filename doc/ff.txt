@@ -24,7 +24,8 @@ A small, simple fuzzy finder with intelligent weights.
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
 - **Intelligent weights**: Sorts the results by weighing: - Frecent
   (frequently + recently opened) files - Open buffers - Modified buffers - The
-  alternate buffer - The current buffer
+  alternate buffer - The current buffer - The fuzzy score of the filename
+  against the current input
 
 ------------------------------------------------------------------------------
 EXAMPLE                                                           *ff-example*

@@ -11,6 +11,7 @@ A small, simple fuzzy finder with intelligent weights.
     - Modified buffers
     - The alternate buffer
     - The current buffer
+    - The fuzzy score of the filename against the current input
 
 ## Example
 ```lua
