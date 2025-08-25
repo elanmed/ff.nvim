@@ -1,6 +1,10 @@
+ff-api	ff.txt	/*ff-api*
 ff-deps	ff.txt	/*ff-deps*
+ff-example	ff.txt	/*ff-example*
 ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
+ff-find	ff.txt	/*ff-find*
+ff-setup	ff.txt	/*ff-setup*
 ff-table-of-contents	ff.txt	/*ff-table-of-contents*
 ff-todo	ff.txt	/*ff-todo*
 ff.txt	ff.txt	/*ff.txt*
