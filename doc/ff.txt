@@ -143,12 +143,14 @@ DEPS                                                                 *ff-deps*
 TODO                                                                 *ff-todo*
 
 
-- [ ] Configuration options - [ ] Horizontal, vertical
+- [ ] Configuration options - [ ] Horizontal, vertical - [ ] `fd` command - [
+  ] Max displayed results - [ ] Ratio between fuzzy and file scores
 - [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
+- [ ] Highlight groups, documentation
 
 ------------------------------------------------------------------------------
 FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*

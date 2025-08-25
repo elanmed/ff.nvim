@@ -361,14 +361,10 @@ end
 -- ======================================================
 -- == Picker =======================================
 -- ======================================================
-
-local tick = 0
-
-local mini_icons = require "mini.icons"
-local fzy = require "fzy-lua-native"
-local ns_id = vim.api.nvim_create_namespace "SmartHighlight"
-
 local P = {}
+
+P.tick = 0
+P.hi_ns_id = vim.api.nvim_create_namespace "SmartHighlight"
 
 -- [-math.huge, math.huge]
 -- just below math.huge is aprox the length of the string
@@ -498,6 +494,7 @@ end
 
 --- @param opts GetSmartFilesOpts
 P.get_smart_files = function(opts)
+  local fzy = require "fzy-lua-native"
   local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
   L.benchmark_start(("query: '%s'"):format(query))
   L.benchmark("start", "entire script")
@@ -553,6 +550,7 @@ P.get_smart_files = function(opts)
     end
     L.benchmark("end", "calculate fuzzy_files")
 
+    local mini_icons = require "mini.icons"
     L.benchmark("start", "calculate weighted_files")
     for idx, fuzzy_entry in ipairs(fuzzy_files) do
       local buf_score = 0
@@ -663,7 +661,7 @@ P.get_smart_files = function(opts)
 
         vim.hl.range(
           opts.results_buf,
-          ns_id,
+          P.hi_ns_id,
           weighted_files[idx].icon_hl,
           { row_0_indexed, icon_hl_col_0_indexed, },
           { row_0_indexed, icon_hl_col_0_indexed + 1, }
@@ -676,7 +674,7 @@ P.get_smart_files = function(opts)
 
         vim.hl.range(
           opts.results_buf,
-          ns_id,
+          P.hi_ns_id,
           "SmartFilesFuzzyHighlightIdx",
           { row_0_indexed, file_char_hl_col_0_indexed, },
           { row_0_indexed, file_char_hl_col_0_indexed + 1, }
@@ -693,7 +691,7 @@ P.get_smart_files = function(opts)
   end)
 
   local function continue_processing()
-    if tick ~= opts.curr_tick then return end
+    if P.tick ~= opts.curr_tick then return end
     coroutine.resume(process_files)
 
     if coroutine.status(process_files) == "suspended" then
@@ -845,7 +843,7 @@ P.find = function(opts)
         results_buf = results_buf,
         curr_bufname = curr_bufname or "",
         alt_bufname = alt_bufname or "",
-        curr_tick = tick,
+        curr_tick = P.tick,
         weights = opts.weights,
         batch_size = opts.batch_size,
         hi_enabled = opts.hi_enabled,
@@ -903,7 +901,7 @@ P.find = function(opts)
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
     buffer = input_buf,
     callback = function()
-      tick = tick + 1
+      P.tick = P.tick + 1
       vim.schedule(function()
         local query = vim.api.nvim_get_current_line()
         P.get_smart_files {
@@ -911,7 +909,7 @@ P.find = function(opts)
           results_buf = results_buf,
           curr_bufname = curr_bufname or "",
           alt_bufname = alt_bufname or "",
-          curr_tick = tick,
+          curr_tick = P.tick,
           weights = opts.weights,
           batch_size = opts.batch_size,
           hi_enabled = opts.hi_enabled,

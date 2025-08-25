@@ -107,11 +107,15 @@ TODO
 ## TODO
 - [ ] Configuration options
     - [ ] Horizontal, vertical
+    - [ ] `fd` command
+    - [ ] Max displayed results
+    - [ ] Ratio between fuzzy and file scores
 - [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
+- [ ] Highlight groups, documentation
 
 ## Features excluded for simplicity
 - Multi-select
