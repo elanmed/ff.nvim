@@ -96,6 +96,9 @@ M.setup = function(opts) end
 M.find = function(opts) end
 ```
 
+## Performance
+TODO
+
 ## Deps
 - [fzy-lua-native](https://github.com/romgrk/fzy-lua-native)
 - [mini.icons](https://github.com/echasnovski/mini.icons)
@@ -109,7 +112,6 @@ M.find = function(opts) end
 - [ ] Support a floating buffer?
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
-- [ ] Healthcheck
 
 ## Features excluded for simplicity
 - Multi-select

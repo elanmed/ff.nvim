@@ -4,6 +4,7 @@ ff-example	ff.txt	/*ff-example*
 ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
 ff-find	ff.txt	/*ff-find*
+ff-performance	ff.txt	/*ff-performance*
 ff-setup	ff.txt	/*ff-setup*
 ff-similar-plugins	ff.txt	/*ff-similar-plugins*
 ff-table-of-contents	ff.txt	/*ff-table-of-contents*

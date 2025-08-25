@@ -1,4 +1,4 @@
-*ff.txt*                                           Last change: 2025 August 24
+*ff.txt*                                           Last change: 2025 August 25
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -7,6 +7,7 @@ Example ......................................................... |ff-example|
 API ................................................................. |ff-api|
 `setup` ........................................................... |ff-setup|
 `find` ............................................................. |ff-find|
+Performance ................................................. |ff-performance|
 Deps ............................................................... |ff-deps|
 TODO ............................................................... |ff-todo|
 Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
@@ -124,6 +125,13 @@ API                                                                   *ff-api*
 <
 
 ------------------------------------------------------------------------------
+PERFORMANCE                                                   *ff-performance*
+
+
+TODO
+
+
+------------------------------------------------------------------------------
 DEPS                                                                 *ff-deps*
 
 
@@ -141,7 +149,6 @@ TODO                                                                 *ff-todo*
 - [ ] Support a floating buffer?
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
-- [ ] Healthcheck
 
 ------------------------------------------------------------------------------
 FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*
