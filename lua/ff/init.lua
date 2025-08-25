@@ -409,9 +409,10 @@ P.caches = {
   open_buffer_to_score = {},
 }
 
-P.populate_fd_cache = function()
+
+--- @param fd_cmd string
+P.populate_fd_cache = function(fd_cmd)
   L.benchmark("start", "fd")
-  local fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
   local fd_handle = io.popen(fd_cmd)
   if not fd_handle then
     error "[smart.lua] fd failed!"
@@ -703,11 +704,12 @@ P.get_smart_files = function(opts)
   continue_processing()
 end
 
---- @class FFSetupOpts
+--- @class SetupOpts
 --- @field refresh_fd_cache "module-load"|"find-call"
 --- @field refresh_frecency_scores_cache "module-load"|"find-call"
 --- @field refresh_open_buffers_cache "module-load"|"find-call"
 --- @field benchmark boolean
+--- @field fd_cmd string
 
 F.setup_opts = {}
 F.setup_opts_defaults = {
@@ -718,7 +720,7 @@ F.setup_opts_defaults = {
 
 F.setup_called = false
 
---- @param opts? FFSetupOpts
+--- @param opts? SetupOpts
 M.setup = function(opts)
   if F.setup_called then return end
   F.setup_called = true
@@ -726,6 +728,12 @@ M.setup = function(opts)
   opts = H.default(opts, {})
   opts.benchmark = H.default(opts.benchmark, false)
   L.LOG = opts.benchmark
+
+  opts.fd_cmd = H.default(
+    opts.fd_cmd,
+    "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
+  )
+
   opts.refresh_fd_cache = H.default(
     opts.refresh_fd_cache,
     F.setup_opts_defaults.refresh_fd_cache
@@ -742,7 +750,7 @@ M.setup = function(opts)
 
   L.benchmark_start "Populate file-level caches"
   if opts.refresh_fd_cache == "module-load" then
-    P.populate_fd_cache()
+    P.populate_fd_cache(opts.fd_cmd)
     P.populate_frecency_files_cwd_cache()
   end
   if opts.refresh_frecency_scores_cache == "module-load" then
@@ -833,7 +841,7 @@ P.find = function(opts)
     function()
       L.benchmark_start "Populate function-level caches"
       if F.setup_opts.refresh_fd_cache == "find-call" then
-        P.populate_fd_cache()
+        P.populate_fd_cache(F.setup_opts.fd_cmd)
         P.populate_frecency_files_cwd_cache()
       end
       if F.setup_opts.refresh_frecency_scores_cache == "find-call" then

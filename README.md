@@ -21,6 +21,7 @@ ff.setup {
   refresh_frecency_scores_cache = "find-call",
   refresh_open_buffers_cache = "find-call",
   benchmark = false,
+  fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
 }
 
 vim.keymap.set("n", "<leader>f", function()
@@ -66,13 +67,14 @@ end)
 
 ### `setup`
 ```lua 
---- @class FFSetupOpts
+--- @class SetupOpts
 --- @field refresh_fd_cache "module-load"|"find-call"
 --- @field refresh_frecency_scores_cache "module-load"|"find-call"
 --- @field refresh_open_buffers_cache "module-load"|"find-call"
 --- @field benchmark boolean
+--- @field fd_cmd string
 
---- @param opts? FFSetupOpts
+--- @param opts? SetupOpts
 M.setup = function(opts) end
 ```
 
@@ -115,7 +117,6 @@ TODO
 - [ ] Configuration options
     - [ ] Horizontal, vertical
     - [ ] `fd` command
-    - [ ] Max displayed results
     - [ ] Ratio between fuzzy and file scores
 - [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
