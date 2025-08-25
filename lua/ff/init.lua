@@ -303,11 +303,11 @@ end
 -- == Bencharking =======================================
 -- ======================================================
 
-local LO = {}
+local L = {}
 local LOG = true
 
 --- @param content string
-LO.log = function(content)
+L.log = function(content)
   local file = io.open("log.txt", "a")
   if not file then return end
   file:write(content)
@@ -315,50 +315,50 @@ LO.log = function(content)
   file:close()
 end
 
-LO.LOG_LEN = 50
+L.LOG_LEN = 50
 
 --- @param type "start"|"middle"|"end"
-LO.benchmark_line = function(type)
+L.benchmark_line = function(type)
   if not LOG then return end
 
   if type == "start" then
-    LO.log("┌" .. ("─"):rep(LO.LOG_LEN - 2) .. "┐")
+    L.log("┌" .. ("─"):rep(L.LOG_LEN - 2) .. "┐")
   elseif type == "middle" then
-    LO.log("├" .. ("─"):rep(LO.LOG_LEN - 2) .. "┤")
+    L.log("├" .. ("─"):rep(L.LOG_LEN - 2) .. "┤")
   else
-    LO.log("└" .. ("─"):rep(LO.LOG_LEN - 2) .. "┘")
+    L.log("└" .. ("─"):rep(L.LOG_LEN - 2) .. "┘")
   end
 end
 
 
 --- @param content string
-LO.benchmark_start = function(content)
+L.benchmark_start = function(content)
   if not LOG then return end
 
-  LO.benchmark_line "start"
-  LO.log("│" .. content .. (" "):rep(LO.LOG_LEN - #content - 2) .. "│")
-  LO.benchmark_line "middle"
+  L.benchmark_line "start"
+  L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
+  L.benchmark_line "middle"
 end
 
-LO.ongoing_benchmarks = {}
+L.ongoing_benchmarks = {}
 --- @param type "start"|"end"
 --- @param label string
-LO.benchmark = function(type, label)
+L.benchmark = function(type, label)
   if not LOG then return end
 
   if type == "start" then
-    LO.ongoing_benchmarks[label] = os.clock()
+    L.ongoing_benchmarks[label] = os.clock()
   else
     local end_time = os.clock()
-    local start_time = LO.ongoing_benchmarks[label]
+    local start_time = L.ongoing_benchmarks[label]
     local elapsed_ms = (end_time - start_time) * 1000
     local content = ("%.3f : %s"):format(elapsed_ms, label)
-    LO.log("│" .. content .. (" "):rep(LO.LOG_LEN - #content - 2) .. "│")
+    L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
   end
 end
 
 -- ======================================================
--- == File finder =======================================
+-- == Picker =======================================
 -- ======================================================
 
 local tick = 0
@@ -432,7 +432,7 @@ P.caches = {
 }
 
 P.populate_fd_cache = function()
-  LO.benchmark("start", "fd")
+  L.benchmark("start", "fd")
   local fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
   local fd_handle = io.popen(fd_cmd)
   if not fd_handle then
@@ -444,7 +444,7 @@ P.populate_fd_cache = function()
     table.insert(P.caches.fd_files, abs_file)
   end
   fd_handle:close()
-  LO.benchmark("end", "fd")
+  L.benchmark("end", "fd")
 end
 
 P.populate_frecency_files_cwd_cache = function()
@@ -452,7 +452,7 @@ P.populate_frecency_files_cwd_cache = function()
   local cwd = vim.uv.cwd()
   local sorted_files_path = F.get_sorted_files_path()
 
-  LO.benchmark("start", "sorted_files_path fs read")
+  L.benchmark("start", "sorted_files_path fs read")
   if vim.fn.filereadable(sorted_files_path) == H.vimscript_false then
     return
   end
@@ -465,27 +465,27 @@ P.populate_frecency_files_cwd_cache = function()
 
     ::continue::
   end
-  LO.benchmark("end", "sorted_files_path fs read")
+  L.benchmark("end", "sorted_files_path fs read")
 end
 
 P.populate_frecency_scores_cache = function()
-  LO.benchmark("start", "dated_files fs read")
+  L.benchmark("start", "dated_files fs read")
   local dated_files_path = F.get_dated_files_path()
   local dated_files = F.read(dated_files_path)
-  LO.benchmark("end", "dated_files fs read")
+  L.benchmark("end", "dated_files fs read")
 
   local now = os.time()
-  LO.benchmark("start", "calculate frecency_file_to_score")
+  L.benchmark("start", "calculate frecency_file_to_score")
   for _, abs_file in ipairs(P.caches.frecency_files) do
     local date_at_score_one = dated_files[abs_file]
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_file] = score
   end
-  LO.benchmark("end", "calculate frecency_file_to_score")
+  L.benchmark("end", "calculate frecency_file_to_score")
 end
 
 P.populate_open_buffers_cache = function()
-  LO.benchmark("start", "open_buffer_to_score loop")
+  L.benchmark("start", "open_buffer_to_score loop")
   local cwd = vim.uv.cwd()
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
@@ -499,7 +499,7 @@ P.populate_open_buffers_cache = function()
 
     ::continue::
   end
-  LO.benchmark("end", "open_buffer_to_score loop")
+  L.benchmark("end", "open_buffer_to_score loop")
 end
 
 --- @class GetSmartFilesOpts
@@ -513,8 +513,8 @@ end
 --- @param callback function
 P.get_smart_files = function(opts, callback)
   local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
-  LO.benchmark_start(("query: '%s'"):format(query))
-  LO.benchmark("start", "entire script")
+  L.benchmark_start(("query: '%s'"):format(query))
+  L.benchmark("start", "entire script")
 
   --- @class AnnotatedFile
   --- @field file string
@@ -530,7 +530,7 @@ P.get_smart_files = function(opts, callback)
     -- TODO: change type, only need file and score
     --- @type AnnotatedFile[]
     local fuzzy_files = {}
-    LO.benchmark("start", "calculate fuzzy_files")
+    L.benchmark("start", "calculate fuzzy_files")
     for idx, abs_file in ipairs(P.caches.fd_files) do
       if query == "" then
         table.insert(fuzzy_files, {
@@ -565,9 +565,9 @@ P.get_smart_files = function(opts, callback)
         coroutine.yield()
       end
     end
-    LO.benchmark("end", "calculate fuzzy_files")
+    L.benchmark("end", "calculate fuzzy_files")
 
-    LO.benchmark("start", "calculate weighted_files")
+    L.benchmark("start", "calculate weighted_files")
     for idx, fuzzy_entry in ipairs(fuzzy_files) do
       local buf_score = 0
 
@@ -629,15 +629,15 @@ P.get_smart_files = function(opts, callback)
         coroutine.yield()
       end
     end
-    LO.benchmark("end", "calculate weighted_files")
+    L.benchmark("end", "calculate weighted_files")
 
-    LO.benchmark("start", "sort weighted_files")
+    L.benchmark("start", "sort weighted_files")
     table.sort(weighted_files, function(a, b)
       return a.score > b.score
     end)
-    LO.benchmark("end", "sort weighted_files")
+    L.benchmark("end", "sort weighted_files")
 
-    LO.benchmark("start", "format weighted_files")
+    L.benchmark("start", "format weighted_files")
     --- @type string[]
     local formatted_files = {}
     for idx, weighted_entry in ipairs(weighted_files) do
@@ -649,19 +649,19 @@ P.get_smart_files = function(opts, callback)
         coroutine.yield()
       end
     end
-    LO.benchmark("end", "format weighted_files")
+    L.benchmark("end", "format weighted_files")
 
-    LO.benchmark("start", "callback")
+    L.benchmark("start", "callback")
     callback(formatted_files)
-    LO.benchmark("end", "callback")
+    L.benchmark("end", "callback")
 
     if not HL_ENABLED then
-      LO.benchmark("end", "entire script")
-      LO.benchmark_line "end"
+      L.benchmark("end", "entire script")
+      L.benchmark_line "end"
       return
     end
 
-    LO.benchmark("start", "highlight loop")
+    L.benchmark("start", "highlight loop")
     for idx, formatted_file in ipairs(formatted_files) do
       local row_0_indexed = idx - 1
 
@@ -695,9 +695,9 @@ P.get_smart_files = function(opts, callback)
         coroutine.yield()
       end
     end
-    LO.benchmark("end", "highlight loop")
-    LO.benchmark("end", "entire script")
-    LO.benchmark_line "end"
+    L.benchmark("end", "highlight loop")
+    L.benchmark("end", "entire script")
+    L.benchmark_line "end"
   end)
 
   local function continue_processing()
@@ -712,10 +712,10 @@ P.get_smart_files = function(opts, callback)
   continue_processing()
 end
 
-LO.benchmark_start "Populate file-level caches"
+L.benchmark_start "Populate file-level caches"
 P.populate_fd_cache()
 P.populate_frecency_files_cwd_cache()
-LO.benchmark_line "end"
+L.benchmark_line "end"
 
 M.smart = function()
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
@@ -740,10 +740,10 @@ M.smart = function()
 
   vim.schedule(
     function()
-      LO.benchmark_start "Populate function-level caches"
+      L.benchmark_start "Populate function-level caches"
       P.populate_frecency_scores_cache()
       P.populate_open_buffers_cache()
-      LO.benchmark_line "end"
+      L.benchmark_line "end"
 
       P.get_smart_files({
         query = "",
