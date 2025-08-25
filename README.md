@@ -2,6 +2,14 @@
 
 A small, simple fuzzy finder with intelligent weights.
 
+Sorts the results by weighing:
+- The fuzzy score of the current input
+- Frecent (frequently + recently opened) files
+- Open buffers
+- Modified buffers
+- The alternate buffer
+- The current buffer
+
 ## Example
 ```lua
 local ff = require "ff"
@@ -111,3 +119,8 @@ M.find = function(opts) end
 
 ## Features excluded for simplicity
 - Multi-select
+
+## Similar plugins
+- [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)
+- [fff.nvim](https://github.com/dmtrKovalenko/fff.nvim)
+- [snacks.nvim's smart picker](https://github.com/folke/snacks.nvim/blob/main/docs/picker.md#smart)

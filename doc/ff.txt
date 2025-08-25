@@ -10,6 +10,7 @@ API ................................................................. |ff-api|
 Deps ............................................................... |ff-deps|
 TODO ............................................................... |ff-todo|
 Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
+Similar plugins ......................................... |ff-similar-plugins|
 
 ==============================================================================
 `FF.NVIM`                                                         *ff-ff.nvim*
@@ -17,6 +18,14 @@ Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
 
 A small, simple fuzzy finder with intelligent weights.
 
+Sorts the results by weighing:
+
+- The fuzzy score of the current input
+- Frecent (frequently + recently opened) files
+- Open buffers
+- Modified buffers
+- The alternate buffer
+- The current buffer
 
 ------------------------------------------------------------------------------
 EXAMPLE                                                           *ff-example*
@@ -144,5 +153,14 @@ FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*
 
 
 - Multi-select
+
+------------------------------------------------------------------------------
+SIMILAR PLUGINS                                           *ff-similar-plugins*
+
+
+- smart-open.nvim <https://github.com/danielfalk/smart-open.nvim>
+- fff.nvim <https://github.com/dmtrKovalenko/fff.nvim>
+- snacks.nvim's smart picker
+  <https://github.com/folke/snacks.nvim/blob/main/docs/picker.md#smart>
 
 vim:tw=78:ts=8:ft=help:norl:
