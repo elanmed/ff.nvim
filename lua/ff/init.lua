@@ -379,7 +379,7 @@ P.weights = {
 
 local ICONS_ENABLED = true
 local HL_ENABLED = true
-P.BATCH_SIZE = 500
+P.BATCH_SIZE = 250
 
 -- [-math.huge, math.huge]
 -- just below math.huge is aprox the length of the string
@@ -576,13 +576,13 @@ P.get_smart_files = function(opts, callback)
 
       if P.caches.open_buffer_to_score[abs_file] ~= nil then
         local bufnr = vim.fn.bufnr(abs_file)
-        local changed = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
+        local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
 
         if abs_file == opts.curr_bufname then
           buf_score = P.weights.CURR_BUF_BOOST
         elseif abs_file == opts.alt_bufname then
           buf_score = P.weights.ALT_BUF_BOOST
-        elseif changed == H.vimscript_true then
+        elseif modified then
           buf_score = P.weights.CHANGED_BUF_BOOST
         else
           buf_score = P.weights.OPEN_BUF_BOOST
