@@ -370,39 +370,20 @@ local ns_id = vim.api.nvim_create_namespace "SmartHighlight"
 
 local P = {}
 
-P.weights = {
-  OPEN_BUF_BOOST = 10,
-  CHANGED_BUF_BOOST = 20,
-  ALT_BUF_BOOST = 30,
-  CURR_BUF_BOOST = -1000,
-}
-
-local ICONS_ENABLED = true
-local HL_ENABLED = true
-P.BATCH_SIZE = 250
-
 -- [-math.huge, math.huge]
 -- just below math.huge is aprox the length of the string
 -- just above -math.huge is aprox 0
 P.MAX_FZY_SCORE = 20
 P.MAX_FRECENCY_SCORE = 99
-
-P.max_score_len = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
-P.icon_char_idx = (function()
-  local formatted_score_last_idx = #H.pad_str(
-    H.fit_decimals(P.MAX_FRECENCY_SCORE, P.max_score_len),
-    P.max_score_len
-  )
-  return formatted_score_last_idx + 2
-end)()
+P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @param rel_file string
 --- @param score number
 --- @param icon string
 P.format_filename = function(rel_file, score, icon)
   local formatted_score = H.pad_str(
-    H.fit_decimals(score or 0, P.max_score_len),
-    P.max_score_len
+    H.fit_decimals(score or 0, P.MAX_SCORE_LEN),
+    P.MAX_SCORE_LEN
   )
   local formatted = ("%s %s|%s"):format(formatted_score, icon, rel_file)
   return formatted
@@ -509,10 +490,14 @@ end
 --- @field curr_bufname string
 --- @field alt_bufname string
 --- @field curr_tick number
+--- @field callback function
+--- @field weights FindWeights
+--- @field batch_size number
+--- @field icons_enabled boolean
+--- @field hl_enabled boolean
 
 --- @param opts GetSmartFilesOpts
---- @param callback function
-P.get_smart_files = function(opts, callback)
+P.get_smart_files = function(opts)
   local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
   L.benchmark_start(("query: '%s'"):format(query))
   L.benchmark("start", "entire script")
@@ -547,7 +532,7 @@ P.get_smart_files = function(opts, callback)
           local fzy_score = fzy.score(query, rel_file)
           local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
           local hl_idxs = {}
-          if HL_ENABLED then
+          if opts.hl_enabled then
             hl_idxs = fzy.positions(query, rel_file)
           end
 
@@ -562,7 +547,7 @@ P.get_smart_files = function(opts, callback)
         end
       end
 
-      if idx % P.BATCH_SIZE == 0 then
+      if idx % opts.batch_size == 0 then
         coroutine.yield()
       end
     end
@@ -579,13 +564,13 @@ P.get_smart_files = function(opts, callback)
         local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
 
         if abs_file == opts.curr_bufname then
-          buf_score = P.weights.CURR_BUF_BOOST
+          buf_score = opts.weights.current_buf_boost
         elseif abs_file == opts.alt_bufname then
-          buf_score = P.weights.ALT_BUF_BOOST
+          buf_score = opts.weights.alternate_buf_boost
         elseif modified then
-          buf_score = P.weights.CHANGED_BUF_BOOST
+          buf_score = opts.weights.modified_buf_boost
         else
-          buf_score = P.weights.OPEN_BUF_BOOST
+          buf_score = opts.weights.open_buf_boost
         end
       end
 
@@ -601,7 +586,7 @@ P.get_smart_files = function(opts, callback)
       local icon_hl = nil
 
       local ext = H.get_extension(rel_file)
-      if ICONS_ENABLED then
+      if opts.icons_enabled then
         if P.caches.icon_cache[ext] then
           icon_char = P.caches.icon_cache[ext].icon_char .. " "
           icon_hl = P.caches.icon_cache[ext].icon_hl
@@ -626,7 +611,7 @@ P.get_smart_files = function(opts, callback)
         }
       )
 
-      if idx % P.BATCH_SIZE == 0 then
+      if idx % opts.batch_size == 0 then
         coroutine.yield()
       end
     end
@@ -646,28 +631,34 @@ P.get_smart_files = function(opts, callback)
 
       local formatted = P.format_filename(weighted_entry.file, weighted_entry.score, weighted_entry.icon_char)
       table.insert(formatted_files, formatted)
-      if idx % P.BATCH_SIZE == 0 then
+      if idx % opts.batch_size == 0 then
         coroutine.yield()
       end
     end
     L.benchmark("end", "format weighted_files")
 
     L.benchmark("start", "callback")
-    callback(formatted_files)
+    opts.callback(formatted_files)
     L.benchmark("end", "callback")
 
-    if not HL_ENABLED then
+    if not opts.hl_enabled then
       L.benchmark("end", "entire script")
       L.benchmark_line "end"
       return
     end
+
+    local formatted_score_last_idx = #H.pad_str(
+      H.fit_decimals(P.MAX_FRECENCY_SCORE, P.MAX_SCORE_LEN),
+      P.MAX_SCORE_LEN
+    )
+    local icon_char_idx = formatted_score_last_idx + 2
 
     L.benchmark("start", "highlight loop")
     for idx, formatted_file in ipairs(formatted_files) do
       local row_0_indexed = idx - 1
 
       if weighted_files[idx].icon_hl then
-        local icon_hl_col_1_indexed = P.icon_char_idx
+        local icon_hl_col_1_indexed = icon_char_idx
         local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
 
         vim.hl.range(
@@ -692,7 +683,7 @@ P.get_smart_files = function(opts, callback)
         )
       end
 
-      if idx % P.BATCH_SIZE == 0 then
+      if idx % opts.batch_size == 0 then
         coroutine.yield()
       end
     end
@@ -774,17 +765,27 @@ M.setup = function(opts)
   })
 end
 
---- @class FFFindOpts
---- @field keymaps FFFindKeymaps
+--- @class FindOpts
+--- @field keymaps FindKeymapsPerMode
+--- @field weights FindWeights
+--- @field batch_size number
+--- @field icons_enabled boolean
+--- @field hl_enabled boolean
 
---- @class FFFindKeymaps
---- @field i FFFindKeymap
---- @field n FFFindKeymap
+--- @class FindWeights
+--- @field open_buf_boost number
+--- @field modified_buf_boost number
+--- @field alternate_buf_boost number
+--- @field current_buf_boost number
 
---- @class FFFindKeymap
+--- @class FindKeymapsPerMode
+--- @field i FindKeymaps
+--- @field n FindKeymaps
+
+--- @class FindKeymaps
 --- @field [string] "select"|"next"|"prev"|"close"|function
 
---- @param opts? FFFindOpts
+--- @param opts? FindOpts
 P.find = function(opts)
   if not F.setup_called then
     error "[ff.nvim] `setup` must be called before `find`!"
@@ -793,6 +794,16 @@ P.find = function(opts)
   opts.keymaps = H.default(opts.keymaps, {})
   opts.keymaps.i = H.default(opts.keymaps.i, {})
   opts.keymaps.n = H.default(opts.keymaps.n, {})
+
+  opts.weights = H.default(opts.weights, {})
+  opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
+  opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
+  opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
+  opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
+
+  opts.batch_size = H.default(opts.batch_size, 250)
+  opts.icons_enabled = H.default(opts.icons_enabled, true)
+  opts.hl_enabled = H.default(opts.hl_enabled, true)
 
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
@@ -829,15 +840,20 @@ P.find = function(opts)
       end
       L.benchmark_line "end"
 
-      P.get_smart_files({
+      P.get_smart_files {
         query = "",
         results_buf = results_buf,
         curr_bufname = curr_bufname or "",
         alt_bufname = alt_bufname or "",
         curr_tick = tick,
-      }, function(results)
-        vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
-      end)
+        weights = opts.weights,
+        batch_size = opts.batch_size,
+        hl_enabled = opts.hl_enabled,
+        icons_enabled = opts.icons_enabled,
+        callback = function(results)
+          vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
+        end,
+      }
     end
   )
 
@@ -890,15 +906,20 @@ P.find = function(opts)
       tick = tick + 1
       vim.schedule(function()
         local query = vim.api.nvim_get_current_line()
-        P.get_smart_files({
+        P.get_smart_files {
           query = query,
           results_buf = results_buf,
           curr_bufname = curr_bufname or "",
           alt_bufname = alt_bufname or "",
           curr_tick = tick,
-        }, function(results)
-          vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
-        end)
+          weights = opts.weights,
+          batch_size = opts.batch_size,
+          hl_enabled = opts.hl_enabled,
+          icons_enabled = opts.icons_enabled,
+          callback = function(results)
+            vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
+          end,
+        }
       end)
     end,
   })
