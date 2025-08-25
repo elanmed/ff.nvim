@@ -225,7 +225,6 @@ end
 --- @class UpdateFileScoreOpts
 --- @field update_type "increase" | "remove"
 --- @field db_dir? string
---- @field debug? boolean
 
 --- @param filename string
 --- @param opts UpdateFileScoreOpts
@@ -714,12 +713,92 @@ P.get_smart_files = function(opts, callback)
   continue_processing()
 end
 
+--- @class FFSetupOpts
+--- @field refresh_fd_cache "module-load"|"find-call"
+--- @field refresh_frecency_scores_cache "module-load"|"find-call"
+--- @field refresh_open_buffers_cache "module-load"|"find-call"
+
+F.setup_opts = {}
+F.setup_opts_defaults = {
+  refresh_fd_cache = "module-load",
+  refresh_frecency_scores_cache = "find-call",
+  refresh_open_buffers_cache = "find-call",
+}
+
+F.setup_called = false
+
+--- @param opts? FFSetupOpts
+M.setup = function(opts)
+  if F.setup_called then return end
+  F.setup_called = true
+
+  opts = H.default(opts, {})
+  opts.refresh_fd_cache = H.default(
+    opts.refresh_fd_cache,
+    F.setup_opts_defaults.refresh_fd_cache
+  )
+  opts.refresh_frecency_scores_cache = H.default(
+    opts.refresh_frecency_scores_cache,
+    F.setup_opts_defaults.refresh_frecency_scores_cache
+  )
+  opts.refresh_open_buffers_cache = H.default(
+    opts.refresh_open_buffers_cache,
+    F.setup_opts_defaults.refresh_open_buffers_cache
+  )
+  F.setup_opts = opts
+
+  L.benchmark_start "Populate file-level caches"
+  if opts.refresh_fd_cache == "module-load" then
+    P.populate_fd_cache()
+    P.populate_frecency_files_cwd_cache()
+  end
+  if opts.refresh_frecency_scores_cache == "module-load" then
+    P.populate_frecency_scores_cache()
+  end
+  if opts.refresh_open_buffers_cache == "module-load" then
+    P.populate_open_buffers_cache()
+  end
+  L.benchmark_line "end"
+
+  vim.api.nvim_create_autocmd({ "BufWinEnter", }, {
+    group = vim.api.nvim_create_augroup("FF", { clear = true, }),
+    callback = function(ev)
+      local current_win = vim.api.nvim_get_current_win()
+      -- :h nvim_win_get_config({window}) "relative is empty for normal buffers"
+      if vim.api.nvim_win_get_config(current_win).relative == "" then
+        -- `nvim_buf_get_name` for unnamed buffers is an empty string
+        local bname = vim.api.nvim_buf_get_name(ev.buf)
+        if #bname > 0 then F.update_file_score(bname, { update_type = "increase", }) end
+      end
+    end,
+  })
+end
+
 L.benchmark_start "Populate file-level caches"
 P.populate_fd_cache()
 P.populate_frecency_files_cwd_cache()
 L.benchmark_line "end"
 
-M.smart = function()
+--- @class FFFindOpts
+--- @field keymaps FFFindKeymaps
+
+--- @class FFFindKeymaps
+--- @field i FFFindKeymap
+--- @field n FFFindKeymap
+
+--- @class FFFindKeymap
+--- @field [string] "select"|"next"|"prev"|"close"|function
+
+--- @param opts? FFFindOpts
+P.find = function(opts)
+  if not F.setup_called then
+    error "[ff.nvim] `setup` must be called before `find`!"
+  end
+  opts = H.default(opts, {})
+  opts.keymaps = H.default(opts.keymaps, {})
+  opts.keymaps.i = H.default(opts.keymaps.i, {})
+  opts.keymaps.n = H.default(opts.keymaps.n, {})
+
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
 
@@ -743,8 +822,16 @@ M.smart = function()
   vim.schedule(
     function()
       L.benchmark_start "Populate function-level caches"
-      P.populate_frecency_scores_cache()
-      P.populate_open_buffers_cache()
+      if F.setup_opts.refresh_fd_cache == "find-call" then
+        P.populate_fd_cache()
+        P.populate_frecency_files_cwd_cache()
+      end
+      if F.setup_opts.refresh_frecency_scores_cache == "find-call" then
+        P.populate_frecency_scores_cache()
+      end
+      if F.setup_opts.refresh_open_buffers_cache == "find-call" then
+        P.populate_open_buffers_cache()
+      end
       L.benchmark_line "end"
 
       P.get_smart_files({
@@ -759,52 +846,46 @@ M.smart = function()
     end
   )
 
-  local function close_picker()
+  local function close()
     local force = true
     vim.api.nvim_buf_delete(input_buf, { force = force, })
     vim.api.nvim_buf_delete(results_buf, { force = force, })
   end
 
-  vim.keymap.set({ "i", "n", }, "<C-n>", function()
-    vim.api.nvim_set_current_win(results_win)
-    vim.cmd "normal! j"
-    vim.api.nvim_set_current_win(input_win)
-  end, { buffer = input_buf, })
+  local keymap_fns = {
+    select = function()
+      vim.api.nvim_set_current_win(results_win)
+      local entry = vim.api.nvim_get_current_line()
+      local file = vim.split(entry, "|")[2]
 
-  vim.keymap.set("n", "<C-j>", function() vim.cmd "wincmd j" end, { buffer = input_buf, })
-  vim.keymap.set("n", "<C-j>", function() vim.cmd "wincmd j" end, { buffer = results_buf, })
-  vim.keymap.set("n", "<C-k>", function() vim.cmd "wincmd k" end, { buffer = results_buf, })
-  vim.keymap.set("n", "<C-k>", function() vim.cmd "wincmd k" end, { buffer = input_buf, })
+      close()
+      vim.cmd("edit " .. file)
+      vim.cmd "stopinsert"
+    end,
+    next = function()
+      vim.api.nvim_set_current_win(results_win)
+      vim.cmd "normal! j"
+      vim.api.nvim_set_current_win(input_win)
+    end,
+    prev = function()
+      vim.api.nvim_set_current_win(results_win)
+      vim.cmd "normal! k"
+      vim.api.nvim_set_current_win(input_win)
+    end,
+    close = close,
+  }
 
-  vim.keymap.set({ "i", "n", }, "<C-p>", function()
-    vim.api.nvim_set_current_win(results_win)
-    vim.cmd "normal! k"
-    vim.api.nvim_set_current_win(input_win)
-  end, { buffer = input_buf, })
-
-  vim.keymap.set({ "i", "n", }, "<cr>", function()
-    vim.api.nvim_set_current_win(results_win)
-    local entry = vim.api.nvim_get_current_line()
-    local file = vim.split(entry, "|")[2]
-    close_picker()
-    vim.cmd("edit " .. file)
-    vim.cmd "stopinsert"
-
-    vim.schedule(function()
-      local abs_file = vim.fs.joinpath(vim.uv.cwd(), file)
-      F.update_file_score(abs_file, { update_type = "increase", })
-    end)
-  end, { buffer = input_buf, })
-
-  for _, keymap in pairs { "q", "<leader>q", "<esc>", "<C-c>", } do
-    vim.keymap.set("n", keymap, close_picker, { buffer = results_buf, nowait = true, })
-    vim.keymap.set("n", keymap, close_picker, { buffer = input_buf, nowait = true, })
+  for mode, keymaps in pairs(opts.keymaps) do
+    for key, map in pairs(keymaps) do
+      vim.keymap.set(mode, key, function()
+        if type(map) == "string" then
+          keymap_fns[map]()
+        else
+          map()
+        end
+      end, { buffer = input_buf, })
+    end
   end
-
-  vim.keymap.set("i", "<C-c>", function()
-    close_picker()
-    vim.cmd "stopinsert"
-  end, { buffer = input_buf, nowait = true, })
 
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:SmartFilesResultsCursor", { win = results_win, })
 
@@ -838,4 +919,5 @@ if _G.FF_TEST then
   }
 end
 
+M.find = P.find
 return M
