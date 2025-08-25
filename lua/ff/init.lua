@@ -493,9 +493,11 @@ end
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
 --- @field max_results number
+--- @field fuzzy_score_multiple number
+--- @field file_score_multiple number
 
 --- @param opts GetSmartFilesOpts
-P.get_smart_files = function(opts)
+P.get_find_files = function(opts)
   local fzy = require "fzy-lua-native"
   local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
   L.benchmark_start(("query: '%s'"):format(query))
@@ -579,7 +581,9 @@ P.get_smart_files = function(opts)
         frecency_and_buf_score = frecency_and_buf_score + P.caches.frecency_file_to_score[abs_file]
       end
 
-      local weighted_score = 0.7 * fuzzy_entry.score + 0.3 * frecency_and_buf_score
+      local weighted_score =
+          opts.fuzzy_score_multiple * fuzzy_entry.score +
+          opts.file_score_multiple * frecency_and_buf_score
 
       local rel_file = H.get_rel_file(abs_file)
       local icon_char = nil
@@ -782,6 +786,8 @@ end
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
 --- @field max_results number
+--- @field fuzzy_score_multiple number
+--- @field file_score_multiple number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -816,6 +822,8 @@ P.find = function(opts)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
   opts.max_results = H.default(opts.max_results, 200)
+  opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
+  opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
 
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
@@ -837,6 +845,27 @@ P.find = function(opts)
 
   vim.cmd "startinsert"
 
+  --- @param query string
+  local function get_find_files_with_query(query)
+    P.get_find_files {
+      query = query,
+      results_buf = results_buf,
+      curr_bufname = curr_bufname or "",
+      alt_bufname = alt_bufname or "",
+      curr_tick = P.tick,
+      weights = opts.weights,
+      batch_size = opts.batch_size,
+      hi_enabled = opts.hi_enabled,
+      icons_enabled = opts.icons_enabled,
+      max_results = opts.max_results,
+      fuzzy_score_multiple = opts.fuzzy_score_multiple,
+      file_score_multiple = opts.file_score_multiple,
+      callback = function(results)
+        vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
+      end,
+    }
+  end
+
   vim.schedule(
     function()
       L.benchmark_start "Populate function-level caches"
@@ -852,21 +881,7 @@ P.find = function(opts)
       end
       L.benchmark_line "end"
 
-      P.get_smart_files {
-        query = "",
-        results_buf = results_buf,
-        curr_bufname = curr_bufname or "",
-        alt_bufname = alt_bufname or "",
-        curr_tick = P.tick,
-        weights = opts.weights,
-        batch_size = opts.batch_size,
-        hi_enabled = opts.hi_enabled,
-        icons_enabled = opts.icons_enabled,
-        max_results = opts.max_results,
-        callback = function(results)
-          vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
-        end,
-      }
+      get_find_files_with_query ""
     end
   )
 
@@ -919,21 +934,7 @@ P.find = function(opts)
       P.tick = P.tick + 1
       vim.schedule(function()
         local query = vim.api.nvim_get_current_line()
-        P.get_smart_files {
-          query = query,
-          results_buf = results_buf,
-          curr_bufname = curr_bufname or "",
-          alt_bufname = alt_bufname or "",
-          curr_tick = P.tick,
-          weights = opts.weights,
-          batch_size = opts.batch_size,
-          hi_enabled = opts.hi_enabled,
-          icons_enabled = opts.icons_enabled,
-          max_results = opts.max_results,
-          callback = function(results)
-            vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
-          end,
-        }
+        get_find_files_with_query(query)
       end)
     end,
   })

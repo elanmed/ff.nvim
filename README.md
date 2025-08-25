@@ -59,6 +59,10 @@ vim.keymap.set("n", "<leader>f", function()
     hi_enabled = true,
     -- defaults to:
     max_results = 200,
+    -- defaults to:
+    fuzzy_score_multiple = 0.7,
+    -- defaults to:
+    file_score_multiple = 0.3,
   }
 end)
 ```
@@ -87,6 +91,8 @@ M.setup = function(opts) end
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
 --- @field max_results number
+--- @field fuzzy_score_multiple number
+--- @field file_score_multiple number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -116,8 +122,6 @@ TODO
 ## TODO
 - [ ] Configuration options
     - [ ] Horizontal, vertical
-    - [ ] `fd` command
-    - [ ] Ratio between fuzzy and file scores
 - [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
 - [ ] Support a floating buffer?
