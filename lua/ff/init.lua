@@ -774,11 +774,6 @@ M.setup = function(opts)
   })
 end
 
-L.benchmark_start "Populate file-level caches"
-P.populate_fd_cache()
-P.populate_frecency_files_cwd_cache()
-L.benchmark_line "end"
-
 --- @class FFFindOpts
 --- @field keymaps FFFindKeymaps
 
