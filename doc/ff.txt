@@ -162,15 +162,16 @@ PERFORMANCE                                                   *ff-performance*
 
 `ff.nvim` prioritizes performance in a few ways:
 
-- Files are processed in batches with coroutines to avoid blocking the picker
-  UI
+- Files are weighted and sorted in batches w/coroutines to avoid blocking the
+  picker UI
 - `fd` calls are executed once and cached when the plugin first loads
 - Frecency scores are calculated once and cached when the picker is opened
   (i.e. not on every keystroke)
 - Open buffers are pulled once and cached when the picker is opened
 - Icons are cached by extension to avoid calling `mini.icons` when possible
-- Results are capped to keep the results buffer small
-- `hi_enabled` and `icons_enabled` are exposed for especially large codebases
+- Results are capped to keep the picker buffer small
+- `hi_enabled` and `icons_enabled` options are exposed for especially large
+  codebases
 With these optimizations in place, I average around ~50ms per keystroke on a
 codebase of 30k files. Enable the `benchmark` option to try it for yourself.
 
