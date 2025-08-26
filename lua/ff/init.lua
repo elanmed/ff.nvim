@@ -28,7 +28,6 @@ end
 --- @param file string
 H.get_extension = function(file)
   local dot_pos = file:find "%.[^.]+$"
-
   if dot_pos then
     return file:sub(dot_pos + 1)
   end
@@ -41,7 +40,6 @@ H.pad_str = function(str, len)
   if #str >= len then
     return tostring(str)
   end
-
   local num_spaces = len - #str
   return string.rep(" ", num_spaces) .. str
 end
@@ -97,7 +95,7 @@ local N = {}
 --- @param ... any
 N._notify = function(level, msg, ...)
   msg = msg or ""
-  msg = "[fzf-lua-frecency]: " .. msg
+  msg = "[ff.nvim]: " .. msg
 
   local rest = ...
   vim.notify(msg:format(rest), level)
@@ -107,12 +105,6 @@ end
 --- @param ... any
 N.notify_error = function(msg, ...)
   N._notify(vim.log.levels.ERROR, msg, ...)
-end
-
---- @param msg string
---- @param ... any
-N.notify_debug = function(msg, ...)
-  N._notify(vim.log.levels.DEBUG, msg, ...)
 end
 
 -- ======================================================
@@ -301,7 +293,7 @@ F.update_file_score = function(filename, opts)
 end
 
 -- ======================================================
--- == Bencharking =======================================
+-- == Benchmarking ======================================
 -- ======================================================
 
 local L = {}
@@ -331,7 +323,6 @@ L.benchmark_line = function(type)
   end
 end
 
-
 --- @param content string
 L.benchmark_start = function(content)
   if not L.LOG then return end
@@ -342,6 +333,7 @@ L.benchmark_start = function(content)
 end
 
 L.ongoing_benchmarks = {}
+
 --- @param type "start"|"end"
 --- @param label string
 L.benchmark = function(type, label)
@@ -359,8 +351,9 @@ L.benchmark = function(type, label)
 end
 
 -- ======================================================
--- == Picker =======================================
+-- == Picker ============================================
 -- ======================================================
+
 local P = {}
 
 P.tick = 0
@@ -381,7 +374,11 @@ P.format_filename = function(rel_file, score, icon_char)
     H.fit_decimals(score or 0, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
   )
-  local formatted = ("%s %s%s"):format(formatted_score, icon_char and icon_char .. " " or "", rel_file)
+  local formatted = ("%s %s%s"):format(
+    formatted_score,
+    icon_char and icon_char .. " " or "",
+    rel_file
+  )
   return formatted
 end
 
@@ -408,7 +405,6 @@ P.caches = {
   --- @type table<string, number>
   open_buffer_to_score = {},
 }
-
 
 --- @param fd_cmd string
 P.populate_fd_cache = function(fd_cmd)
