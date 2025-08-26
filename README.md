@@ -2,7 +2,7 @@
 
 A small, simple fuzzy finder with intelligent weights.
 
-- **Small**: ~1000 LOC
+- **Small**: ~1000 LOC,
 - **Simple**: 1 source file, 1 test file
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
 - **Intelligent weights**: Sorts the results by weighing:
@@ -132,7 +132,17 @@ M.find = function(opts) end
 ```
 
 ## Performance
-TODO
+`ff.nvim` prioritizes performance in a few ways:
+
+- Files are processed in batches with coroutines to avoid blocking the picker UI
+- `fd` calls are executed once and cached when the plugin first loads
+- Frecency scores are calculated once and cached when the picker is opened (i.e. not on every keystroke)
+- Open buffers are pulled once and cached when the picker is opened
+- Icons are cached by extension to avoid calling `mini.icons` when possible
+- Results are capped to keep the results buffer small
+- `hi_enabled` and `icons_enabled` are exposed for especially large codebases
+
+With these optimizations in place, I average around ~50ms per keystroke on a codebase of 30k files. Enable the `benchmark` option to try it for yourself.
 
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
@@ -157,6 +167,7 @@ after `setup` is called.
 
 ## Features excluded for simplicity
 - Multi-select
+- Shared options between `setup` and `find`
 
 ## Similar plugins
 - [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)
