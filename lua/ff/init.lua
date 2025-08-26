@@ -999,5 +999,3 @@ end
 
 M.find = P.find
 return M
-
--- 0.59  |tests/test_ff.lua

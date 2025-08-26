@@ -8,6 +8,7 @@ API ................................................................. |ff-api|
 `setup` ........................................................... |ff-setup|
 `find` ............................................................. |ff-find|
 Performance ................................................. |ff-performance|
+Highlight Groups ....................................... |ff-highlight-groups|
 Deps ............................................................... |ff-deps|
 TODO ............................................................... |ff-todo|
 Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
@@ -19,7 +20,7 @@ Similar plugins ......................................... |ff-similar-plugins|
 
 A small, simple fuzzy finder with intelligent weights.
 
-- **Small**: ~900 LOC
+- **Small**: ~1000 LOC
 - **Simple**: 1 source file, 1 test file
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
 - **Intelligent weights**: Sorts the results by weighing: - Frecent
@@ -62,25 +63,42 @@ EXAMPLE                                                           *ff-example*
             ["<c-c>"] = "close",
           },
         },
-        -- defaults to:
+        -- defaults:
         weights = {
           open_buf_boost = 10,
           modified_buf_boost = 20,
           alternate_buf_boost = 30,
           current_buf_boost = -1000,
         }
-        -- defaults to:
         batch_size = 250,
-        -- defaults to:
         icons_enabled = true,
-        -- defaults to:
         hi_enabled = true,
-        -- defaults to:
         max_results = 200,
-        -- defaults to:
         fuzzy_score_multiple = 0.7,
-        -- defaults to:
         file_score_multiple = 0.3,
+        input_win_config = {
+          style = "minimal",
+          anchor = "SW",
+          relative = "editor",
+          width = vim.o.columns,
+          height = 1,
+          row = vim.o.lines,
+          col = 0,
+          border = "rounded",
+          title = "Input",
+        },
+        results_win_config = {
+          style = "minimal",
+          anchor = "SW",
+          relative = "editor",
+          width = vim.o.columns,
+          height = 20,
+          row = vim.o.lines - 4,
+          col = 0,
+          border = "rounded",
+          title = "Results",
+          focusable = false,
+        }
       }
     end)
 <
@@ -118,6 +136,8 @@ API                                                                   *ff-api*
     --- @field max_results number
     --- @field fuzzy_score_multiple number
     --- @field file_score_multiple number
+    --- @field input_win_config vim.api.keyset.win_config
+    --- @field results_win_config vim.api.keyset.win_config
     
     --- @class FindWeights
     --- @field open_buf_boost number
@@ -144,6 +164,18 @@ TODO
 
 
 ------------------------------------------------------------------------------
+HIGHLIGHT GROUPS                                         *ff-highlight-groups*
+
+
+- `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
+  - Defaults to `Search`
+- `FFPickerCursorLine`: The current line in the results window - Defaults to
+  `CursorLine`
+  [!NOTE] The default highlight groups are set as a part of `setup`. In order to
+  override a highlight group, make sure to set it after `setup` is called.
+
+
+------------------------------------------------------------------------------
 DEPS                                                                 *ff-deps*
 
 
@@ -155,13 +187,10 @@ DEPS                                                                 *ff-deps*
 TODO                                                                 *ff-todo*
 
 
-- [ ] Configuration options - [ ] Horizontal, vertical
 - [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
-- [ ] Support a floating buffer?
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
-- [ ] Highlight groups, documentation
 
 ------------------------------------------------------------------------------
 FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*
