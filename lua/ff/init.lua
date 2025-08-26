@@ -364,7 +364,7 @@ end
 local P = {}
 
 P.tick = 0
-P.hi_ns_id = vim.api.nvim_create_namespace "SmartHighlight"
+P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 
 -- [-math.huge, math.huge]
 -- just below math.huge is aprox the length of the string
@@ -667,7 +667,7 @@ P.get_find_files = function(opts)
 
         vim.hl.range(
           opts.results_buf,
-          P.hi_ns_id,
+          P.ns_id,
           weighted_files[idx].icon_hl,
           { row_0_indexed, icon_hl_col_0_indexed, },
           { row_0_indexed, icon_hl_col_0_indexed + 1, }
@@ -680,8 +680,8 @@ P.get_find_files = function(opts)
 
         vim.hl.range(
           opts.results_buf,
-          P.hi_ns_id,
-          "SmartFilesFuzzyHighlightIdx",
+          P.ns_id,
+          "FFPickerFuzzyHighlightChar",
           { row_0_indexed, file_char_hl_col_0_indexed, },
           { row_0_indexed, file_char_hl_col_0_indexed + 1, }
         )
@@ -777,6 +777,8 @@ M.setup = function(opts)
       end
     end,
   })
+  vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { link = "Search", })
+  vim.api.nvim_set_hl(0, "FFPickerCursorLine", { link = "CursorLine", })
 end
 
 --- @class FindOpts
@@ -788,6 +790,8 @@ end
 --- @field max_results number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
+--- @field input_win_config vim.api.keyset.win_config
+--- @field results_win_config vim.api.keyset.win_config
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -825,24 +829,45 @@ P.find = function(opts)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
 
+  opts.input_win_config = H.default(opts.input_win_config, {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = 1,
+    row = vim.o.lines,
+    col = 0,
+    border = "rounded",
+    title = "Input",
+  })
+  opts.results_win_config = H.default(opts.results_win_config, {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = 20,
+    row = vim.o.lines - 4,
+    col = 0,
+    border = "rounded",
+    title = "Results",
+    focusable = false,
+  })
+
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
 
-  vim.cmd "new"
-  local results_buf = vim.api.nvim_get_current_buf()
-  local results_win = vim.api.nvim_get_current_win()
-  vim.bo.buftype = "nofile"
-  vim.bo.buflisted = false
-  vim.api.nvim_buf_set_name(results_buf, "Results")
+  local results_buf = vim.api.nvim_create_buf(false, true)
+  local results_win = vim.api.nvim_open_win(results_buf, false, opts.results_win_config)
+  vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf, })
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = results_buf, })
+  vim.api.nvim_set_option_value("scrolloff", 0, { win = results_win, })
+  vim.api.nvim_set_option_value("cursorline", true, { win = results_win, })
 
-  vim.cmd "new"
-  vim.cmd "resize 1"
-  local input_buf = vim.api.nvim_get_current_buf()
-  local input_win = vim.api.nvim_get_current_win()
-  vim.bo.buftype = "nofile"
-  vim.bo.buflisted = false
-  vim.api.nvim_buf_set_name(input_buf, "Input")
-
+  local input_buf = vim.api.nvim_create_buf(false, true)
+  local input_win = vim.api.nvim_open_win(input_buf, false, opts.input_win_config)
+  vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf, })
+  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = input_buf, })
+  vim.api.nvim_set_current_win(input_win)
   vim.cmd "startinsert"
 
   --- @param query string
@@ -891,6 +916,7 @@ P.find = function(opts)
     vim.api.nvim_buf_delete(results_buf, { force = force, })
   end
 
+  local current_line = 1
   local keymap_fns = {
     select = function()
       vim.api.nvim_set_current_win(results_win)
@@ -902,14 +928,36 @@ P.find = function(opts)
       vim.cmd "stopinsert"
     end,
     next = function()
-      vim.api.nvim_set_current_win(results_win)
-      vim.cmd "normal! j"
-      vim.api.nvim_set_current_win(input_win)
+      vim.api.nvim_win_call(results_win, function()
+        if current_line == vim.api.nvim_buf_line_count(results_buf) then
+          current_line = 1
+          vim.cmd "normal! gg"
+        else
+          current_line = current_line + 1
+          vim.cmd "normal! j"
+        end
+        vim.hl.range(results_buf, P.ns_id, "Search",
+          { current_line, vim.o.columns, },
+          { current_line, vim.o.columns, },
+          { inclusive = true, }
+        )
+      end)
     end,
     prev = function()
-      vim.api.nvim_set_current_win(results_win)
-      vim.cmd "normal! k"
-      vim.api.nvim_set_current_win(input_win)
+      vim.api.nvim_win_call(results_win, function()
+        if current_line == 1 then
+          current_line = vim.api.nvim_buf_line_count(results_buf)
+          vim.cmd "normal! G"
+        else
+          current_line = current_line - 1
+          vim.cmd "normal! k"
+        end
+        vim.hl.range(results_buf, P.ns_id, "Search",
+          { current_line, vim.o.columns, },
+          { current_line, vim.o.columns, },
+          { inclusive = true, }
+        )
+      end)
     end,
     close = close,
   }
@@ -926,15 +974,14 @@ P.find = function(opts)
     end
   end
 
-  vim.api.nvim_set_option_value("winhighlight", "CursorLine:SmartFilesResultsCursor", { win = results_win, })
+  vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = results_win, })
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
     buffer = input_buf,
     callback = function()
       P.tick = P.tick + 1
       vim.schedule(function()
-        local query = vim.api.nvim_get_current_line()
-        get_find_files_with_query(query)
+        get_find_files_with_query(vim.api.nvim_get_current_line())
       end)
     end,
   })
