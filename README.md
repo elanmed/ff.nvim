@@ -35,7 +35,7 @@ vim.keymap.set("n", "<leader>f", function()
         ["<c-p>"] = "prev",
         ["<c-c>"] = "close",
 
-        ["<leader>q"] = "close",
+        ["q"] = "close",
         ["<esc>"] = "close",
       },
       i = {

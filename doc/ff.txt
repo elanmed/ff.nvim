@@ -1,4 +1,4 @@
-*ff.txt*                                           Last change: 2025 August 25
+*ff.txt*                                           Last change: 2025 August 26
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -53,7 +53,7 @@ EXAMPLE                                                           *ff-example*
             ["<c-p>"] = "prev",
             ["<c-c>"] = "close",
     
-            ["<leader>q"] = "close",
+            ["q"] = "close",
             ["<esc>"] = "close",
           },
           i = {

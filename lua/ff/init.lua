@@ -921,9 +921,9 @@ P.find = function(opts)
   )
 
   local function close()
-    local force = true
-    vim.api.nvim_buf_delete(input_buf, { force = force, })
-    vim.api.nvim_buf_delete(results_buf, { force = force, })
+    vim.api.nvim_buf_delete(input_buf, { force = true, })
+    vim.api.nvim_buf_delete(results_buf, { force = true, })
+    vim.cmd "stopinsert"
   end
 
   local current_line = 1
@@ -935,7 +935,6 @@ P.find = function(opts)
 
       close()
       vim.cmd("edit " .. file)
-      vim.cmd "stopinsert"
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
