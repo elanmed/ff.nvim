@@ -149,7 +149,7 @@ M.find = function(opts) end
 
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
 - `fd` calls are executed once and cached when the plugin first loads
-- Frecency scores are calculated once and cached when the picker is opened (i.e. not on every keystroke)
+- Frecency scores are calculated once and cached when the picker is opened - not on every keystroke
 - Open buffers are pulled once and cached when the picker is opened
 - Icons are cached by extension to avoid calling `mini.icons` when possible
 - Results are capped to keep the picker buffer small
@@ -173,7 +173,7 @@ after calling`setup`
 - [`fd`](https://github.com/sharkdp/fd)
 
 ## TODO
-- [ ] Support `nvim-web-devicons`
+- [ ] Support alternatives to `mini.icons`
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
 
