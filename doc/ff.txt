@@ -69,7 +69,7 @@ EXAMPLE                                                           *ff-example*
           modified_buf_boost = 20,
           alternate_buf_boost = 30,
           current_buf_boost = -1000,
-        }
+        },
         batch_size = 250,
         icons_enabled = true,
         hi_enabled = true,
@@ -98,7 +98,13 @@ EXAMPLE                                                           *ff-example*
           border = "rounded",
           title = "Results",
           focusable = false,
-        }
+        },
+        on_picker_open = function(opts)
+          -- opts.input_buf
+          -- opts.input_win
+          -- opts.results_buf
+          -- opts.results_win
+        end
       }
     end)
 <
@@ -138,6 +144,13 @@ API                                                                   *ff-api*
     --- @field file_score_multiple number
     --- @field input_win_config vim.api.keyset.win_config
     --- @field results_win_config vim.api.keyset.win_config
+    --- @field on_picker_open fun(opts:OnPickerOpenOpts):nil
+    
+    --- @class OnPickerOpenOpts
+    --- @field results_win number
+    --- @field results_buf number
+    --- @field input_win number
+    --- @field input_buf number
     
     --- @class FindWeights
     --- @field open_buf_boost number
@@ -184,8 +197,9 @@ HIGHLIGHT GROUPS                                         *ff-highlight-groups*
   - Defaults to `Search`
 - `FFPickerCursorLine`: The current line in the results window - Defaults to
   `CursorLine`
-  [!NOTE] The default highlight groups are set as a part of `setup`. In order to
-  override a highlight group, make sure to set it after `setup` is called.
+  [!NOTE] The default highlight groups are set as a part of the `setup`
+  function. In order to successfully override a highlight group, make sure to
+  set it after calling`setup`
 
 
 ------------------------------------------------------------------------------
@@ -200,7 +214,6 @@ DEPS                                                                 *ff-deps*
 TODO                                                                 *ff-todo*
 
 
-- [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows

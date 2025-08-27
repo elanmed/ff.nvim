@@ -51,7 +51,7 @@ vim.keymap.set("n", "<leader>f", function()
       modified_buf_boost = 20,
       alternate_buf_boost = 30,
       current_buf_boost = -1000,
-    }
+    },
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
@@ -80,7 +80,13 @@ vim.keymap.set("n", "<leader>f", function()
       border = "rounded",
       title = "Results",
       focusable = false,
-    }
+    },
+    on_picker_open = function(opts)
+      -- opts.input_buf
+      -- opts.input_win
+      -- opts.results_buf
+      -- opts.results_win
+    end
   }
 end)
 ```
@@ -113,6 +119,13 @@ M.setup = function(opts) end
 --- @field file_score_multiple number
 --- @field input_win_config vim.api.keyset.win_config
 --- @field results_win_config vim.api.keyset.win_config
+--- @field on_picker_open fun(opts:OnPickerOpenOpts):nil
+
+--- @class OnPickerOpenOpts
+--- @field results_win number
+--- @field results_buf number
+--- @field input_win number
+--- @field input_buf number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -151,8 +164,8 @@ With these optimizations in place, I average around ~50ms per keystroke on a cod
   - Defaults to `CursorLine`
 
 > [!NOTE]
-> The default highlight groups are set as a part of `setup`. In order to override a highlight group, make sure to set it
-after `setup` is called.
+> The default highlight groups are set as a part of the `setup` function. In order to successfully override a highlight group, make sure to set it
+after calling`setup`
 
 ## Deps
 - [fzy-lua-native](https://github.com/romgrk/fzy-lua-native)
@@ -160,7 +173,6 @@ after `setup` is called.
 - [`fd`](https://github.com/sharkdp/fd)
 
 ## TODO
-- [ ] Enable global search
 - [ ] Support `nvim-web-devicons`
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows

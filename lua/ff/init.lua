@@ -297,7 +297,6 @@ end
 -- ======================================================
 
 local L = {}
-L.LOG = true
 
 --- @param content string
 L.log = function(content)
@@ -788,6 +787,13 @@ end
 --- @field file_score_multiple number
 --- @field input_win_config vim.api.keyset.win_config
 --- @field results_win_config vim.api.keyset.win_config
+--- @field on_picker_open fun(opts:OnPickerOpenOpts):nil
+
+--- @class OnPickerOpenOpts
+--- @field results_win number
+--- @field results_buf number
+--- @field input_win number
+--- @field input_buf number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -824,6 +830,7 @@ P.find = function(opts)
   opts.max_results = H.default(opts.max_results, 200)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
+  opts.on_picker_open = H.default(opts.on_picker_open, function() end)
 
   opts.input_win_config = H.default(opts.input_win_config, {
     style = "minimal",
@@ -856,7 +863,6 @@ P.find = function(opts)
   local results_win = vim.api.nvim_open_win(results_buf, false, opts.results_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf, })
   vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = results_buf, })
-  vim.api.nvim_set_option_value("scrolloff", 0, { win = results_win, })
   vim.api.nvim_set_option_value("cursorline", true, { win = results_win, })
 
   local input_buf = vim.api.nvim_create_buf(false, true)
@@ -864,6 +870,14 @@ P.find = function(opts)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf, })
   vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = input_buf, })
   vim.api.nvim_set_current_win(input_win)
+
+  opts.on_picker_open {
+    input_buf = input_buf,
+    input_win = input_win,
+    results_buf = results_buf,
+    results_win = results_win,
+  }
+
   vim.cmd "startinsert"
 
   --- @param query string
