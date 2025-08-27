@@ -25,6 +25,15 @@ ff.setup {
   fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
 }
 
+local editor_height = vim.o.lines - 1
+local input_height = 1
+local border_height = 2
+local available_height = editor_height - input_height - (border_height * 3)
+local results_preview_height = math.floor(available_height / 2)
+local input_row = editor_height
+local results_row = input_row - input_height - border_height
+local preview_row = results_row - results_preview_height - border_height
+
 vim.keymap.set("n", "<leader>f", function()
   ff.find {
     -- no keymaps are set by default
@@ -34,15 +43,20 @@ vim.keymap.set("n", "<leader>f", function()
         ["<c-n>"] = "next",
         ["<c-p>"] = "prev",
         ["<c-c>"] = "close",
+        ["<esc>"] = "close",
+        ["<c-d>"] = "scroll_preview_down",
+        ["<c-u>"] = "scroll_preview_up",
 
         ["q"] = "close",
-        ["<esc>"] = "close",
       },
       i = {
         ["<cr>"] = "select",
         ["<c-n>"] = "next",
         ["<c-p>"] = "prev",
         ["<c-c>"] = "close",
+        ["<esc>"] = "close",
+        ["<c-d>"] = "scroll_preview_down",
+        ["<c-u>"] = "scroll_preview_up",
       },
     },
     -- defaults:
@@ -55,16 +69,18 @@ vim.keymap.set("n", "<leader>f", function()
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
+    preview_enabled = true,
     max_results = 200,
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
+
     input_win_config = {
       style = "minimal",
       anchor = "SW",
       relative = "editor",
       width = vim.o.columns,
       height = 1,
-      row = vim.o.lines,
+      row = input_row,
       col = 0,
       border = "rounded",
       title = "Input",
@@ -74,19 +90,26 @@ vim.keymap.set("n", "<leader>f", function()
       anchor = "SW",
       relative = "editor",
       width = vim.o.columns,
-      height = 20,
-      row = vim.o.lines - 4,
+      height = results_preview_height,
+      row = results_row,
       col = 0,
       border = "rounded",
       title = "Results",
       focusable = false,
     },
-    on_picker_open = function(opts)
-      -- opts.input_buf
-      -- opts.input_win
-      -- opts.results_buf
-      -- opts.results_win
-    end
+    preview_win_config = {
+      style = "minimal",
+      anchor = "SW",
+      relative = "editor",
+      width = vim.o.columns,
+      height = results_preview_height,
+      row = preview_row,
+      col = 0,
+      border = "rounded",
+      title = "Preview",
+      focusable = false,
+    },
+    on_picker_open = function(on_picker_open_opts) end
   }
 end)
 ```
@@ -114,11 +137,13 @@ M.setup = function(opts) end
 --- @field batch_size number
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
+--- @field preview_enabled boolean
 --- @field max_results number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 --- @field input_win_config vim.api.keyset.win_config
 --- @field results_win_config vim.api.keyset.win_config
+--- @field preview_win_config vim.api.keyset.win_config
 --- @field on_picker_open fun(opts:OnPickerOpenOpts):nil
 
 --- @class OnPickerOpenOpts
@@ -126,6 +151,8 @@ M.setup = function(opts) end
 --- @field results_buf number
 --- @field input_win number
 --- @field input_buf number
+--- @field preview_win number
+--- @field preview_buf number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -153,7 +180,7 @@ M.find = function(opts) end
 - Open buffers are pulled once and cached when the picker is opened
 - Icons are cached by extension to avoid calling `mini.icons` when possible
 - Results are capped to keep the picker buffer small
-- `hi_enabled` and `icons_enabled` options are exposed for especially large codebases
+- Icons, highlights, and previews can be disabled for especially large codebases
 
 With these optimizations in place, I average around ~50ms per keystroke on a codebase of 30k files. Enable the `benchmark` option to try it for yourself.
 

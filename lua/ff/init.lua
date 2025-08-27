@@ -81,6 +81,11 @@ H.fit_decimals = function(num, max_len)
   return no_decimals
 end
 
+--- @parmam file
+H.pcall_edit = function(file)
+  pcall(vim.cmd, "edit " .. file)
+end
+
 H.vimscript_true = 1
 H.vimscript_false = 0
 
@@ -782,11 +787,13 @@ end
 --- @field batch_size number
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
+--- @field preview_enabled boolean
 --- @field max_results number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 --- @field input_win_config vim.api.keyset.win_config
 --- @field results_win_config vim.api.keyset.win_config
+--- @field preview_win_config vim.api.keyset.win_config
 --- @field on_picker_open fun(opts:OnPickerOpenOpts):nil
 
 --- @class OnPickerOpenOpts
@@ -794,6 +801,8 @@ end
 --- @field results_buf number
 --- @field input_win number
 --- @field input_buf number
+--- @field preview_win number
+--- @field preview_buf number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -806,7 +815,7 @@ end
 --- @field n FindKeymaps
 
 --- @class FindKeymaps
---- @field [string] "select"|"next"|"prev"|"close"|function
+--- @field [string] "select"|"next"|"prev"|"close"|"scroll_preview_up"|"scroll_preview_down"|function
 
 --- @param opts? FindOpts
 P.find = function(opts)
@@ -827,10 +836,20 @@ P.find = function(opts)
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
+  opts.preview_enabled = H.default(opts.preview_enabled, true)
   opts.max_results = H.default(opts.max_results, 200)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
   opts.on_picker_open = H.default(opts.on_picker_open, function() end)
+
+  local editor_height = vim.o.lines - 1
+  local input_height = 1
+  local border_height = 2
+  local available_height = editor_height - input_height - (border_height * 3)
+  local results_preview_height = math.floor(available_height / 2)
+  local input_row = editor_height
+  local results_row = input_row - input_height - border_height
+  local preview_row = results_row - results_preview_height - border_height
 
   opts.input_win_config = H.default(opts.input_win_config, {
     style = "minimal",
@@ -838,7 +857,7 @@ P.find = function(opts)
     relative = "editor",
     width = vim.o.columns,
     height = 1,
-    row = vim.o.lines,
+    row = input_row,
     col = 0,
     border = "rounded",
     title = "Input",
@@ -848,11 +867,23 @@ P.find = function(opts)
     anchor = "SW",
     relative = "editor",
     width = vim.o.columns,
-    height = 20,
-    row = vim.o.lines - 4,
+    height = results_preview_height,
+    row = results_row,
     col = 0,
     border = "rounded",
     title = "Results",
+    focusable = false,
+  })
+  opts.preview_win_config = H.default(opts.preview_win_config, {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = results_preview_height,
+    row = preview_row,
+    col = 0,
+    border = "rounded",
+    title = "Preview",
     focusable = false,
   })
 
@@ -871,14 +902,41 @@ P.find = function(opts)
   vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = input_buf, })
   vim.api.nvim_set_current_win(input_win)
 
+  local preview_buf
+  local preview_win
+  if opts.preview_enabled then
+    preview_buf = vim.api.nvim_create_buf(false, true)
+    preview_win = vim.api.nvim_open_win(preview_buf, false, opts.preview_win_config)
+  end
+
   opts.on_picker_open {
     input_buf = input_buf,
     input_win = input_win,
     results_buf = results_buf,
     results_win = results_win,
+    preview_buf = preview_buf,
+    preview_win = preview_win,
   }
 
   vim.cmd "startinsert"
+
+  --- @param formatted_result string
+  local function parse_result(formatted_result)
+    return vim.split(vim.trim(formatted_result), "%s+")[opts.icons_enabled and 3 or 2]
+  end
+
+  local curr_preview_result = nil
+  --- @param result string
+  local set_preview_result = function(result)
+    if not opts.preview_enabled then return end
+
+    local new_preview_result = parse_result(result)
+    if new_preview_result == curr_preview_result then return end
+    curr_preview_result = new_preview_result
+    vim.api.nvim_win_call(preview_win, function()
+      H.pcall_edit(curr_preview_result)
+    end)
+  end
 
   --- @param query string
   local function get_find_files_with_query(query)
@@ -897,6 +955,9 @@ P.find = function(opts)
       file_score_multiple = opts.file_score_multiple,
       callback = function(results)
         vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
+        vim.api.nvim_win_call(results_win, function()
+          set_preview_result(vim.api.nvim_get_current_line())
+        end)
       end,
     }
   end
@@ -921,8 +982,11 @@ P.find = function(opts)
   )
 
   local function close()
-    vim.api.nvim_buf_delete(input_buf, { force = true, })
-    vim.api.nvim_buf_delete(results_buf, { force = true, })
+    vim.api.nvim_win_close(input_win, true)
+    vim.api.nvim_win_close(results_win, true)
+    if opts.preview_enabled then
+      vim.api.nvim_win_close(preview_win, true)
+    end
     vim.cmd "stopinsert"
   end
 
@@ -930,11 +994,9 @@ P.find = function(opts)
   local keymap_fns = {
     select = function()
       vim.api.nvim_set_current_win(results_win)
-      local entry = vim.api.nvim_get_current_line()
-      local file = vim.split(vim.trim(entry), "%s+")[opts.icons_enabled and 3 or 2]
-
+      local result = vim.api.nvim_get_current_line()
       close()
-      vim.cmd("edit " .. file)
+      H.pcall_edit(parse_result(result))
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
@@ -950,6 +1012,8 @@ P.find = function(opts)
           { current_line, vim.o.columns, },
           { inclusive = true, }
         )
+        local result = vim.api.nvim_get_current_line()
+        set_preview_result(result)
       end)
     end,
     prev = function()
@@ -966,9 +1030,22 @@ P.find = function(opts)
           { current_line, vim.o.columns, },
           { inclusive = true, }
         )
+
+        local result = vim.api.nvim_get_current_line()
+        set_preview_result(result)
       end)
     end,
     close = close,
+    scroll_preview_down = function()
+      vim.api.nvim_win_call(preview_win, function()
+        vim.cmd("normal! " .. vim.api.nvim_replace_termcodes("<C-d>", true, false, true))
+      end)
+    end,
+    scroll_preview_up = function()
+      vim.api.nvim_win_call(preview_win, function()
+        vim.cmd("normal! " .. vim.api.nvim_replace_termcodes("<C-u>", true, false, true))
+      end)
+    end,
   }
 
   for mode, keymaps in pairs(opts.keymaps) do
