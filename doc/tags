@@ -6,6 +6,7 @@ ff-ff.nvim	ff.txt	/*ff-ff.nvim*
 ff-find	ff.txt	/*ff-find*
 ff-highlight-groups	ff.txt	/*ff-highlight-groups*
 ff-performance	ff.txt	/*ff-performance*
+ff-refresh_fd_cache	ff.txt	/*ff-refresh_fd_cache*
 ff-setup	ff.txt	/*ff-setup*
 ff-similar-plugins	ff.txt	/*ff-similar-plugins*
 ff-table-of-contents	ff.txt	/*ff-table-of-contents*

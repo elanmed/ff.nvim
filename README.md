@@ -171,6 +171,12 @@ M.setup = function(opts) end
 M.find = function(opts) end
 ```
 
+### `refresh_fd_cache`
+```lua
+--- @param fd_cmd string
+M.refresh_fd_cache = function(fd_cmd) end
+```
+
 ## Performance
 `ff.nvim` prioritizes performance in a few ways:
 

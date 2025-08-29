@@ -1,4 +1,4 @@
-*ff.txt*                                           Last change: 2025 August 26
+*ff.txt*                                           Last change: 2025 August 27
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -7,6 +7,7 @@ Example ......................................................... |ff-example|
 API ................................................................. |ff-api|
 `setup` ........................................................... |ff-setup|
 `find` ............................................................. |ff-find|
+`refresh_fd_cache` ..................................... |ff-refresh_fd_cache|
 Performance ................................................. |ff-performance|
 Highlight Groups ....................................... |ff-highlight-groups|
 Deps ............................................................... |ff-deps|
@@ -194,6 +195,14 @@ API                                                                   *ff-api*
     
     --- @param opts? FindOpts
     M.find = function(opts) end
+<
+
+                                                                              
+`REFRESH_FD_CACHE`                                       *ff-refresh_fd_cache*
+
+>lua
+    --- @param fd_cmd string
+    M.refresh_fd_cache = function(fd_cmd) end
 <
 
 ------------------------------------------------------------------------------

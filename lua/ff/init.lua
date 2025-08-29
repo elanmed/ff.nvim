@@ -410,6 +410,8 @@ P.caches = {
   open_buffer_to_score = {},
 }
 
+P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
+
 --- @param fd_cmd string
 P.populate_fd_cache = function(fd_cmd)
   L.benchmark("start", "fd")
@@ -715,42 +717,38 @@ end
 --- @field benchmark boolean
 --- @field fd_cmd string
 
-F.setup_opts = {}
-F.setup_opts_defaults = {
+P.setup_opts = {}
+P.setup_opts_defaults = {
   refresh_fd_cache = "module-load",
   refresh_frecency_scores_cache = "find-call",
   refresh_open_buffers_cache = "find-call",
 }
 
-F.setup_called = false
+P.setup_called = false
 
 --- @param opts? SetupOpts
 M.setup = function(opts)
-  if F.setup_called then return end
-  F.setup_called = true
+  if P.setup_called then return end
+  P.setup_called = true
 
   opts = H.default(opts, {})
   opts.benchmark = H.default(opts.benchmark, false)
   L.LOG = opts.benchmark
 
-  opts.fd_cmd = H.default(
-    opts.fd_cmd,
-    "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
-  )
-
+  opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
   opts.refresh_fd_cache = H.default(
     opts.refresh_fd_cache,
-    F.setup_opts_defaults.refresh_fd_cache
+    P.setup_opts_defaults.refresh_fd_cache
   )
   opts.refresh_frecency_scores_cache = H.default(
     opts.refresh_frecency_scores_cache,
-    F.setup_opts_defaults.refresh_frecency_scores_cache
+    P.setup_opts_defaults.refresh_frecency_scores_cache
   )
   opts.refresh_open_buffers_cache = H.default(
     opts.refresh_open_buffers_cache,
-    F.setup_opts_defaults.refresh_open_buffers_cache
+    P.setup_opts_defaults.refresh_open_buffers_cache
   )
-  F.setup_opts = opts
+  P.setup_opts = opts
 
   L.benchmark_start "Populate file-level caches"
   if opts.refresh_fd_cache == "module-load" then
@@ -779,6 +777,16 @@ M.setup = function(opts)
   })
   vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { link = "Search", })
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { link = "CursorLine", })
+end
+
+--- @param fd_cmd string
+M.refresh_fd_cache = function(fd_cmd)
+  if not P.setup_called then
+    error "[ff.nvim] `setup` must be called before `refresh_fd_cache`!"
+  end
+  fd_cmd = H.default(fd_cmd, P.setup_opts.fd_cmd)
+  P.populate_fd_cache(fd_cmd)
+  P.populate_frecency_files_cwd_cache()
 end
 
 --- @class FindOpts
@@ -819,7 +827,7 @@ end
 
 --- @param opts? FindOpts
 P.find = function(opts)
-  if not F.setup_called then
+  if not P.setup_called then
     error "[ff.nvim] `setup` must be called before `find`!"
   end
   opts = H.default(opts, {})
@@ -965,14 +973,14 @@ P.find = function(opts)
   vim.schedule(
     function()
       L.benchmark_start "Populate function-level caches"
-      if F.setup_opts.refresh_fd_cache == "find-call" then
-        P.populate_fd_cache(F.setup_opts.fd_cmd)
+      if P.setup_opts.refresh_fd_cache == "find-call" then
+        P.populate_fd_cache(P.setup_opts.fd_cmd)
         P.populate_frecency_files_cwd_cache()
       end
-      if F.setup_opts.refresh_frecency_scores_cache == "find-call" then
+      if P.setup_opts.refresh_frecency_scores_cache == "find-call" then
         P.populate_frecency_scores_cache()
       end
-      if F.setup_opts.refresh_open_buffers_cache == "find-call" then
+      if P.setup_opts.refresh_open_buffers_cache == "find-call" then
         P.populate_open_buffers_cache()
       end
       L.benchmark_line "end"
