@@ -819,7 +819,7 @@ end
 --- @field n FindKeymaps
 
 --- @class FindKeymaps
---- @field [string] "select"|"next"|"prev"|"close"|"scroll_preview_up"|"scroll_preview_down"|function
+--- @field [string] "select"|"next"|"prev"|"close"|function
 
 --- @param opts? FindOpts
 P.find = function(opts)
@@ -974,8 +974,6 @@ P.find = function(opts)
           { current_line, vim.o.columns, },
           { inclusive = true, }
         )
-        local result = vim.api.nvim_get_current_line()
-        set_preview_result(result)
       end)
     end,
     prev = function()
@@ -992,22 +990,9 @@ P.find = function(opts)
           { current_line, vim.o.columns, },
           { inclusive = true, }
         )
-
-        local result = vim.api.nvim_get_current_line()
-        set_preview_result(result)
       end)
     end,
     close = close,
-    scroll_preview_down = function()
-      vim.api.nvim_win_call(preview_win, function()
-        vim.cmd("normal! " .. vim.api.nvim_replace_termcodes("<C-d>", true, false, true))
-      end)
-    end,
-    scroll_preview_up = function()
-      vim.api.nvim_win_call(preview_win, function()
-        vim.cmd("normal! " .. vim.api.nvim_replace_termcodes("<C-u>", true, false, true))
-      end)
-    end,
   }
 
   for mode, keymaps in pairs(opts.keymaps) do

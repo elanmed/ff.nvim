@@ -43,8 +43,6 @@ vim.keymap.set("n", "<leader>f", function()
         ["<c-p>"] = "prev",
         ["<c-c>"] = "close",
         ["<esc>"] = "close",
-        ["<c-d>"] = "scroll_preview_down",
-        ["<c-u>"] = "scroll_preview_up",
 
         ["q"] = "close",
       },
@@ -54,8 +52,6 @@ vim.keymap.set("n", "<leader>f", function()
         ["<c-p>"] = "prev",
         ["<c-c>"] = "close",
         ["<esc>"] = "close",
-        ["<c-d>"] = "scroll_preview_down",
-        ["<c-u>"] = "scroll_preview_up",
       },
     },
     -- defaults:
