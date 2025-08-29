@@ -29,10 +29,9 @@ local editor_height = vim.o.lines - 1
 local input_height = 1
 local border_height = 2
 local available_height = editor_height - input_height - (border_height * 3)
-local results_preview_height = math.floor(available_height / 2)
+local results_height = math.floor(available_height / 2)
 local input_row = editor_height
 local results_row = input_row - input_height - border_height
-local preview_row = results_row - results_preview_height - border_height
 
 vim.keymap.set("n", "<leader>f", function()
   ff.find {
@@ -69,7 +68,6 @@ vim.keymap.set("n", "<leader>f", function()
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
-    preview_enabled = true,
     max_results = 200,
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
@@ -90,23 +88,11 @@ vim.keymap.set("n", "<leader>f", function()
       anchor = "SW",
       relative = "editor",
       width = vim.o.columns,
-      height = results_preview_height,
+      height = results_height,
       row = results_row,
       col = 0,
       border = "rounded",
       title = "Results",
-      focusable = false,
-    },
-    preview_win_config = {
-      style = "minimal",
-      anchor = "SW",
-      relative = "editor",
-      width = vim.o.columns,
-      height = results_preview_height,
-      row = preview_row,
-      col = 0,
-      border = "rounded",
-      title = "Preview",
       focusable = false,
     },
     on_picker_open = function(on_picker_open_opts) end
@@ -137,13 +123,11 @@ M.setup = function(opts) end
 --- @field batch_size number
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
---- @field preview_enabled boolean
 --- @field max_results number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 --- @field input_win_config vim.api.keyset.win_config
 --- @field results_win_config vim.api.keyset.win_config
---- @field preview_win_config vim.api.keyset.win_config
 --- @field on_picker_open fun(opts:OnPickerOpenOpts):nil
 
 --- @class OnPickerOpenOpts
@@ -151,8 +135,6 @@ M.setup = function(opts) end
 --- @field results_buf number
 --- @field input_win number
 --- @field input_buf number
---- @field preview_win number
---- @field preview_buf number
 
 --- @class FindWeights
 --- @field open_buf_boost number
@@ -186,7 +168,7 @@ M.refresh_fd_cache = function(fd_cmd) end
 - Open buffers are pulled once and cached when the picker is opened
 - Icons are cached by extension to avoid calling `mini.icons` when possible
 - Results are capped to keep the picker buffer small
-- Icons, highlights, and previews can be disabled for especially large codebases
+- Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around ~50ms per keystroke on a codebase of 30k files. Enable the `benchmark` option to try it for yourself.
 
@@ -213,6 +195,7 @@ after calling`setup`
 ## Features excluded for simplicity
 - Multi-select
 - Shared options between `setup` and `find`
+- A preview window
 
 ## Similar plugins
 - [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)
