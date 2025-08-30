@@ -711,11 +711,11 @@ P.get_find_files = function(opts)
 end
 
 --- @class SetupOpts
---- @field refresh_fd_cache "module-load"|"find-call"
---- @field refresh_frecency_scores_cache "module-load"|"find-call"
---- @field refresh_open_buffers_cache "module-load"|"find-call"
---- @field benchmark boolean
---- @field fd_cmd string
+--- @field refresh_fd_cache? "module-load"|"find-call"
+--- @field refresh_frecency_scores_cache? "module-load"|"find-call"
+--- @field refresh_open_buffers_cache? "module-load"|"find-call"
+--- @field benchmark? boolean
+--- @field fd_cmd? string
 
 P.setup_opts = {}
 P.setup_opts_defaults = {
@@ -790,17 +790,17 @@ M.refresh_fd_cache = function(fd_cmd)
 end
 
 --- @class FindOpts
---- @field keymaps FindKeymapsPerMode
---- @field weights FindWeights
---- @field batch_size number
---- @field icons_enabled boolean
---- @field hi_enabled boolean
---- @field max_results number
---- @field fuzzy_score_multiple number
---- @field file_score_multiple number
---- @field input_win_config vim.api.keyset.win_config
---- @field results_win_config vim.api.keyset.win_config
---- @field on_picker_open fun(opts:OnPickerOpenOpts):nil
+--- @field keymaps? FindKeymapsPerMode
+--- @field weights? FindWeights
+--- @field batch_size? number
+--- @field icons_enabled? boolean
+--- @field hi_enabled? boolean
+--- @field max_results? number
+--- @field fuzzy_score_multiple? number
+--- @field file_score_multiple? number
+--- @field input_win_config? vim.api.keyset.win_config
+--- @field results_win_config? vim.api.keyset.win_config
+--- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
 
 --- @class OnPickerOpenOpts
 --- @field results_win number
@@ -809,14 +809,14 @@ end
 --- @field input_buf number
 
 --- @class FindWeights
---- @field open_buf_boost number
---- @field modified_buf_boost number
---- @field alternate_buf_boost number
---- @field current_buf_boost number
+--- @field open_buf_boost? number
+--- @field modified_buf_boost? number
+--- @field alternate_buf_boost? number
+--- @field current_buf_boost? number
 
 --- @class FindKeymapsPerMode
---- @field i FindKeymaps
---- @field n FindKeymaps
+--- @field i? FindKeymaps
+--- @field n? FindKeymaps
 
 --- @class FindKeymaps
 --- @field [string] "select"|"next"|"prev"|"close"|function
