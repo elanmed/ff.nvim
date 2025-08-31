@@ -25,11 +25,25 @@ H.get_rel_file = function(abs_file)
   return abs_file:sub(#cwd + 2)
 end
 
---- @param file string
-H.get_extension = function(file)
-  local dot_pos = file:find "%.[^.]+$"
-  if dot_pos then
-    return file:sub(dot_pos + 1)
+--- @param path string
+--- @param opts { with_ext: boolean }
+H.basename = function(path, opts)
+  if path == "" then return path end
+  local basename = path:match "([^/\\]+)$"
+  if opts.with_ext then return basename end
+
+  local first_dot_pos = basename:find "%."
+  if first_dot_pos then
+    return basename:sub(1, first_dot_pos - 1)
+  end
+  return basename
+end
+
+--- @param filename string
+H.get_ext = function(filename)
+  local last_dot_pos = filename:find "%.[^.]+$"
+  if last_dot_pos then
+    return filename:sub(last_dot_pos + 1)
   end
   return nil
 end
@@ -550,8 +564,8 @@ end
 --- @param opts GetSmartFilesOpts
 P.get_find_files = function(opts)
   local fzy = require "fzy-lua-native"
-  local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
-  L.benchmark_step_heading(("query: '%s'"):format(query))
+  opts.query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
+  L.benchmark_step_heading(("query: '%s'"):format(opts.query))
   L.benchmark_step("start", "Entire script")
 
   --- @class AnnotatedFile
@@ -570,7 +584,7 @@ P.get_find_files = function(opts)
     local fuzzy_files = {}
     L.benchmark_step("start", "Calculate fuzzy_files")
     for idx, abs_file in ipairs(P.caches.fd_files) do
-      if query == "" then
+      if opts.query == "" then
         if idx <= opts.max_results then
           table.insert(fuzzy_files, {
             file = abs_file,
@@ -582,14 +596,14 @@ P.get_find_files = function(opts)
         end
       else
         local rel_file = H.get_rel_file(abs_file)
-        if fzy.has_match(query, rel_file) then
-          local fzy_score = fzy.score(query, rel_file)
+        if fzy.has_match(opts.query, rel_file) then
+          local fzy_score = fzy.score(opts.query, rel_file)
 
           if fzy_score >= opts.min_matched_chars then
             local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
             local hl_idxs = {}
             if opts.hi_enabled then
-              hl_idxs = fzy.positions(query, rel_file)
+              hl_idxs = fzy.positions(opts.query, rel_file)
             end
 
             table.insert(fuzzy_files,
@@ -616,8 +630,12 @@ P.get_find_files = function(opts)
       local buf_score = 0
 
       local abs_file = fuzzy_entry.file
+      local basename_with_ext = H.basename(abs_file, { with_ext = true, })
+      local basename_without_ext = H.basename(abs_file, { with_ext = false, })
 
-      if P.caches.open_buffer_to_score[abs_file] ~= nil then
+      if opts.query == basename_with_ext or opts.query == basename_without_ext then
+        buf_score = opts.weights.exact_basename_boost
+      elseif P.caches.open_buffer_to_score[abs_file] ~= nil then
         local bufnr = vim.fn.bufnr(abs_file)
         local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
 
@@ -645,7 +663,7 @@ P.get_find_files = function(opts)
       local icon_char = nil
       local icon_hl = nil
 
-      local ext = H.get_extension(rel_file)
+      local ext = H.get_ext(rel_file)
       if opts.icons_enabled then
         if P.caches.icon_cache[ext] then
           icon_char = P.caches.icon_cache[ext].icon_char
@@ -872,6 +890,7 @@ end
 --- @field modified_buf_boost? number
 --- @field alternate_buf_boost? number
 --- @field current_buf_boost? number
+--- @field exact_basename_boost? number
 
 --- @class FindKeymapsPerMode
 --- @field i? FindKeymaps
@@ -894,6 +913,7 @@ P.find = function(opts)
   opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
   opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
   opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
+  opts.weights.exact_basename_boost = H.default(opts.weights.exact_basename_boost, 40)
   opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
 
   opts.batch_size = H.default(opts.batch_size, 250)

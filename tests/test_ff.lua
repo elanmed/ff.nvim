@@ -33,12 +33,24 @@ T["H"]["#get_rel_file"]["returns the abs file path as a fallback"] = function()
   MiniTest.expect.equality(H.get_rel_file "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
 end
 
-T["H"]["#get_extension"] = MiniTest.new_set()
-T["H"]["#get_extension"]["returns the extension"] = function()
-  MiniTest.expect.equality(H.get_extension "path/to/file.txt", "txt")
-  MiniTest.expect.equality(H.get_extension "path/to/file.min.txt", "txt")
-  MiniTest.expect.equality(H.get_extension "path/to/file", nil)
-  MiniTest.expect.equality(H.get_extension "", nil)
+T["H"]["#get_ext"] = MiniTest.new_set()
+T["H"]["#get_ext"]["returns the extension"] = function()
+  MiniTest.expect.equality(H.get_ext "path/to/file.txt", "txt")
+  MiniTest.expect.equality(H.get_ext "path/to/file.min.txt", "txt")
+  MiniTest.expect.equality(H.get_ext "path/to/file", nil)
+  MiniTest.expect.equality(H.get_ext "", nil)
+end
+
+T["H"]["#basename"] = MiniTest.new_set()
+T["H"]["#basename"]["returns the basename with and without an extension"] = function()
+  MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = true, }), "file.txt")
+  MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = false, }), "file")
+  MiniTest.expect.equality(H.basename("path/to/file.min.txt", { with_ext = true, }), "file.min.txt")
+  MiniTest.expect.equality(H.basename("path/to/file.min.txt", { with_ext = false, }), "file")
+  MiniTest.expect.equality(H.basename("path/to/file", { with_ext = true, }), "file")
+  MiniTest.expect.equality(H.basename("path/to/file", { with_ext = false, }), "file")
+  MiniTest.expect.equality(H.basename("", { with_ext = true, }), "")
+  MiniTest.expect.equality(H.basename("", { with_ext = false, }), "")
 end
 
 T["H"]["#default"]["returns original value when not nil"] = function()

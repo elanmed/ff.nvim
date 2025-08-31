@@ -60,6 +60,7 @@ vim.keymap.set("n", "<leader>f", function()
       open_buf_boost = 10,
       modified_buf_boost = 20,
       alternate_buf_boost = 30,
+      exact_basename_boost = 40,
       current_buf_boost = -1000,
     },
     batch_size = 250,
@@ -140,6 +141,7 @@ M.setup = function(opts) end
 --- @field open_buf_boost? number
 --- @field modified_buf_boost? number
 --- @field alternate_buf_boost? number
+--- @field exact_basename_boost? number
 --- @field current_buf_boost? number
 
 --- @class FindKeymapsPerMode
