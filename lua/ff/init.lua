@@ -634,7 +634,7 @@ P.get_find_files = function(opts)
       local basename_without_ext = H.basename(abs_file, { with_ext = false, })
 
       if opts.query == basename_with_ext or opts.query == basename_without_ext then
-        buf_score = opts.weights.exact_basename_boost
+        buf_score = opts.weights.basename_boost
       elseif P.caches.open_buffer_to_score[abs_file] ~= nil then
         local bufnr = vim.fn.bufnr(abs_file)
         local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
@@ -890,7 +890,7 @@ end
 --- @field modified_buf_boost? number
 --- @field alternate_buf_boost? number
 --- @field current_buf_boost? number
---- @field exact_basename_boost? number
+--- @field basename_boost? number
 
 --- @class FindKeymapsPerMode
 --- @field i? FindKeymaps
@@ -913,7 +913,7 @@ P.find = function(opts)
   opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
   opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
   opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
-  opts.weights.exact_basename_boost = H.default(opts.weights.exact_basename_boost, 40)
+  opts.weights.basename_boost = H.default(opts.weights.basename_boost, 40)
   opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
 
   opts.batch_size = H.default(opts.batch_size, 250)
