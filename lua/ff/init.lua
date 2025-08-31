@@ -134,12 +134,6 @@ local F = {}
 F.default_db_dir = vim.fs.joinpath(vim.fn.stdpath "data", "ff")
 
 --- @param db_dir? string
-F.get_sorted_files_path = function(db_dir)
-  db_dir = H.default(db_dir, F.default_db_dir)
-  return vim.fs.joinpath(db_dir, "sorted-files.txt")
-end
-
---- @param db_dir? string
 F.get_dated_files_path = function(db_dir)
   db_dir = H.default(db_dir, F.default_db_dir)
   return vim.fs.joinpath(db_dir, "dated-files.json")
@@ -166,16 +160,12 @@ F.read = function(path)
   return decoded_data
 end
 
---- @class WriteOpts
---- @field path string
---- @field data table | string | number
---- @field encode boolean
-
---- @param opts WriteOpts
+--- @param path string
+--- @param data table
 --- @return nil
-F.write = function(opts)
+F.write = function(path, data)
   -- vim.fn.mkdir won't throw
-  local path_dir = vim.fs.dirname(opts.path)
+  local path_dir = vim.fs.dirname(path)
   local mkdir_res = vim.fn.mkdir(path_dir, "p")
   if mkdir_res == H.vimscript_false then
     N.notify_error "ERROR: vim.fn.mkdir returned vimscript_false"
@@ -183,22 +173,18 @@ F.write = function(opts)
   end
 
   -- io.open won't throw
-  local file = io.open(opts.path, "w")
+  local file = io.open(path, "w")
   if file == nil then
-    N.notify_error("ERROR: io.open failed to open the file created with vim.fn.mkdir at path: %s", opts.path)
+    N.notify_error("ERROR: io.open failed to open the file created with vim.fn.mkdir at path: %s", path)
     return
   end
 
-  if opts.encode then
-    -- vim.json.encode will throw
-    local encode_ok, encoded_data = pcall(vim.json.encode, opts.data)
-    if encode_ok then
-      file:write(encoded_data)
-    else
-      N.notify_error("ERROR: vim.json.encode threw: %s", encoded_data)
-    end
+  -- vim.json.encode will throw
+  local encode_ok, encoded_data = pcall(vim.json.encode, data)
+  if encode_ok then
+    file:write(encoded_data)
   else
-    file:write(opts.data)
+    N.notify_error("ERROR: vim.json.encode threw: %s", encoded_data)
   end
 
   file:close()
@@ -243,7 +229,6 @@ F.update_file_score = function(filename, opts)
   local now = F._now()
 
   opts._db_dir = H.default(opts._db_dir, F.default_db_dir)
-  local sorted_files_path = F.get_sorted_files_path(opts._db_dir)
   local dated_files_path = F.get_dated_files_path(opts._db_dir)
   local dated_files = F.read(dated_files_path)
 
@@ -269,7 +254,7 @@ F.update_file_score = function(filename, opts)
   end)()
 
   dated_files[filename] = updated_date_at_score_one
-  F.write { path = dated_files_path, data = dated_files, encode = true, }
+  F.write(dated_files_path, dated_files)
 
   --- @type ScoredFile[]
   local scored_files = {}
@@ -285,30 +270,7 @@ F.update_file_score = function(filename, opts)
     end
   end
 
-  F.write {
-    data = updated_dated_files,
-    path = dated_files_path,
-    encode = true,
-  }
-
-  table.sort(scored_files, function(a, b)
-    return a.score > b.score
-  end)
-
-  local scored_files_list = {}
-  for _, scored_file in pairs(scored_files) do
-    table.insert(scored_files_list, scored_file.filename)
-  end
-  local sorted_files_str = table.concat(scored_files_list, "\n")
-  if #sorted_files_str > 0 then
-    sorted_files_str = sorted_files_str .. "\n"
-  end
-
-  F.write {
-    path = sorted_files_path,
-    data = sorted_files_str,
-    encode = false,
-  }
+  F.write(dated_files_path, updated_dated_files)
 end
 
 -- ======================================================
@@ -488,27 +450,6 @@ P.populate_fd_cache = function(fd_cmd)
   end
   fd_handle:close()
   L.benchmark_step("end", "fd")
-end
-
-P.populate_frecency_files_cwd_cache = function()
-  --- @type string
-  local cwd = vim.uv.cwd()
-  local sorted_files_path = F.get_sorted_files_path()
-
-  L.benchmark_step("start", "Frecency sorted_files_path fs read")
-  if vim.fn.filereadable(sorted_files_path) == H.vimscript_false then
-    return
-  end
-
-  for abs_file in io.lines(sorted_files_path) do
-    if not vim.startswith(abs_file, cwd) then goto continue end
-    if vim.fn.filereadable(abs_file) == H.vimscript_false then goto continue end
-
-    table.insert(P.caches.frecency_files, abs_file)
-
-    ::continue::
-  end
-  L.benchmark_step("end", "Frecency sorted_files_path fs read")
 end
 
 P.populate_frecency_scores_cache = function()
@@ -829,7 +770,6 @@ M.setup = function(opts)
   L.benchmark_step_heading "Populate file-level caches"
   if opts.refresh_fd_cache == "module-load" then
     P.populate_fd_cache(opts.fd_cmd)
-    P.populate_frecency_files_cwd_cache()
   end
   if opts.refresh_frecency_scores_cache == "module-load" then
     P.populate_frecency_scores_cache()
@@ -862,7 +802,6 @@ M.refresh_fd_cache = function(fd_cmd)
   end
   fd_cmd = H.default(fd_cmd, P.setup_opts.fd_cmd)
   P.populate_fd_cache(fd_cmd)
-  P.populate_frecency_files_cwd_cache()
 end
 
 --- @class FindOpts
@@ -1013,7 +952,6 @@ P.find = function(opts)
       L.benchmark_step_heading "Populate function-level caches"
       if P.setup_opts.refresh_fd_cache == "find-call" then
         P.populate_fd_cache(P.setup_opts.fd_cmd)
-        P.populate_frecency_files_cwd_cache()
       end
       if P.setup_opts.refresh_frecency_scores_cache == "find-call" then
         P.populate_frecency_scores_cache()

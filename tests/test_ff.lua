@@ -106,7 +106,6 @@ T["F"] = MiniTest.new_set()
 
 local root_dir = vim.fs.joinpath(vim.fn.getcwd(), "test-ff")
 local _db_dir = vim.fs.joinpath(root_dir, "db-dir")
-local sorted_files_path = F.get_sorted_files_path(_db_dir)
 local dated_files_path = F.get_dated_files_path(_db_dir)
 
 local cwd = vim.fs.joinpath(root_dir, "files")
@@ -123,14 +122,6 @@ local score_decayed_after_30_min = 0.99951876362267
 local function create_file(path)
   vim.fn.mkdir(vim.fs.dirname(path), "p")
   vim.fn.writefile({ "content", }, path)
-end
-
-local function read_sorted()
-  local file = io.open(sorted_files_path, "r")
-  if not file then return "" end
-  local data = file:read "*a"
-  file:close()
-  return data
 end
 
 local function cleanup()
@@ -162,7 +153,6 @@ T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new f
   local dated_files = F.read(dated_files_path)
   local date_at_score_one = dated_files[test_file_a]
   MiniTest.expect.equality(date_at_score_one, date_at_score_one_now)
-  MiniTest.expect.equality(read_sorted(), test_file_a .. "\n")
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeated calls"] = function()
@@ -216,7 +206,6 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
     F.read(dated_files_path)[test_file_b],
     F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
   )
-  MiniTest.expect.equality(read_sorted(), test_file_b .. "\n" .. test_file_a .. "\n")
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = function()
@@ -247,7 +236,6 @@ T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = 
     F.read(dated_files_path)[test_file_b],
     F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
   )
-  MiniTest.expect.equality(read_sorted(), test_file_b .. "\n")
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted files"] = function()
@@ -303,7 +291,6 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
   })
 
   MiniTest.expect.equality(F.read(dated_files_path)[test_file_a], date_at_score_one_now)
-  MiniTest.expect.equality(read_sorted(), test_file_a .. "\n")
 
   F._now = function() return now end
   F.update_file_score(test_file_a, {
@@ -312,7 +299,6 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
   })
 
   MiniTest.expect.equality(F.read(dated_files_path)[test_file_a], nil)
-  MiniTest.expect.equality(read_sorted(), "")
 end
 
 return T
