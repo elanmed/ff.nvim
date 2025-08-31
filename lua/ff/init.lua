@@ -543,6 +543,7 @@ end
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
 --- @field max_results number
+--- @field min_matched_chars number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 
@@ -583,20 +584,23 @@ P.get_find_files = function(opts)
         local rel_file = H.get_rel_file(abs_file)
         if fzy.has_match(query, rel_file) then
           local fzy_score = fzy.score(query, rel_file)
-          local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
-          local hl_idxs = {}
-          if opts.hi_enabled then
-            hl_idxs = fzy.positions(query, rel_file)
-          end
 
-          table.insert(fuzzy_files,
-            {
-              file = abs_file,
-              score = scaled_fzy_score,
-              hl_idxs = hl_idxs,
-              icon_char = nil,
-              icon_hl = nil,
-            })
+          if fzy_score >= opts.min_matched_chars then
+            local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
+            local hl_idxs = {}
+            if opts.hi_enabled then
+              hl_idxs = fzy.positions(query, rel_file)
+            end
+
+            table.insert(fuzzy_files,
+              {
+                file = abs_file,
+                score = scaled_fzy_score,
+                hl_idxs = hl_idxs,
+                icon_char = nil,
+                icon_hl = nil,
+              })
+          end
         end
       end
 
@@ -850,6 +854,7 @@ end
 --- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
 --- @field max_results? number
+--- @field min_matched_chars? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -895,6 +900,7 @@ P.find = function(opts)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
   opts.max_results = H.default(opts.max_results, 200)
+  opts.min_matched_chars = H.default(opts.min_matched_chars, 2)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
   opts.on_picker_open = H.default(opts.on_picker_open, function() end)
@@ -973,6 +979,7 @@ P.find = function(opts)
       hi_enabled = opts.hi_enabled,
       icons_enabled = opts.icons_enabled,
       max_results = opts.max_results,
+      min_matched_chars = opts.min_matched_chars,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
       callback = function(results)

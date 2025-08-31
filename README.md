@@ -66,6 +66,7 @@ vim.keymap.set("n", "<leader>f", function()
     icons_enabled = true,
     hi_enabled = true,
     max_results = 200,
+    min_matched_chars = 2, -- approximate
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
 
@@ -122,6 +123,7 @@ M.setup = function(opts) end
 --- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
 --- @field max_results? number
+--- @field min_matched_chars? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -165,7 +167,8 @@ M.refresh_fd_cache = function(fd_cmd) end
 - Frecency scores are calculated once and cached when the picker is opened - not on every keystroke
 - Open buffers are pulled once and cached when the picker is opened
 - Icons are cached by extension to avoid calling `mini.icons` when possible
-- Results are capped to keep the picker buffer small
+- Results are only processed if they match at least `opts.min_matched_chars` characters (approximately)
+- Results are capped to `opts.max_results` keep the picker buffer small
 - Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around ~50ms per keystroke on a codebase of 30k files. Enable the `benchmark_step`/`benchmark_mean` option to try it for yourself.
