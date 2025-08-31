@@ -305,7 +305,6 @@ local L = {}
 
 --- @param content string
 L.log = function(content)
-  if not L.SHOULD_LOG then return end
   local file = io.open("log.txt", "a")
   if not file then return end
   file:write(content)
@@ -317,14 +316,11 @@ L.LOG_LEN = 100
 
 --- @param content string
 L.log_content = function(content)
-  if not L.SHOULD_LOG then return end
   L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
 end
 
 --- @param type "start"|"middle"|"end"
 L.log_line = function(type)
-  if not L.SHOULD_LOG then return end
-
   local content = ("─"):rep(L.LOG_LEN - 2)
   if type == "start" then
     L.log("┌" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "┐")
@@ -336,16 +332,28 @@ L.log_line = function(type)
 end
 
 --- @param content string
-L.benchmark_heading = function(content)
-  if not L.SHOULD_LOG then return end
-
+L.benchmark_step_heading = function(content)
+  if not L.SHOULD_LOG_STEP then return end
   L.log_line "start"
   L.log_content(content)
   L.log_line "middle"
 end
 
-L.benchmark_closing = function()
-  if not L.SHOULD_LOG then return end
+L.benchmark_step_closing = function()
+  if not L.SHOULD_LOG_STEP then return end
+  L.log_line "end"
+end
+
+--- @param content string
+L.benchmark_mean_heading = function(content)
+  if not L.SHOULD_LOG_MEAN then return end
+  L.log_line "start"
+  L.log_content(content)
+  L.log_line "middle"
+end
+
+L.benchmark_mean_closing = function()
+  if not L.SHOULD_LOG_MEAN then return end
   L.log_line "end"
 end
 
@@ -357,9 +365,7 @@ L.collected_benchmarks = {}
 
 --- @param type "start"|"end"
 --- @param label string
-L.benchmark = function(type, label)
-  if not L.SHOULD_LOG then return end
-
+L.benchmark_step = function(type, label)
   if type == "start" then
     L.ongoing_benchmarks[label] = os.clock()
   else
@@ -368,18 +374,22 @@ L.benchmark = function(type, label)
     local elapsed_ms = (end_time - start_time) * 1000
     local formatted_ms = H.pad_str(H.exact_decimals(elapsed_ms, 3), 8)
 
-    if not L.collected_benchmarks[label] then
-      L.collected_benchmarks[label] = {}
+    if L.SHOULD_LOG_MEAN then
+      if not L.collected_benchmarks[label] then
+        L.collected_benchmarks[label] = {}
+      end
+      table.insert(L.collected_benchmarks[label], elapsed_ms)
     end
-    table.insert(L.collected_benchmarks[label], elapsed_ms)
 
-    local content = ("% sms : %s"):format(formatted_ms, label)
-    L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
+    if L.SHOULD_LOG_STEP then
+      local content = ("% sms : %s"):format(formatted_ms, label)
+      L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
+    end
   end
 end
 
-L.log_collected = function()
-  if not L.SHOULD_LOG then return end
+L.benchmark_mean = function()
+  if not L.SHOULD_LOG_MEAN then return end
 
   for label, benchmarks in pairs(L.collected_benchmarks) do
     local sum = 0
@@ -452,7 +462,7 @@ P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules 
 
 --- @param fd_cmd string
 P.populate_fd_cache = function(fd_cmd)
-  L.benchmark("start", "fd")
+  L.benchmark_step("start", "fd")
   local fd_handle = io.popen(fd_cmd)
   if not fd_handle then
     error "[smart.lua] fd failed!"
@@ -463,7 +473,7 @@ P.populate_fd_cache = function(fd_cmd)
     table.insert(P.caches.fd_files, abs_file)
   end
   fd_handle:close()
-  L.benchmark("end", "fd")
+  L.benchmark_step("end", "fd")
 end
 
 P.populate_frecency_files_cwd_cache = function()
@@ -471,7 +481,7 @@ P.populate_frecency_files_cwd_cache = function()
   local cwd = vim.uv.cwd()
   local sorted_files_path = F.get_sorted_files_path()
 
-  L.benchmark("start", "sorted_files_path fs read")
+  L.benchmark_step("start", "Frecency sorted_files_path fs read")
   if vim.fn.filereadable(sorted_files_path) == H.vimscript_false then
     return
   end
@@ -484,27 +494,27 @@ P.populate_frecency_files_cwd_cache = function()
 
     ::continue::
   end
-  L.benchmark("end", "sorted_files_path fs read")
+  L.benchmark_step("end", "Frecency sorted_files_path fs read")
 end
 
 P.populate_frecency_scores_cache = function()
-  L.benchmark("start", "dated_files fs read")
+  L.benchmark_step("start", "Frecency dated_files fs read")
   local dated_files_path = F.get_dated_files_path()
   local dated_files = F.read(dated_files_path)
-  L.benchmark("end", "dated_files fs read")
+  L.benchmark_step("end", "Frecency dated_files fs read")
 
   local now = os.time()
-  L.benchmark("start", "calculate frecency_file_to_score")
+  L.benchmark_step("start", "Calculate frecency_file_to_score")
   for _, abs_file in ipairs(P.caches.frecency_files) do
     local date_at_score_one = dated_files[abs_file]
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_file] = score
   end
-  L.benchmark("end", "calculate frecency_file_to_score")
+  L.benchmark_step("end", "Calculate frecency_file_to_score")
 end
 
 P.populate_open_buffers_cache = function()
-  L.benchmark("start", "open_buffer_to_score loop")
+  L.benchmark_step("start", "open_buffer_to_score loop")
   local cwd = vim.uv.cwd()
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
@@ -518,7 +528,7 @@ P.populate_open_buffers_cache = function()
 
     ::continue::
   end
-  L.benchmark("end", "open_buffer_to_score loop")
+  L.benchmark_step("end", "open_buffer_to_score loop")
 end
 
 --- @class GetSmartFilesOpts
@@ -540,8 +550,8 @@ end
 P.get_find_files = function(opts)
   local fzy = require "fzy-lua-native"
   local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
-  L.benchmark_heading(("query: '%s'"):format(query))
-  L.benchmark("start", "entire script")
+  L.benchmark_step_heading(("query: '%s'"):format(query))
+  L.benchmark_step("start", "Entire script")
 
   --- @class AnnotatedFile
   --- @field file string
@@ -557,7 +567,7 @@ P.get_find_files = function(opts)
     -- TODO: change type, only need file and score
     --- @type AnnotatedFile[]
     local fuzzy_files = {}
-    L.benchmark("start", "calculate fuzzy_files")
+    L.benchmark_step("start", "Calculate fuzzy_files")
     for idx, abs_file in ipairs(P.caches.fd_files) do
       if query == "" then
         if idx <= opts.max_results then
@@ -594,10 +604,10 @@ P.get_find_files = function(opts)
         coroutine.yield()
       end
     end
-    L.benchmark("end", "calculate fuzzy_files")
+    L.benchmark_step("end", "Calculate fuzzy_files")
 
     local mini_icons = require "mini.icons"
-    L.benchmark("start", "calculate weighted_files")
+    L.benchmark_step("start", "Calculate weighted_files")
     for idx, fuzzy_entry in ipairs(fuzzy_files) do
       local buf_score = 0
 
@@ -661,15 +671,15 @@ P.get_find_files = function(opts)
         coroutine.yield()
       end
     end
-    L.benchmark("end", "calculate weighted_files")
+    L.benchmark_step("end", "Calculate weighted_files")
 
-    L.benchmark("start", "sort weighted_files")
+    L.benchmark_step("start", "Sort weighted_files")
     table.sort(weighted_files, function(a, b)
       return a.score > b.score
     end)
-    L.benchmark("end", "sort weighted_files")
+    L.benchmark_step("end", "Sort weighted_files")
 
-    L.benchmark("start", "format weighted_files")
+    L.benchmark_step("start", "Format weighted_files")
     --- @type string[]
     local formatted_files = {}
     for idx, weighted_entry in ipairs(weighted_files) do
@@ -681,15 +691,15 @@ P.get_find_files = function(opts)
         coroutine.yield()
       end
     end
-    L.benchmark("end", "format weighted_files")
+    L.benchmark_step("end", "Format weighted_files")
 
-    L.benchmark("start", "callback")
+    L.benchmark_step("start", "Callback")
     opts.callback(formatted_files)
-    L.benchmark("end", "callback")
+    L.benchmark_step("end", "Callback")
 
     if not opts.hi_enabled then
-      L.benchmark("end", "entire script")
-      L.benchmark_closing()
+      L.benchmark_step("end", "Entire script")
+      L.benchmark_step_closing()
       return
     end
 
@@ -699,7 +709,7 @@ P.get_find_files = function(opts)
     )
     local icon_char_idx = formatted_score_last_idx + 2
 
-    L.benchmark("start", "highlight loop")
+    L.benchmark_step("start", "Highlight loop")
     for idx, formatted_file in ipairs(formatted_files) do
       local row_0_indexed = idx - 1
 
@@ -733,9 +743,9 @@ P.get_find_files = function(opts)
         coroutine.yield()
       end
     end
-    L.benchmark("end", "highlight loop")
-    L.benchmark("end", "entire script")
-    L.benchmark_closing()
+    L.benchmark_step("end", "Highlight loop")
+    L.benchmark_step("end", "Entire script")
+    L.benchmark_step_closing()
   end)
 
   local function continue_processing()
@@ -754,7 +764,8 @@ end
 --- @field refresh_fd_cache? "module-load"|"find-call"
 --- @field refresh_frecency_scores_cache? "module-load"|"find-call"
 --- @field refresh_open_buffers_cache? "module-load"|"find-call"
---- @field benchmark? boolean
+--- @field benchmark_step? boolean
+--- @field benchmark_mean? boolean
 --- @field fd_cmd? string
 
 P.setup_opts = {}
@@ -772,8 +783,11 @@ M.setup = function(opts)
   P.setup_called = true
 
   opts = H.default(opts, {})
-  opts.benchmark = H.default(opts.benchmark, false)
-  L.SHOULD_LOG = opts.benchmark
+  opts.benchmark_step = H.default(opts.benchmark_step, false)
+  L.SHOULD_LOG_STEP = opts.benchmark_step
+
+  opts.benchmark_mean = H.default(opts.benchmark_mean, false)
+  L.SHOULD_LOG_MEAN = opts.benchmark_mean
 
   opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
   opts.refresh_fd_cache = H.default(
@@ -790,7 +804,7 @@ M.setup = function(opts)
   )
   P.setup_opts = opts
 
-  L.benchmark_heading "Populate file-level caches"
+  L.benchmark_step_heading "Populate file-level caches"
   if opts.refresh_fd_cache == "module-load" then
     P.populate_fd_cache(opts.fd_cmd)
     P.populate_frecency_files_cwd_cache()
@@ -801,7 +815,7 @@ M.setup = function(opts)
   if opts.refresh_open_buffers_cache == "module-load" then
     P.populate_open_buffers_cache()
   end
-  L.benchmark_closing()
+  L.benchmark_step_closing()
 
   vim.api.nvim_create_autocmd({ "BufWinEnter", }, {
     group = vim.api.nvim_create_augroup("FF", { clear = true, }),
@@ -969,7 +983,7 @@ P.find = function(opts)
 
   vim.schedule(
     function()
-      L.benchmark_heading "Populate function-level caches"
+      L.benchmark_step_heading "Populate function-level caches"
       if P.setup_opts.refresh_fd_cache == "find-call" then
         P.populate_fd_cache(P.setup_opts.fd_cmd)
         P.populate_frecency_files_cwd_cache()
@@ -980,16 +994,16 @@ P.find = function(opts)
       if P.setup_opts.refresh_open_buffers_cache == "find-call" then
         P.populate_open_buffers_cache()
       end
-      L.benchmark_closing()
+      L.benchmark_step_closing()
 
       get_find_files_with_query ""
     end
   )
 
   local function close()
-    L.benchmark_heading "Aggregated benchmarks"
-    L.log_collected()
-    L.benchmark_closing()
+    L.benchmark_mean_heading "Aggregated benchmarks"
+    L.benchmark_mean()
+    L.benchmark_mean_closing()
     L.ongoing_benchmarks = {}
     L.collected_benchmarks = {}
 

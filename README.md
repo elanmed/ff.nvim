@@ -21,7 +21,8 @@ ff.setup {
   refresh_fd_cache = "module-load",
   refresh_frecency_scores_cache = "find-call",
   refresh_open_buffers_cache = "find-call",
-  benchmark = false,
+  benchmark_step = false,
+  benchmark_mean = false,
   fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
 }
 
@@ -104,7 +105,8 @@ end)
 --- @field refresh_fd_cache? "module-load"|"find-call"
 --- @field refresh_frecency_scores_cache? "module-load"|"find-call"
 --- @field refresh_open_buffers_cache? "module-load"|"find-call"
---- @field benchmark? boolean
+--- @field benchmark_step? boolean
+--- @field benchmark_mean? boolean
 --- @field fd_cmd? string
 
 --- @param opts? SetupOpts
@@ -166,7 +168,7 @@ M.refresh_fd_cache = function(fd_cmd) end
 - Results are capped to keep the picker buffer small
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around ~50ms per keystroke on a codebase of 30k files. Enable the `benchmark` option to try it for yourself.
+With these optimizations in place, I average around ~50ms per keystroke on a codebase of 30k files. Enable the `benchmark_step`/`benchmark_mean` option to try it for yourself.
 
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
