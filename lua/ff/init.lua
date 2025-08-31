@@ -319,7 +319,7 @@ local L = {}
 
 --- @param content string
 L.log = function(content)
-  local file = io.open("log.txt", "a")
+  local file = io.open("ff.log", "a")
   if not file then return end
   file:write(content)
   file:write "\n"
