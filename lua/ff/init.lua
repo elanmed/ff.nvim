@@ -560,13 +560,15 @@ P.get_find_files = function(opts)
     L.benchmark("start", "calculate fuzzy_files")
     for idx, abs_file in ipairs(P.caches.fd_files) do
       if query == "" then
-        table.insert(fuzzy_files, {
-          file = abs_file,
-          score = 0,
-          hl_idxs = {},
-          icon_char = nil,
-          icon_hl = nil,
-        })
+        if idx <= opts.max_results then
+          table.insert(fuzzy_files, {
+            file = abs_file,
+            score = 0,
+            hl_idxs = {},
+            icon_char = nil,
+            icon_hl = nil,
+          })
+        end
       else
         local rel_file = H.get_rel_file(abs_file)
         if fzy.has_match(query, rel_file) then
