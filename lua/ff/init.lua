@@ -305,6 +305,7 @@ local L = {}
 
 --- @param content string
 L.log = function(content)
+  if not L.SHOULD_LOG then return end
   local file = io.open("log.txt", "a")
   if not file then return end
   file:write(content)
@@ -312,36 +313,52 @@ L.log = function(content)
   file:close()
 end
 
-L.LOG_LEN = 50
+L.LOG_LEN = 100
+
+--- @param content string
+L.log_content = function(content)
+  if not L.SHOULD_LOG then return end
+  L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
+end
 
 --- @param type "start"|"middle"|"end"
-L.benchmark_line = function(type)
-  if not L.LOG then return end
+L.log_line = function(type)
+  if not L.SHOULD_LOG then return end
 
+  local content = ("─"):rep(L.LOG_LEN - 2)
   if type == "start" then
-    L.log("┌" .. ("─"):rep(L.LOG_LEN - 2) .. "┐")
+    L.log("┌" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "┐")
   elseif type == "middle" then
-    L.log("├" .. ("─"):rep(L.LOG_LEN - 2) .. "┤")
-  else
-    L.log("└" .. ("─"):rep(L.LOG_LEN - 2) .. "┘")
+    L.log("├" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "┤")
+  elseif type == "end" then
+    L.log("└" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "┘")
   end
 end
 
 --- @param content string
-L.benchmark_start = function(content)
-  if not L.LOG then return end
+L.benchmark_heading = function(content)
+  if not L.SHOULD_LOG then return end
 
-  L.benchmark_line "start"
-  L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
-  L.benchmark_line "middle"
+  L.log_line "start"
+  L.log_content(content)
+  L.log_line "middle"
 end
 
+L.benchmark_closing = function()
+  if not L.SHOULD_LOG then return end
+  L.log_line "end"
+end
+
+--- @type table<string, number>
 L.ongoing_benchmarks = {}
+
+--- @type table<string, number[]>
+L.collected_benchmarks = {}
 
 --- @param type "start"|"end"
 --- @param label string
 L.benchmark = function(type, label)
-  if not L.LOG then return end
+  if not L.SHOULD_LOG then return end
 
   if type == "start" then
     L.ongoing_benchmarks[label] = os.clock()
@@ -349,8 +366,29 @@ L.benchmark = function(type, label)
     local end_time = os.clock()
     local start_time = L.ongoing_benchmarks[label]
     local elapsed_ms = (end_time - start_time) * 1000
-    local content = ("%.3f : %s"):format(elapsed_ms, label)
+    local formatted_ms = H.pad_str(H.exact_decimals(elapsed_ms, 3), 8)
+
+    if not L.collected_benchmarks[label] then
+      L.collected_benchmarks[label] = {}
+    end
+    table.insert(L.collected_benchmarks[label], elapsed_ms)
+
+    local content = ("% sms : %s"):format(formatted_ms, label)
     L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
+  end
+end
+
+L.log_collected = function()
+  if not L.SHOULD_LOG then return end
+
+  for label, benchmarks in pairs(L.collected_benchmarks) do
+    local sum = 0
+    for _, bench in ipairs(benchmarks) do
+      sum = sum + bench
+    end
+    local mean = sum / #benchmarks
+    local formatted_mean = H.pad_str(H.exact_decimals(mean, 3), 8)
+    L.log_content(("%s ms : %s"):format(formatted_mean, label))
   end
 end
 
@@ -502,7 +540,7 @@ end
 P.get_find_files = function(opts)
   local fzy = require "fzy-lua-native"
   local query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
-  L.benchmark_start(("query: '%s'"):format(query))
+  L.benchmark_heading(("query: '%s'"):format(query))
   L.benchmark("start", "entire script")
 
   --- @class AnnotatedFile
@@ -649,7 +687,7 @@ P.get_find_files = function(opts)
 
     if not opts.hi_enabled then
       L.benchmark("end", "entire script")
-      L.benchmark_line "end"
+      L.benchmark_closing()
       return
     end
 
@@ -695,7 +733,7 @@ P.get_find_files = function(opts)
     end
     L.benchmark("end", "highlight loop")
     L.benchmark("end", "entire script")
-    L.benchmark_line "end"
+    L.benchmark_closing()
   end)
 
   local function continue_processing()
@@ -733,7 +771,7 @@ M.setup = function(opts)
 
   opts = H.default(opts, {})
   opts.benchmark = H.default(opts.benchmark, false)
-  L.LOG = opts.benchmark
+  L.SHOULD_LOG = opts.benchmark
 
   opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
   opts.refresh_fd_cache = H.default(
@@ -750,7 +788,7 @@ M.setup = function(opts)
   )
   P.setup_opts = opts
 
-  L.benchmark_start "Populate file-level caches"
+  L.benchmark_heading "Populate file-level caches"
   if opts.refresh_fd_cache == "module-load" then
     P.populate_fd_cache(opts.fd_cmd)
     P.populate_frecency_files_cwd_cache()
@@ -761,7 +799,7 @@ M.setup = function(opts)
   if opts.refresh_open_buffers_cache == "module-load" then
     P.populate_open_buffers_cache()
   end
-  L.benchmark_line "end"
+  L.benchmark_closing()
 
   vim.api.nvim_create_autocmd({ "BufWinEnter", }, {
     group = vim.api.nvim_create_augroup("FF", { clear = true, }),
@@ -779,7 +817,7 @@ M.setup = function(opts)
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { link = "CursorLine", })
 end
 
---- @param fd_cmd string
+--- @param fd_cmd? string
 M.refresh_fd_cache = function(fd_cmd)
   if not P.setup_called then
     error "[ff.nvim] `setup` must be called before `refresh_fd_cache`!"
@@ -929,7 +967,7 @@ P.find = function(opts)
 
   vim.schedule(
     function()
-      L.benchmark_start "Populate function-level caches"
+      L.benchmark_heading "Populate function-level caches"
       if P.setup_opts.refresh_fd_cache == "find-call" then
         P.populate_fd_cache(P.setup_opts.fd_cmd)
         P.populate_frecency_files_cwd_cache()
@@ -940,13 +978,19 @@ P.find = function(opts)
       if P.setup_opts.refresh_open_buffers_cache == "find-call" then
         P.populate_open_buffers_cache()
       end
-      L.benchmark_line "end"
+      L.benchmark_closing()
 
       get_find_files_with_query ""
     end
   )
 
   local function close()
+    L.benchmark_heading "Aggregated benchmarks"
+    L.log_collected()
+    L.benchmark_closing()
+    L.ongoing_benchmarks = {}
+    L.collected_benchmarks = {}
+
     vim.api.nvim_win_close(input_win, true)
     vim.api.nvim_win_close(results_win, true)
     vim.cmd "stopinsert"
