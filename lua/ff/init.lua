@@ -474,7 +474,7 @@ end
 --- @field hi_enabled boolean
 --- @field max_results_rendered number
 --- @field max_results_considered number
---- @field min_score_to_consider number
+--- @field min_score_considered number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 
@@ -514,7 +514,7 @@ P.get_find_files = function(opts)
 
     local fzy_score = fzy.score(opts.query, rel_file)
     local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
-    if scaled_fzy_score < opts.min_score_to_consider then
+    if scaled_fzy_score < opts.min_score_considered then
       return
     end
 
@@ -799,7 +799,7 @@ end
 --- @field hi_enabled? boolean
 --- @field max_results_rendered? number
 --- @field max_results_considered? number
---- @field min_score_to_consider? number
+--- @field min_score_considered? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -850,7 +850,7 @@ P.find = function(opts)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
   opts.max_results_rendered = H.default(opts.max_results_rendered, 200)
   opts.max_results_considered = H.default(opts.max_results_considered, opts.max_results_rendered * 3)
-  opts.min_score_to_consider = H.default(opts.min_score_to_consider, 10)
+  opts.min_score_considered = H.default(opts.min_score_considered, 10)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
   opts.on_picker_open = H.default(opts.on_picker_open, function() end)
@@ -930,7 +930,7 @@ P.find = function(opts)
       icons_enabled = opts.icons_enabled,
       max_results_rendered = opts.max_results_rendered,
       max_results_considered = opts.max_results_considered,
-      min_score_to_consider = opts.min_score_to_consider,
+      min_score_considered = opts.min_score_considered,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
       callback = function(results)
