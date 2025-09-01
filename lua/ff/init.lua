@@ -103,6 +103,12 @@ H.notify_error = function(msg)
   vim.notify(msg, vim.log.levels.ERROR)
 end
 
+--- @param abs_file string
+H.readable = function(abs_file)
+  local stat_result = vim.uv.fs_stat(abs_file)
+  return stat_result ~= nil and stat_result.type == "file"
+end
+
 -- ======================================================
 -- == Frecency ==========================================
 -- ======================================================
@@ -211,9 +217,7 @@ F.update_file_score = function(filename, opts)
 
   local updated_date_at_score_one = (function()
     if opts.update_type == "increase" then
-      local stat_result = vim.uv.fs_stat(filename)
-      local readable = stat_result ~= nil and stat_result.type == "file"
-      if not readable then
+      if not H.readable(filename) then
         return nil
       end
 
@@ -234,9 +238,7 @@ F.update_file_score = function(filename, opts)
 
   local readable_dated_files_cwd = {}
   for dated_file, date_at_score_one in pairs(dated_files[cwd]) do
-    local stat_result = vim.uv.fs_stat(dated_file)
-    local readable = stat_result ~= nil and stat_result.type == "file"
-    if readable then
+    if not H.readable(dated_file) then
       readable_dated_files_cwd[dated_file] = date_at_score_one
     end
   end
@@ -438,9 +440,13 @@ P.populate_frecency_scores_cache = function()
   local now = os.time()
   L.benchmark_step("start", "Calculate frecency_file_to_score")
   for abs_file, date_at_score_one in pairs(dated_files[cwd]) do
+    if not H.readable(abs_file) then goto continue end
+
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_file] = score
     table.insert(P.caches.frecency_files, abs_file)
+
+    ::continue::
   end
   L.benchmark_step("end", "Calculate frecency_file_to_score")
 end
