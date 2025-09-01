@@ -238,7 +238,7 @@ F.update_file_score = function(filename, opts)
 
   local readable_dated_files_cwd = {}
   for dated_file, date_at_score_one in pairs(dated_files[cwd]) do
-    if not H.readable(dated_file) then
+    if H.readable(dated_file) then
       readable_dated_files_cwd[dated_file] = date_at_score_one
     end
   end
