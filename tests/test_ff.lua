@@ -38,6 +38,7 @@ T["H"]["#get_ext"]["returns the extension"] = function()
   MiniTest.expect.equality(H.get_ext "path/to/file.txt", "txt")
   MiniTest.expect.equality(H.get_ext "path/to/file.min.txt", "txt")
   MiniTest.expect.equality(H.get_ext "path/to/file", nil)
+  MiniTest.expect.equality(H.get_ext ".gitignore", nil)
   MiniTest.expect.equality(H.get_ext "", nil)
 end
 
@@ -51,6 +52,8 @@ T["H"]["#basename"]["returns the basename with and without an extension"] = func
   MiniTest.expect.equality(H.basename("path/to/file", { with_ext = false, }), "file")
   MiniTest.expect.equality(H.basename("file.txt", { with_ext = true, }), "file.txt")
   MiniTest.expect.equality(H.basename("file.txt", { with_ext = false, }), "file")
+  MiniTest.expect.equality(H.basename(".gitignore", { with_ext = true, }), ".gitignore")
+  MiniTest.expect.equality(H.basename(".gitignore", { with_ext = false, }), ".gitignore")
   MiniTest.expect.equality(H.basename("", { with_ext = true, }), "")
   MiniTest.expect.equality(H.basename("", { with_ext = false, }), "")
 end

@@ -29,11 +29,12 @@ end
 --- @param opts { with_ext: boolean }
 H.basename = function(path, opts)
   if path == "" then return path end
-  local basename = path:match "([^/\\]+)$"
+  --- @type string
+  local basename = vim.fs.basename(path)
   if opts.with_ext then return basename end
 
   local first_dot_pos = basename:find "%."
-  if first_dot_pos then
+  if first_dot_pos and first_dot_pos > 1 then
     return basename:sub(1, first_dot_pos - 1)
   end
   return basename
@@ -41,8 +42,8 @@ end
 
 --- @param filename string
 H.get_ext = function(filename)
-  local last_dot_pos = filename:find "%.[^.]+$"
-  if last_dot_pos then
+  local last_dot_pos = filename:find "%.[^.]*$"
+  if last_dot_pos and last_dot_pos > 1 then
     return filename:sub(last_dot_pos + 1)
   end
   return nil
