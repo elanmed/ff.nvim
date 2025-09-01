@@ -1008,6 +1008,7 @@ P.find = function(opts)
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = results_win, })
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
+    group = vim.api.nvim_create_augroup("ff", { clear = true, }),
     buffer = input_buf,
     callback = function()
       P.tick = P.tick + 1
