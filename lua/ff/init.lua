@@ -980,7 +980,8 @@ P.find = function(opts)
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
-        if vim.api.nvim_buf_line_count(results_buf) == 0 then return end
+        local line_count = vim.api.nvim_buf_line_count(results_buf)
+        if line_count == 0 then return end
 
         if vim.api.nvim_win_get_cursor(results_win)[1] == line_count then
           vim.cmd "normal! gg"
@@ -992,7 +993,8 @@ P.find = function(opts)
     end,
     prev = function()
       vim.api.nvim_win_call(results_win, function()
-        if vim.api.nvim_buf_line_count(results_buf) == 0 then return end
+        local line_count = vim.api.nvim_buf_line_count(results_buf)
+        if line_count == 0 then return end
 
         if vim.api.nvim_win_get_cursor(results_win)[1] == 1 then
           vim.cmd "normal! G"
