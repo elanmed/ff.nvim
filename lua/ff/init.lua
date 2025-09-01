@@ -393,6 +393,9 @@ P.caches = {
   --- @type string[]
   fd_files = {},
 
+  --- @type string[]
+  frecency_files = {},
+
   --- @type table<string, number>
   frecency_file_to_score = {},
 
@@ -407,6 +410,8 @@ P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules 
 
 --- @param fd_cmd string
 P.populate_fd_cache = function(fd_cmd)
+  P.caches.fd_files = {}
+
   L.benchmark_step("start", "fd")
   local fd_handle = io.popen(fd_cmd)
   if not fd_handle then
@@ -422,22 +427,31 @@ P.populate_fd_cache = function(fd_cmd)
 end
 
 P.populate_frecency_scores_cache = function()
+  P.caches.frecency_files = {}
+  P.caches.frecency_file_to_score = {}
+
   L.benchmark_step("start", "Frecency dated_files fs read")
+  local cwd = vim.uv.cwd()
   local dated_files_path = F.get_dated_files_path()
   local dated_files = F.read(dated_files_path)
+  if not dated_files[cwd] then
+    dated_files[cwd] = {}
+  end
   L.benchmark_step("end", "Frecency dated_files fs read")
 
   local now = os.time()
-  local cwd = vim.uv.cwd()
   L.benchmark_step("start", "Calculate frecency_file_to_score")
-  for abs_file, date_at_score_one in ipairs(dated_files[cwd]) do
+  for abs_file, date_at_score_one in pairs(dated_files[cwd]) do
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_file] = score
+    table.insert(P.caches.frecency_files, abs_file)
   end
   L.benchmark_step("end", "Calculate frecency_file_to_score")
 end
 
 P.populate_open_buffers_cache = function()
+  P.caches.open_buffer_to_score = {}
+
   L.benchmark_step("start", "open_buffer_to_score loop")
   local cwd = vim.uv.cwd()
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
@@ -466,8 +480,9 @@ end
 --- @field batch_size number
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
---- @field max_results number
---- @field min_matched_chars number
+--- @field max_results_rendered number
+--- @field max_results_considered number
+--- @field min_score_to_consider number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 
@@ -478,55 +493,77 @@ P.get_find_files = function(opts)
   L.benchmark_step_heading(("query: '%s'"):format(opts.query))
   L.benchmark_step("start", "Entire script")
 
-  --- @class AnnotatedFile
+
+  --- @class ConsideredFile
   --- @field file string
   --- @field score number
   --- @field hl_idxs table
+
+  --- @class WeightedFile : ConsideredFile
   --- @field icon_char string
   --- @field icon_hl string
 
-  --- @type AnnotatedFile[]
-  local weighted_files = {}
+  --- @param considered_files ConsideredFile[]
+  --- @param abs_file string
+  local function populate_considered_files(considered_files, abs_file)
+    if #considered_files > opts.max_results_considered then return true end
+
+    if opts.query == "" then
+      table.insert(considered_files, {
+        file = abs_file,
+        score = 0,
+        hl_idxs = {},
+      })
+      return false
+    end
+
+    local rel_file = H.get_rel_file(abs_file)
+    if not fzy.has_match(opts.query, rel_file) then
+      return false
+    end
+
+    local fzy_score = fzy.score(opts.query, rel_file)
+    local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
+    if scaled_fzy_score < opts.min_score_to_consider then
+      return false
+    end
+
+    local hl_idxs = {}
+    if opts.hi_enabled then
+      hl_idxs = fzy.positions(opts.query, rel_file)
+    end
+    table.insert(considered_files,
+      {
+        file = abs_file,
+        score = scaled_fzy_score,
+        hl_idxs = hl_idxs,
+      })
+    return false
+  end
 
   local process_files = coroutine.create(function()
-    -- TODO: change type, only need file and score
-    --- @type AnnotatedFile[]
-    local fuzzy_files = {}
-    L.benchmark_step("start", "Calculate fuzzy_files with fd")
-    for idx, abs_file in ipairs(P.caches.fd_files) do
-      if opts.query == "" then
-        if idx <= opts.max_results then
-          table.insert(fuzzy_files, {
-            file = abs_file,
-            score = 0,
-            hl_idxs = {},
-            icon_char = nil,
-            icon_hl = nil,
-          })
-        end
-      else
-        local rel_file = H.get_rel_file(abs_file)
-        if fzy.has_match(opts.query, rel_file) then
-          local fzy_score = fzy.score(opts.query, rel_file)
+    --- @type ConsideredFile[]
+    local considered_files = {}
 
-          if fzy_score >= opts.min_matched_chars then
-            local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
-            local hl_idxs = {}
-            if opts.hi_enabled then
-              hl_idxs = fzy.positions(opts.query, rel_file)
-            end
+    L.benchmark_step("start", "Populate considered_files with frecency")
+    for idx, abs_file in pairs(P.caches.frecency_files) do
+      local should_break = populate_considered_files(considered_files, abs_file)
+      if should_break then break end
 
-            table.insert(fuzzy_files,
-              {
-                file = abs_file,
-                score = scaled_fzy_score,
-                hl_idxs = hl_idxs,
-                icon_char = nil,
-                icon_hl = nil,
-              })
-          end
-        end
+      if idx % opts.batch_size == 0 then
+        coroutine.yield()
       end
+    end
+    L.benchmark_step("end", "Populate considered_files with frecency")
+
+    L.benchmark_step("start", "Populate considered_files with fd")
+    for idx, abs_file in ipairs(P.caches.fd_files) do
+      if P.caches.frecency_file_to_score[abs_file] ~= nil then
+        goto continue
+      end
+
+      local should_break = populate_considered_files(considered_files, abs_file)
+      if should_break then break end
 
       if idx % opts.batch_size == 0 then
         coroutine.yield()
@@ -534,11 +571,14 @@ P.get_find_files = function(opts)
 
       ::continue::
     end
-    L.benchmark_step("end", "Calculate fuzzy_files with fd")
+    L.benchmark_step("end", "Populate considered_files with fd")
 
+    --- @type WeightedFile[]
+    local weighted_files = {}
     local mini_icons = require "mini.icons"
+
     L.benchmark_step("start", "Calculate weighted_files")
-    for idx, fuzzy_entry in ipairs(fuzzy_files) do
+    for idx, fuzzy_entry in ipairs(considered_files) do
       local buf_score = 0
 
       local abs_file = fuzzy_entry.file
@@ -617,7 +657,7 @@ P.get_find_files = function(opts)
     --- @type string[]
     local formatted_files = {}
     for idx, weighted_entry in ipairs(weighted_files) do
-      if idx > opts.max_results then break end
+      if idx > opts.max_results_rendered then break end
 
       local formatted = P.format_filename(weighted_entry.file, weighted_entry.score, weighted_entry.icon_char)
       table.insert(formatted_files, formatted)
@@ -751,7 +791,7 @@ M.setup = function(opts)
   L.benchmark_step_closing()
 
   vim.api.nvim_create_autocmd({ "BufWinEnter", }, {
-    group = vim.api.nvim_create_augroup("FF", { clear = true, }),
+    group = vim.api.nvim_create_augroup("ff", { clear = true, }),
     callback = function(ev)
       local current_win = vim.api.nvim_get_current_win()
       -- :h nvim_win_get_config({window}) "relative is empty for normal buffers"
@@ -781,8 +821,9 @@ end
 --- @field batch_size? number
 --- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
---- @field max_results? number
---- @field min_matched_chars? number
+--- @field max_results_rendered? number
+--- @field max_results_considered? number
+--- @field min_score_to_consider? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -830,8 +871,9 @@ P.find = function(opts)
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
-  opts.max_results = H.default(opts.max_results, 200)
-  opts.min_matched_chars = H.default(opts.min_matched_chars, 2)
+  opts.max_results_rendered = H.default(opts.max_results_rendered, 200)
+  opts.max_results_considered = H.default(opts.max_results_considered, opts.max_results_rendered * 3)
+  opts.min_score_to_consider = H.default(opts.min_score_to_consider, 10)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
   opts.on_picker_open = H.default(opts.on_picker_open, function() end)
@@ -909,8 +951,9 @@ P.find = function(opts)
       batch_size = opts.batch_size,
       hi_enabled = opts.hi_enabled,
       icons_enabled = opts.icons_enabled,
-      max_results = opts.max_results,
-      min_matched_chars = opts.min_matched_chars,
+      max_results_rendered = opts.max_results_rendered,
+      max_results_considered = opts.max_results_considered,
+      min_score_to_consider = opts.min_score_to_consider,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
       callback = function(results)
