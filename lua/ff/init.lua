@@ -969,7 +969,6 @@ P.find = function(opts)
     vim.cmd "stopinsert"
   end
 
-  local current_line = 1
   local keymap_fns = {
     select = function()
       vim.api.nvim_set_current_win(results_win)
@@ -979,7 +978,11 @@ P.find = function(opts)
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
-        if current_line == vim.api.nvim_buf_line_count(results_buf) then
+        local line_count = vim.api.nvim_buf_line_count(results_buf)
+        if line_count == 0 then return end
+
+        local current_line = vim.api.nvim_win_get_cursor(results_win)[1]
+        if current_line == line_count then
           current_line = 1
           vim.cmd "normal! gg"
         else
@@ -987,26 +990,36 @@ P.find = function(opts)
           vim.cmd "normal! j"
         end
 
+        local current_line_0_indexed = current_line - 1
+        local next_line_0_indexed = current_line_0_indexed + 1
+
         vim.hl.range(results_buf, P.ns_id, "Search",
-          { current_line, vim.o.columns, },
-          { current_line, vim.o.columns, },
+          { next_line_0_indexed, vim.o.columns, },
+          { next_line_0_indexed, vim.o.columns, },
           { inclusive = true, }
         )
       end)
     end,
     prev = function()
       vim.api.nvim_win_call(results_win, function()
+        local line_count = vim.api.nvim_buf_line_count(results_buf)
+        if line_count == 0 then return end
+
+        local current_line = vim.api.nvim_win_get_cursor(results_win)[1]
         if current_line == 1 then
-          current_line = vim.api.nvim_buf_line_count(results_buf)
+          current_line = line_count
           vim.cmd "normal! G"
         else
           current_line = current_line - 1
           vim.cmd "normal! k"
         end
 
+        local current_line_0_indexed = current_line - 1
+        local next_line_0_indexed = current_line_0_indexed + 1
+
         vim.hl.range(results_buf, P.ns_id, "Search",
-          { current_line, vim.o.columns, },
-          { current_line, vim.o.columns, },
+          { next_line_0_indexed, vim.o.columns, },
+          { next_line_0_indexed, vim.o.columns, },
           { inclusive = true, }
         )
       end)
