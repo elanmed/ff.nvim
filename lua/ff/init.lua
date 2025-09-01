@@ -257,8 +257,7 @@ local L = {}
 L.log = function(content)
   local file = io.open("ff.log", "a")
   if not file then return end
-  file:write(content)
-  file:write "\n"
+  file:write(content .. "\n")
   file:close()
 end
 
@@ -363,8 +362,8 @@ P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 -- [-math.huge, math.huge]
 -- just below math.huge is approx the length of the string
 -- just above -math.huge is approx 0
-P.MAX_FZY_SCORE = 20
-P.MAX_FRECENCY_SCORE = 99
+P.MAX_FZY_SCORE = 20 -- approx the longest reasonable query
+P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @param rel_file string
@@ -376,12 +375,11 @@ P.format_filename = function(rel_file, score, icon_char)
     P.MAX_SCORE_LEN
   )
   local formatted_icon_char = icon_char and icon_char .. " " or ""
-  local formatted_filename = ("%s %s%s"):format(
+  return ("%s %s%s"):format(
     formatted_score,
     formatted_icon_char,
     rel_file
   )
-  return formatted_filename
 end
 
 --- @param fzy_score number
@@ -415,7 +413,8 @@ P.populate_fd_cache = function(fd_cmd)
   P.caches.fd_files = {}
 
   L.benchmark_step("start", "fd")
-  vim.system(vim.split(fd_cmd, " "), { text = true, }, function(obj)
+  local fd_cmd_tbl = vim.split(fd_cmd, " ")
+  vim.system(fd_cmd_tbl, { text = true, }, function(obj)
     local lines = vim.split(obj.stdout, "\n")
     for _, abs_file in ipairs(lines) do
       table.insert(P.caches.fd_files, abs_file)
@@ -441,7 +440,6 @@ P.populate_frecency_scores_cache = function()
   L.benchmark_step("start", "Calculate frecency_file_to_score")
   for abs_file, date_at_score_one in pairs(dated_files[cwd]) do
     if not H.readable(abs_file) then goto continue end
-
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_file] = score
     table.insert(P.caches.frecency_files, abs_file)
