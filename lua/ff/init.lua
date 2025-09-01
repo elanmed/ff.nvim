@@ -68,7 +68,7 @@ end
 --- @param num number
 --- @param decimals number
 H.min_decimals = function(num, decimals)
-  return string.format("%." .. decimals .. "f", num)
+  return string.format("%." .. tostring(decimals) .. "f", num)
 end
 
 --- @param num number
