@@ -414,12 +414,11 @@ P.populate_fd_cache = function(fd_cmd)
 
   L.benchmark_step("start", "fd")
   local fd_cmd_tbl = vim.split(fd_cmd, " ")
-  vim.system(fd_cmd_tbl, { text = true, }, function(obj)
-    local lines = vim.split(obj.stdout, "\n")
-    for _, abs_file in ipairs(lines) do
-      table.insert(P.caches.fd_files, abs_file)
-    end
-  end)
+  local obj = vim.system(fd_cmd_tbl, { text = true, }):wait()
+  local lines = vim.split(obj.stdout, "\n")
+  for _, abs_file in ipairs(lines) do
+    table.insert(P.caches.fd_files, abs_file)
+  end
   L.benchmark_step("end", "fd")
 end
 
