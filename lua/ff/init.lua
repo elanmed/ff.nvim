@@ -736,8 +736,6 @@ end
 
 --- @class SetupOpts
 --- @field refresh_fd_cache? "module-load"|"find-call"
---- @field refresh_frecency_scores_cache? "module-load"|"find-call"
---- @field refresh_open_buffers_cache? "module-load"|"find-call"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field fd_cmd? string
@@ -745,8 +743,6 @@ end
 P.setup_opts = {}
 P.setup_opts_defaults = {
   refresh_fd_cache = "module-load",
-  refresh_frecency_scores_cache = "find-call",
-  refresh_open_buffers_cache = "find-call",
 }
 
 P.setup_called = false
@@ -764,29 +760,12 @@ M.setup = function(opts)
   L.SHOULD_LOG_MEAN = opts.benchmark_mean
 
   opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
-  opts.refresh_fd_cache = H.default(
-    opts.refresh_fd_cache,
-    P.setup_opts_defaults.refresh_fd_cache
-  )
-  opts.refresh_frecency_scores_cache = H.default(
-    opts.refresh_frecency_scores_cache,
-    P.setup_opts_defaults.refresh_frecency_scores_cache
-  )
-  opts.refresh_open_buffers_cache = H.default(
-    opts.refresh_open_buffers_cache,
-    P.setup_opts_defaults.refresh_open_buffers_cache
-  )
+  opts.refresh_fd_cache = H.default(opts.refresh_fd_cache, P.setup_opts_defaults.refresh_fd_cache)
   P.setup_opts = opts
 
   L.benchmark_step_heading "Populate file-level caches"
   if opts.refresh_fd_cache == "module-load" then
     P.populate_fd_cache(opts.fd_cmd)
-  end
-  if opts.refresh_frecency_scores_cache == "module-load" then
-    P.populate_frecency_scores_cache()
-  end
-  if opts.refresh_open_buffers_cache == "module-load" then
-    P.populate_open_buffers_cache()
   end
   L.benchmark_step_closing()
 
@@ -968,12 +947,8 @@ P.find = function(opts)
       if P.setup_opts.refresh_fd_cache == "find-call" then
         P.populate_fd_cache(P.setup_opts.fd_cmd)
       end
-      if P.setup_opts.refresh_frecency_scores_cache == "find-call" then
-        P.populate_frecency_scores_cache()
-      end
-      if P.setup_opts.refresh_open_buffers_cache == "find-call" then
-        P.populate_open_buffers_cache()
-      end
+      P.populate_frecency_scores_cache()
+      P.populate_open_buffers_cache()
       L.benchmark_step_closing()
 
       get_find_files_with_query ""

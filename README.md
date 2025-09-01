@@ -20,8 +20,6 @@ local ff = require "ff"
 ff.setup {
   -- defaults to:
   refresh_fd_cache = "module-load",
-  refresh_frecency_scores_cache = "find-call",
-  refresh_open_buffers_cache = "find-call",
   benchmark_step = false,
   benchmark_mean = false,
   fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
@@ -106,8 +104,6 @@ end)
 ```lua 
 --- @class SetupOpts
 --- @field refresh_fd_cache? "module-load"|"find-call"
---- @field refresh_frecency_scores_cache? "module-load"|"find-call"
---- @field refresh_open_buffers_cache? "module-load"|"find-call"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field fd_cmd? string
