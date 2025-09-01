@@ -274,11 +274,11 @@ end
 L.log_line = function(type)
   local content = ("─"):rep(L.LOG_LEN - 2)
   if type == "start" then
-    L.log("┌" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "┐")
+    L.log("┌" .. content .. (" "):rep(L.LOG_LEN - #content) .. "┐")
   elseif type == "middle" then
-    L.log("├" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "┤")
+    L.log("├" .. content .. (" "):rep(L.LOG_LEN - #content) .. "┤")
   elseif type == "end" then
-    L.log("└" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "┘")
+    L.log("└" .. content .. (" "):rep(L.LOG_LEN - #content) .. "┘")
   end
 end
 
