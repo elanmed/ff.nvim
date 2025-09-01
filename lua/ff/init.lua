@@ -411,7 +411,7 @@ P.populate_fd_cache = function(fd_cmd)
   L.benchmark_step("start", "fd")
   local fd_handle = io.popen(fd_cmd)
   if not fd_handle then
-    error "[smart.lua] fd failed!"
+    N.notify_error "[ff.nvim]: fd failed"
     return
   end
 
