@@ -176,7 +176,7 @@ M.refresh_fd_cache = function(fd_cmd) end
 - Rendered results are capped to `opts.max_results_rendered` keep the picker buffer small
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around ~50ms per keystroke on a codebase of 30k files. Enable the `benchmark_step`/`benchmark_mean` option to try it for yourself.
+With these optimizations in place, I average around ~40ms per keystroke on a codebase of 50k files. Enable the `benchmark_step`/`benchmark_mean` option to try it for yourself.
 
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
