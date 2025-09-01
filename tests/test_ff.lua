@@ -13,14 +13,10 @@ T["H"]["#default"]["returns default when value is nil"] = function()
   MiniTest.expect.equality(H.default(nil, false), false)
 end
 
-local vim_uv_cwd = vim.uv.cwd
 T["H"]["#rel_file"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      vim.uv.cwd = function() return "path/to/dir" end
-    end,
-    post_case = function()
-      vim.uv.cwd = vim_uv_cwd
+      H.cwd = "path/to/dir"
     end,
   },
 }
@@ -141,13 +137,10 @@ end
 T["F"]["#update_file_score"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      vim.uv.cwd = function() return cwd end
+      H.cwd = cwd
       cleanup()
     end,
-    post_case = function()
-      vim.uv.cwd = vim_uv_cwd
-      cleanup()
-    end,
+    post_case = cleanup,
     post_once = function()
       vim.fn.delete(root_dir, "rf")
     end,

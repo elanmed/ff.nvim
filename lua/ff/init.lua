@@ -5,6 +5,7 @@ local M = {}
 -- ======================================================
 
 local H = {}
+H.cwd = vim.uv.cwd()
 
 --- @generic T
 --- @param val T | nil
@@ -20,9 +21,8 @@ end
 --- @param abs_file string
 H.rel_file = function(abs_file)
   --- @type string
-  local cwd = vim.uv.cwd()
-  if not vim.startswith(abs_file, cwd) then return abs_file end
-  return abs_file:sub(#cwd + 2)
+  if not vim.startswith(abs_file, H.cwd) then return abs_file end
+  return abs_file:sub(#H.cwd + 2)
 end
 
 --- @param path string
@@ -207,14 +207,13 @@ end
 --- @param filename string
 --- @param opts UpdateFileScoreOpts
 F.update_file_score = function(filename, opts)
-  local cwd = vim.uv.cwd()
   local now = F._now()
 
   opts._db_dir = H.default(opts._db_dir, F.default_db_dir)
   local dated_files_path = F.get_dated_files_path(opts._db_dir)
   local dated_files = F.read(dated_files_path)
-  if not dated_files[cwd] then
-    dated_files[cwd] = {}
+  if not dated_files[H.cwd] then
+    dated_files[H.cwd] = {}
   end
 
   local updated_date_at_score_one = (function()
@@ -224,7 +223,7 @@ F.update_file_score = function(filename, opts)
       end
 
       local score = 0
-      local date_at_score_one = dated_files[cwd][filename]
+      local date_at_score_one = dated_files[H.cwd][filename]
       if date_at_score_one then
         score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
       end
@@ -236,16 +235,16 @@ F.update_file_score = function(filename, opts)
     return nil
   end)()
 
-  dated_files[cwd][filename] = updated_date_at_score_one
+  dated_files[H.cwd][filename] = updated_date_at_score_one
 
   local readable_dated_files_cwd = {}
-  for dated_file, date_at_score_one in pairs(dated_files[cwd]) do
+  for dated_file, date_at_score_one in pairs(dated_files[H.cwd]) do
     if H.readable(dated_file) then
       readable_dated_files_cwd[dated_file] = date_at_score_one
     end
   end
 
-  dated_files[cwd] = readable_dated_files_cwd
+  dated_files[H.cwd] = readable_dated_files_cwd
   F.write(dated_files_path, dated_files)
 end
 
@@ -435,17 +434,16 @@ P.populate_frecency_scores_cache = function()
   P.caches.frecency_file_to_score = {}
 
   L.benchmark_step("start", "Frecency dated_files fs read")
-  local cwd = vim.uv.cwd()
   local dated_files_path = F.get_dated_files_path()
   local dated_files = F.read(dated_files_path)
-  if not dated_files[cwd] then
-    dated_files[cwd] = {}
+  if not dated_files[H.cwd] then
+    dated_files[H.cwd] = {}
   end
   L.benchmark_step("end", "Frecency dated_files fs read")
 
   local now = os.time()
   L.benchmark_step("start", "Calculate frecency_file_to_score")
-  for abs_file, date_at_score_one in pairs(dated_files[cwd]) do
+  for abs_file, date_at_score_one in pairs(dated_files[H.cwd]) do
     if not H.readable(abs_file) then goto continue end
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_file] = score
@@ -460,14 +458,13 @@ P.populate_open_buffers_cache = function()
   P.caches.open_buffer_to_modified = {}
 
   L.benchmark_step("start", "open_buffer_to_modified loop")
-  local cwd = vim.uv.cwd()
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
     if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then goto continue end
     local buf_name = vim.api.nvim_buf_get_name(bufnr)
     if buf_name == nil then goto continue end
     if buf_name == "" then goto continue end
-    if not vim.startswith(buf_name, cwd) then goto continue end
+    if not vim.startswith(buf_name, H.cwd) then goto continue end
 
     local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
     P.caches.open_buffer_to_modified[buf_name] = modified
@@ -848,6 +845,7 @@ P.find = function(opts)
     H.notify_error "[ff.nvim]: `setup` must be called before `find`"
     return
   end
+  H.cwd = vim.uv.cwd()
   opts = H.default(opts, {})
   opts.keymaps = H.default(opts.keymaps, {})
   opts.keymaps.i = H.default(opts.keymaps.i, {})
