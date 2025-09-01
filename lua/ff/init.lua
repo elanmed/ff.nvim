@@ -109,21 +109,10 @@ H.vimscript_false = 0
 
 local N = {}
 
---- @param level vim.log.levels
---- @param msg string
---- @param ... any
-N._notify = function(level, msg, ...)
-  msg = msg or ""
-  msg = "[ff.nvim]: " .. msg
-
-  local rest = ...
-  vim.notify(msg:format(rest), level)
-end
 
 --- @param msg string
---- @param ... any
-N.notify_error = function(msg, ...)
-  N._notify(vim.log.levels.ERROR, msg, ...)
+N.notify_error = function(msg)
+  vim.notify(msg, vim.log.levels.ERROR)
 end
 
 -- ======================================================
@@ -154,7 +143,7 @@ F.read = function(path)
   -- vim.json.decode will throw
   local decode_ok, decoded_data = pcall(vim.json.decode, encoded_data)
   if not decode_ok then
-    N.notify_error("ERROR: vim.json.decode threw: %s", decoded_data)
+    N.notify_error "[ff.nvim]: vim.json.decode threw"
     return {}
   end
   return decoded_data
@@ -168,14 +157,14 @@ F.write = function(path, data)
   local path_dir = vim.fs.dirname(path)
   local mkdir_res = vim.fn.mkdir(path_dir, "p")
   if mkdir_res == H.vimscript_false then
-    N.notify_error "ERROR: vim.fn.mkdir returned vimscript_false"
+    N.notify_error "[ff.nvim]: vim.fn.mkdir returned vimscript_false"
     return
   end
 
   -- io.open won't throw
   local file = io.open(path, "w")
   if file == nil then
-    N.notify_error("ERROR: io.open failed to open the file created with vim.fn.mkdir at path: %s", path)
+    N.notify_error "[ff.nvim]: io.open failed to open the file created with vim.fn.mkdir"
     return
   end
 
@@ -184,7 +173,7 @@ F.write = function(path, data)
   if encode_ok then
     file:write(encoded_data)
   else
-    N.notify_error("ERROR: vim.json.encode threw: %s", encoded_data)
+    N.notify_error "[ff.nvim]: vim.json.encode threw"
   end
 
   file:close()
@@ -781,7 +770,7 @@ end
 --- @param fd_cmd? string
 M.refresh_fd_cache = function(fd_cmd)
   if not P.setup_called then
-    error "[ff.nvim] `setup` must be called before `refresh_fd_cache`!"
+    N.notify_error "[ff.nvim]: `setup` must be called before `refresh_fd_cache`"
   end
   fd_cmd = H.default(fd_cmd, P.setup_opts.fd_cmd)
   P.populate_fd_cache(fd_cmd)
@@ -824,7 +813,8 @@ end
 --- @param opts? FindOpts
 P.find = function(opts)
   if not P.setup_called then
-    error "[ff.nvim] `setup` must be called before `find`!"
+    N.notify_error "[ff.nvim]: `setup` must be called before `find`"
+    return
   end
   opts = H.default(opts, {})
   opts.keymaps = H.default(opts.keymaps, {})
