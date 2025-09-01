@@ -771,7 +771,7 @@ M.setup = function(opts)
   L.benchmark_step_closing()
 
   vim.api.nvim_create_autocmd({ "BufWinEnter", }, {
-    group = vim.api.nvim_create_augroup("ff_setup", { clear = true, }),
+    group = vim.api.nvim_create_augroup("FFSetup", { clear = true, }),
     callback = function(ev)
       local current_win = vim.api.nvim_get_current_win()
       -- :h nvim_win_get_config({window}) "relative is empty for normal buffers"
@@ -978,50 +978,26 @@ P.find = function(opts)
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
-        local line_count = vim.api.nvim_buf_line_count(results_buf)
-        if line_count == 0 then return end
+        if vim.api.nvim_buf_line_count(results_buf) == 0 then return end
 
-        local current_line = vim.api.nvim_win_get_cursor(results_win)[1]
-        if current_line == line_count then
-          current_line = 1
+        if vim.api.nvim_win_get_cursor(results_win)[1] == line_count then
           vim.cmd "normal! gg"
         else
-          current_line = current_line + 1
           vim.cmd "normal! j"
         end
-
-        local current_line_0_indexed = current_line - 1
-        local next_line_0_indexed = current_line_0_indexed + 1
-
-        vim.hl.range(results_buf, P.ns_id, "Search",
-          { next_line_0_indexed, vim.o.columns, },
-          { next_line_0_indexed, vim.o.columns, },
-          { inclusive = true, }
-        )
+        vim.cmd "redraw"
       end)
     end,
     prev = function()
       vim.api.nvim_win_call(results_win, function()
-        local line_count = vim.api.nvim_buf_line_count(results_buf)
-        if line_count == 0 then return end
+        if vim.api.nvim_buf_line_count(results_buf) == 0 then return end
 
-        local current_line = vim.api.nvim_win_get_cursor(results_win)[1]
-        if current_line == 1 then
-          current_line = line_count
+        if vim.api.nvim_win_get_cursor(results_win)[1] == 1 then
           vim.cmd "normal! G"
         else
-          current_line = current_line - 1
           vim.cmd "normal! k"
         end
-
-        local current_line_0_indexed = current_line - 1
-        local next_line_0_indexed = current_line_0_indexed + 1
-
-        vim.hl.range(results_buf, P.ns_id, "Search",
-          { next_line_0_indexed, vim.o.columns, },
-          { next_line_0_indexed, vim.o.columns, },
-          { inclusive = true, }
-        )
+        vim.cmd "redraw"
       end)
     end,
     close = close,
@@ -1042,7 +1018,7 @@ P.find = function(opts)
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = results_win, })
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
-    group = vim.api.nvim_create_augroup("ff_picker", { clear = true, }),
+    group = vim.api.nvim_create_augroup("FFPicker", { clear = true, }),
     buffer = input_buf,
     callback = function()
       P.tick = P.tick + 1
