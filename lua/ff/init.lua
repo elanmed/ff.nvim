@@ -99,8 +99,10 @@ H.vimscript_true = 1
 H.vimscript_false = 0
 
 --- @param msg string
-H.notify_error = function(msg)
-  vim.notify(msg, vim.log.levels.ERROR)
+--- @param ... any
+H.notify_error = function(msg, ...)
+  local formatted = msg:format(...)
+  vim.notify(formatted, vim.log.levels.ERROR)
 end
 
 --- @param abs_file string
@@ -137,7 +139,7 @@ F.read = function(path)
   -- vim.json.decode will throw
   local decode_ok, decoded_data = pcall(vim.json.decode, encoded_data)
   if not decode_ok then
-    H.notify_error "[ff.nvim]: vim.json.decode threw"
+    H.notify_error("[ff.nvim]: vim.json.decode threw: %s", vim.inspect(decoded_data))
     return {}
   end
   return decoded_data
@@ -167,7 +169,7 @@ F.write = function(path, data)
   if encode_ok then
     file:write(encoded_data)
   else
-    H.notify_error "[ff.nvim]: vim.json.encode threw"
+    H.notify_error("[ff.nvim]: vim.json.encode threw: %s", vim.inspect(encoded_data))
   end
 
   file:close()
