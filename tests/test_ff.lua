@@ -14,7 +14,7 @@ T["H"]["#default"]["returns default when value is nil"] = function()
 end
 
 local vim_uv_cwd = vim.uv.cwd
-T["H"]["#get_rel_file"] = MiniTest.new_set {
+T["H"]["#rel_file"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
       vim.uv.cwd = function() return "path/to/dir" end
@@ -25,12 +25,12 @@ T["H"]["#get_rel_file"] = MiniTest.new_set {
   },
 }
 
-T["H"]["#get_rel_file"]["returns the rel file path when able"] = function()
-  MiniTest.expect.equality(H.get_rel_file "path/to/dir/file.txt", "file.txt")
-  MiniTest.expect.equality(H.get_rel_file "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
+T["H"]["#rel_file"]["returns the rel file path when able"] = function()
+  MiniTest.expect.equality(H.rel_file "path/to/dir/file.txt", "file.txt")
+  MiniTest.expect.equality(H.rel_file "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
 end
-T["H"]["#get_rel_file"]["returns the abs file path as a fallback"] = function()
-  MiniTest.expect.equality(H.get_rel_file "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
+T["H"]["#rel_file"]["returns the abs file path as a fallback"] = function()
+  MiniTest.expect.equality(H.rel_file "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
 end
 
 T["H"]["#get_ext"] = MiniTest.new_set()

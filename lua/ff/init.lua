@@ -18,7 +18,7 @@ H.default = function(val, default_val)
 end
 
 --- @param abs_file string
-H.get_rel_file = function(abs_file)
+H.rel_file = function(abs_file)
   --- @type string
   local cwd = vim.uv.cwd()
   if not vim.startswith(abs_file, cwd) then return abs_file end
@@ -373,15 +373,16 @@ P.MAX_FZY_SCORE = 20 -- approx the longest reasonable query
 P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
---- @param rel_file string
+--- @param abs_file string
 --- @param score number
 --- @param icon_char string|nil
-P.format_filename = function(rel_file, score, icon_char)
+P.format_filename = function(abs_file, score, icon_char)
   local formatted_score = H.pad_str(
     H.fit_decimals(score or 0, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
   )
   local formatted_icon_char = icon_char and icon_char .. " " or ""
+  local rel_file = H.rel_file(abs_file)
   return ("%s %s%s"):format(
     formatted_score,
     formatted_icon_char,
@@ -409,8 +410,8 @@ P.caches = {
   --- @type table<string, {icon_char: string, icon_hl: string|nil}>
   icon_cache = {},
 
-  --- @type table<string, number>
-  open_buffer_to_score = {},
+  --- @type table<string, boolea>
+  open_buffer_to_modified = {},
 }
 
 P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
@@ -456,9 +457,9 @@ P.populate_frecency_scores_cache = function()
 end
 
 P.populate_open_buffers_cache = function()
-  P.caches.open_buffer_to_score = {}
+  P.caches.open_buffer_to_modified = {}
 
-  L.benchmark_step("start", "open_buffer_to_score loop")
+  L.benchmark_step("start", "open_buffer_to_modified loop")
   local cwd = vim.uv.cwd()
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
@@ -468,11 +469,12 @@ P.populate_open_buffers_cache = function()
     if buf_name == "" then goto continue end
     if not vim.startswith(buf_name, cwd) then goto continue end
 
-    P.caches.open_buffer_to_score[buf_name] = 0
+    local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
+    P.caches.open_buffer_to_modified[buf_name] = modified
 
     ::continue::
   end
-  L.benchmark_step("end", "open_buffer_to_score loop")
+  L.benchmark_step("end", "open_buffer_to_modified loop")
 end
 
 --- @class GetSmartFilesOpts
@@ -521,7 +523,7 @@ P.get_find_files = function(opts)
       })
     end
 
-    local rel_file = H.get_rel_file(abs_file)
+    local rel_file = H.rel_file(abs_file)
     if not fzy.has_match(opts.query, rel_file) then
       return
     end
@@ -590,9 +592,8 @@ P.get_find_files = function(opts)
 
       if opts.query == basename_with_ext or opts.query == basename_without_ext then
         buf_score = opts.weights.basename_boost
-      elseif P.caches.open_buffer_to_score[abs_file] ~= nil then
-        local bufnr = vim.fn.bufnr(abs_file)
-        local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
+      elseif P.caches.open_buffer_to_modified[abs_file] ~= nil then
+        local modified = P.caches.open_buffer_to_modified[abs_file]
 
         if abs_file == opts.curr_bufname then
           buf_score = opts.weights.current_buf_boost
@@ -614,17 +615,16 @@ P.get_find_files = function(opts)
           opts.fuzzy_score_multiple * fuzzy_entry.score +
           opts.file_score_multiple * frecency_and_buf_score
 
-      local rel_file = H.get_rel_file(abs_file)
       local icon_char = nil
       local icon_hl = nil
 
-      local ext = H.get_ext(rel_file)
+      local ext = H.get_ext(abs_file)
       if opts.icons_enabled then
         if P.caches.icon_cache[ext] then
           icon_char = P.caches.icon_cache[ext].icon_char
           icon_hl = P.caches.icon_cache[ext].icon_hl
         else
-          local _, icon_char_res, icon_hl_res = pcall(mini_icons.get, "file", rel_file)
+          local _, icon_char_res, icon_hl_res = pcall(mini_icons.get, "file", abs_file)
           icon_char = icon_char_res or "?"
           icon_hl = icon_hl_res or nil
           if ext then
@@ -636,7 +636,7 @@ P.get_find_files = function(opts)
       table.insert(
         weighted_files,
         {
-          file = rel_file,
+          file = abs_file,
           score = weighted_score,
           hl_idxs = fuzzy_entry.hl_idxs,
           icon_hl = icon_hl,
