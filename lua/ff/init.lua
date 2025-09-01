@@ -487,6 +487,8 @@ end
 
 --- @param opts GetSmartFilesOpts
 P.get_find_files = function(opts)
+  vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
+
   local fzy = require "fzy-lua-native"
   opts.query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
   L.benchmark_step_heading(("query: '%s'"):format(opts.query))
@@ -769,7 +771,7 @@ M.setup = function(opts)
   L.benchmark_step_closing()
 
   vim.api.nvim_create_autocmd({ "BufWinEnter", }, {
-    group = vim.api.nvim_create_augroup("ff", { clear = true, }),
+    group = vim.api.nvim_create_augroup("ff_setup", { clear = true, }),
     callback = function(ev)
       local current_win = vim.api.nvim_get_current_win()
       -- :h nvim_win_get_config({window}) "relative is empty for normal buffers"
@@ -955,6 +957,7 @@ P.find = function(opts)
   )
 
   local function close()
+    vim.api.nvim_buf_clear_namespace(results_buf, P.ns_id, 0, -1)
     L.benchmark_mean_heading "Mean benchmarks"
     L.benchmark_mean()
     L.benchmark_mean_closing()
@@ -1026,7 +1029,7 @@ P.find = function(opts)
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = results_win, })
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
-    group = vim.api.nvim_create_augroup("ff", { clear = true, }),
+    group = vim.api.nvim_create_augroup("ff_picker", { clear = true, }),
     buffer = input_buf,
     callback = function()
       P.tick = P.tick + 1
