@@ -126,22 +126,15 @@ end
 
 --- @param path string
 F.read = function(path)
-  -- io.open won't throw
   local file = io.open(path, "r")
   if file == nil then
     return {}
   end
 
-  -- file:read won't throw
   local encoded_data = file:read "*a"
   file:close()
 
-  -- vim.json.decode will throw
-  local decode_ok, decoded_data = pcall(vim.json.decode, encoded_data)
-  if not decode_ok then
-    H.notify_error("[ff.nvim]: vim.json.decode threw: %s", vim.inspect(decoded_data))
-    return {}
-  end
+  local decoded_data = vim.json.decode(encoded_data)
   return decoded_data
 end
 
@@ -165,13 +158,8 @@ F.write = function(path, data)
   end
 
   -- vim.json.encode will throw
-  local encode_ok, encoded_data = pcall(vim.json.encode, data)
-  if encode_ok then
-    file:write(encoded_data)
-  else
-    H.notify_error("[ff.nvim]: vim.json.encode threw: %s", vim.inspect(encoded_data))
-  end
-
+  local encoded_data = vim.json.encode(data)
+  file:write(encoded_data)
   file:close()
 end
 
@@ -462,7 +450,6 @@ P.populate_open_buffers_cache = function()
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
     if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then goto continue end
     local buf_name = vim.api.nvim_buf_get_name(bufnr)
-    if buf_name == nil then goto continue end
     if buf_name == "" then goto continue end
     if not vim.startswith(buf_name, H.cwd) then goto continue end
 
@@ -984,7 +971,7 @@ P.find = function(opts)
       vim.api.nvim_set_current_win(results_win)
       local result = vim.api.nvim_get_current_line()
       close()
-      pcall(vim.cmd, "edit " .. parse_result(result))
+      vim.cmd("edit " .. parse_result(result))
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
