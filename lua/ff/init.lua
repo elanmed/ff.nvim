@@ -243,6 +243,17 @@ F.update_file_score = function(filename, opts)
   end)()
 
   dated_files[cwd][filename] = updated_date_at_score_one
+
+  local readable_dated_files_cwd = {}
+  for dated_file, date_at_score_one in pairs(dated_files[cwd]) do
+    local stat_result = vim.uv.fs_stat(dated_file)
+    local readable = stat_result ~= nil and stat_result.type == "file"
+    if readable then
+      readable_dated_files_cwd[dated_file] = date_at_score_one
+    end
+  end
+
+  dated_files[cwd] = readable_dated_files_cwd
   F.write(dated_files_path, dated_files)
 end
 

@@ -49,6 +49,8 @@ T["H"]["#basename"]["returns the basename with and without an extension"] = func
   MiniTest.expect.equality(H.basename("path/to/file.min.txt", { with_ext = false, }), "file")
   MiniTest.expect.equality(H.basename("path/to/file", { with_ext = true, }), "file")
   MiniTest.expect.equality(H.basename("path/to/file", { with_ext = false, }), "file")
+  MiniTest.expect.equality(H.basename("file.txt", { with_ext = true, }), "file.txt")
+  MiniTest.expect.equality(H.basename("file.txt", { with_ext = false, }), "file")
   MiniTest.expect.equality(H.basename("", { with_ext = true, }), "")
   MiniTest.expect.equality(H.basename("", { with_ext = false, }), "")
 end
@@ -135,8 +137,14 @@ end
 
 T["F"]["#update_file_score"] = MiniTest.new_set {
   hooks = {
-    pre_case = cleanup,
-    post_case = cleanup,
+    pre_case = function()
+      vim.uv.cwd = function() return cwd end
+      cleanup()
+    end,
+    post_case = function()
+      vim.uv.cwd = vim_uv_cwd
+      cleanup()
+    end,
     post_once = function()
       vim.fn.delete(root_dir, "rf")
     end,
@@ -151,7 +159,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new f
   })
 
   local dated_files = F.read(dated_files_path)
-  local date_at_score_one = dated_files[test_file_a]
+  local date_at_score_one = dated_files[cwd][test_file_a]
   MiniTest.expect.equality(date_at_score_one, date_at_score_one_now)
 end
 
@@ -163,7 +171,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeat
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_a],
+    F.read(dated_files_path)[cwd][test_file_a],
     date_at_score_one_now
   )
 
@@ -188,7 +196,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_a],
+    F.read(dated_files_path)[cwd][test_file_a],
     date_at_score_one_now
   )
 
@@ -199,11 +207,11 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_a],
+    F.read(dated_files_path)[cwd][test_file_a],
     F.compute_date_at_score_one { now = now_after_30_min, score = score_decayed_after_30_min, }
   )
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_b],
+    F.read(dated_files_path)[cwd][test_file_b],
     F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
   )
 end
@@ -216,7 +224,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = 
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_a],
+    F.read(dated_files_path)[cwd][test_file_a],
     date_at_score_one_now
   )
 
@@ -229,11 +237,11 @@ T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = 
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_a],
+    F.read(dated_files_path)[cwd][test_file_a],
     nil
   )
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_b],
+    F.read(dated_files_path)[cwd][test_file_b],
     F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
   )
 end
@@ -248,7 +256,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted file
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_file_a],
+    F.read(dated_files_path)[cwd][test_file_a],
     nil
   )
 end
@@ -261,7 +269,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories"
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_dir_a],
+    F.read(dated_files_path)[cwd][test_dir_a],
     nil
   )
 end
@@ -277,7 +285,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories 
   })
 
   MiniTest.expect.equality(
-    F.read(dated_files_path)[test_dir_a],
+    F.read(dated_files_path)[cwd][test_dir_a],
     nil
   )
 end
@@ -290,7 +298,7 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
     update_type = "increase",
   })
 
-  MiniTest.expect.equality(F.read(dated_files_path)[test_file_a], date_at_score_one_now)
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
   F._now = function() return now end
   F.update_file_score(test_file_a, {
@@ -298,7 +306,7 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
     update_type = "remove",
   })
 
-  MiniTest.expect.equality(F.read(dated_files_path)[test_file_a], nil)
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
 end
 
 return T
