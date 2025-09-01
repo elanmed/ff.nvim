@@ -307,6 +307,11 @@ end
 L.benchmark_step_closing = L.create_benchmark_closing(function() return L.SHOULD_LOG_STEP end)
 L.benchmark_mean_closing = L.create_benchmark_closing(function() return L.SHOULD_LOG_MEAN end)
 
+L.benchmark_step_interrupted = function()
+  if not L.SHOULD_LOG_STEP then return end
+  L.log_content "INTERRUPTED"
+end
+
 --- @type table<string, number>
 L.ongoing_benchmarks = {}
 
@@ -670,6 +675,11 @@ P.get_find_files = function(opts)
     end
     L.benchmark_step("end", "Format weighted_files")
 
+    if P.tick ~= opts.curr_tick then
+      L.benchmark_step_interrupted()
+      L.benchmark_step_closing()
+      return
+    end
     L.benchmark_step("start", "Callback")
     opts.callback(formatted_files)
     L.benchmark_step("end", "Callback")
@@ -726,7 +736,11 @@ P.get_find_files = function(opts)
   end)
 
   local function continue_processing()
-    if P.tick ~= opts.curr_tick then return end
+    if P.tick ~= opts.curr_tick then
+      L.benchmark_step_interrupted()
+      L.benchmark_step_closing()
+      return
+    end
     coroutine.resume(process_files)
 
     if coroutine.status(process_files) == "suspended" then
