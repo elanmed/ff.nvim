@@ -513,26 +513,23 @@ P.get_find_files = function(opts)
   --- @param considered_files ConsideredFile[]
   --- @param abs_file string
   local function populate_considered_files(considered_files, abs_file)
-    if #considered_files >= opts.max_results_considered then return true end
-
     if opts.query == "" then
       table.insert(considered_files, {
         file = abs_file,
         score = 0,
         hl_idxs = {},
       })
-      return false
     end
 
     local rel_file = H.get_rel_file(abs_file)
     if not fzy.has_match(opts.query, rel_file) then
-      return false
+      return
     end
 
     local fzy_score = fzy.score(opts.query, rel_file)
     local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
     if scaled_fzy_score < opts.min_score_to_consider then
-      return false
+      return
     end
 
     local hl_idxs = {}
@@ -545,7 +542,6 @@ P.get_find_files = function(opts)
         score = scaled_fzy_score,
         hl_idxs = hl_idxs,
       })
-    return false
   end
 
   local process_files = coroutine.create(function()
@@ -554,8 +550,8 @@ P.get_find_files = function(opts)
 
     L.benchmark_step("start", "Populate considered_files with frecency")
     for idx, abs_file in pairs(P.caches.frecency_files) do
-      local should_break = populate_considered_files(considered_files, abs_file)
-      if should_break then break end
+      if #considered_files >= opts.max_results_considered then break end
+      populate_considered_files(considered_files, abs_file)
 
       if idx % opts.batch_size == 0 then
         coroutine.yield()
@@ -565,12 +561,12 @@ P.get_find_files = function(opts)
 
     L.benchmark_step("start", "Populate considered_files with fd")
     for idx, abs_file in ipairs(P.caches.fd_files) do
+      if #considered_files >= opts.max_results_considered then break end
       if P.caches.frecency_file_to_score[abs_file] ~= nil then
         goto continue
       end
 
-      local should_break = populate_considered_files(considered_files, abs_file)
-      if should_break then break end
+      populate_considered_files(considered_files, abs_file)
 
       if idx % opts.batch_size == 0 then
         coroutine.yield()
