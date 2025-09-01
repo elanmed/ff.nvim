@@ -424,16 +424,12 @@ P.populate_fd_cache = function(fd_cmd)
   P.caches.fd_files = {}
 
   L.benchmark_step("start", "fd")
-  local fd_handle = io.popen(fd_cmd)
-  if not fd_handle then
-    N.notify_error "[ff.nvim]: fd failed"
-    return
-  end
-
-  for abs_file in fd_handle:lines() do
-    table.insert(P.caches.fd_files, abs_file)
-  end
-  fd_handle:close()
+  vim.system(vim.split(fd_cmd, " "), { text = true, }, function(obj)
+    local lines = vim.split(obj.stdout, "\n")
+    for _, abs_file in ipairs(lines) do
+      table.insert(P.caches.fd_files, abs_file)
+    end
+  end)
   L.benchmark_step("end", "fd")
 end
 
