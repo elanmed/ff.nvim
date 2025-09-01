@@ -95,7 +95,7 @@ H.fit_decimals = function(num, max_len)
   return no_decimals
 end
 
---- @parmam file
+--- @param file string
 H.pcall_edit = function(file)
   pcall(vim.cmd, "edit " .. file)
 end
