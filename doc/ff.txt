@@ -150,8 +150,9 @@ API                                                                   *ff-api*
     --- @field batch_size? number
     --- @field icons_enabled? boolean
     --- @field hi_enabled? boolean
-    --- @field max_results? number
-    --- @field min_matched_chars? number
+    --- @field max_results_rendered? number
+    --- @field max_results_considered? number
+    --- @field min_score_to_consider? number
     --- @field fuzzy_score_multiple? number
     --- @field file_score_multiple? number
     --- @field input_win_config? vim.api.keyset.win_config
@@ -168,8 +169,8 @@ API                                                                   *ff-api*
     --- @field open_buf_boost? number
     --- @field modified_buf_boost? number
     --- @field alternate_buf_boost? number
-    --- @field basename_boost? number
     --- @field current_buf_boost? number
+    --- @field basename_boost? number
     
     --- @class FindKeymapsPerMode
     --- @field i? FindKeymaps
@@ -203,9 +204,11 @@ PERFORMANCE                                                   *ff-performance*
   not on every keystroke
 - Open buffers are pulled once and cached when the picker is opened
 - Icons are cached by extension to avoid calling `mini.icons` when possible
-- Results are only processed if they match at least `opts.min_matched_chars`
-  characters (approximately)
-- Results are capped to `opts.max_results` keep the picker buffer small
+- Results are only processed if they have a fuzzy score of at least
+  `opts.min_score_to_consider`
+- A max of `opts.max_results_considered` results are processed
+- Rendered results are capped to `opts.max_results_rendered` keep the picker
+  buffer small
 - Icons and highlights can be disabled for especially large codebases
 With these optimizations in place, I average around ~50ms per keystroke on a
 codebase of 30k files. Enable the `benchmark_step`/`benchmark_mean` option to
