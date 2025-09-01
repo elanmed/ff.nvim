@@ -280,31 +280,30 @@ L.log_line = function(type)
   end
 end
 
---- @param content string
-L.benchmark_step_heading = function(content)
-  if not L.SHOULD_LOG_STEP then return end
-  L.log_line "start"
-  L.log_content(content)
-  L.log_line "middle"
+--- @param get_flag function
+L.create_benchmark_heading = function(get_flag)
+  --- @param content string
+  return function(content)
+    if not get_flag() then return end
+    L.log_line "start"
+    L.log_content(content)
+    L.log_line "middle"
+  end
 end
 
-L.benchmark_step_closing = function()
-  if not L.SHOULD_LOG_STEP then return end
-  L.log_line "end"
+L.benchmark_step_heading = L.create_benchmark_heading(function() return L.SHOULD_LOG_STEP end)
+L.benchmark_mean_heading = L.create_benchmark_heading(function() return L.SHOULD_LOG_MEAN end)
+
+--- @param get_flag function
+L.create_benchmark_closing = function(get_flag)
+  return function()
+    if not get_flag() then return end
+    L.log_line "end"
+  end
 end
 
---- @param content string
-L.benchmark_mean_heading = function(content)
-  if not L.SHOULD_LOG_MEAN then return end
-  L.log_line "start"
-  L.log_content(content)
-  L.log_line "middle"
-end
-
-L.benchmark_mean_closing = function()
-  if not L.SHOULD_LOG_MEAN then return end
-  L.log_line "end"
-end
+L.benchmark_step_closing = L.create_benchmark_closing(function() return L.SHOULD_LOG_STEP end)
+L.benchmark_mean_closing = L.create_benchmark_closing(function() return L.SHOULD_LOG_MEAN end)
 
 --- @type table<string, number>
 L.ongoing_benchmarks = {}
