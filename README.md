@@ -11,7 +11,7 @@ A small, simple fuzzy finder with intelligent weights.
     - Modified buffers
     - The alternate buffer
     - The current buffer
-    - The basename of the current file with and without an extension
+    - The basename of the current file (with and without an extension)
     - The fuzzy score of the filename against the current input
 
 ## Example
@@ -67,11 +67,11 @@ vim.keymap.set("n", "<leader>f", function()
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
-    max_results = 200,
-    min_matched_chars = 2, -- approximate
+    max_results_rendered = 200,
+    max_results_considered = 200 * 3,
+    min_score_to_consider = 10, -- scores have a normalized range of [0, 100]
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
-
     input_win_config = {
       style = "minimal",
       anchor = "SW",
@@ -173,10 +173,10 @@ M.refresh_fd_cache = function(fd_cmd) end
 - Icons are cached by extension to avoid calling `mini.icons` when possible
 - Results are only processed if they have a fuzzy score of at least `opts.min_score_to_consider`
 - A max of `opts.max_results_considered` results are processed
-- Rendered results are capped to `opts.max_results_rendered` keep the picker buffer small
+- A max of `opts.max_results_rendered` results are rendered to keep the picker buffer small
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around ~40ms per keystroke on a codebase of 50k files. Enable the `benchmark_step`/`benchmark_mean` option to try it for yourself.
+With these optimizations in place, I average around ~40ms per keystroke on a codebase of 50k files. Enable the `benchmark_step` and `benchmark_mean` options to try it yourself.
 
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched

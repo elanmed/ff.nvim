@@ -28,7 +28,6 @@ end
 --- @param path string
 --- @param opts { with_ext: boolean }
 H.basename = function(path, opts)
-  if path == "" then return path end
   --- @type string
   local basename = vim.fs.basename(path)
   if opts.with_ext then return basename end
@@ -96,23 +95,11 @@ H.fit_decimals = function(num, max_len)
   return no_decimals
 end
 
---- @param file string
-H.pcall_edit = function(file)
-  pcall(vim.cmd, "edit " .. file)
-end
-
 H.vimscript_true = 1
 H.vimscript_false = 0
 
--- ======================================================
--- == Notify ============================================
--- ======================================================
-
-local N = {}
-
-
 --- @param msg string
-N.notify_error = function(msg)
+H.notify_error = function(msg)
   vim.notify(msg, vim.log.levels.ERROR)
 end
 
@@ -144,7 +131,7 @@ F.read = function(path)
   -- vim.json.decode will throw
   local decode_ok, decoded_data = pcall(vim.json.decode, encoded_data)
   if not decode_ok then
-    N.notify_error "[ff.nvim]: vim.json.decode threw"
+    H.notify_error "[ff.nvim]: vim.json.decode threw"
     return {}
   end
   return decoded_data
@@ -158,14 +145,14 @@ F.write = function(path, data)
   local path_dir = vim.fs.dirname(path)
   local mkdir_res = vim.fn.mkdir(path_dir, "p")
   if mkdir_res == H.vimscript_false then
-    N.notify_error "[ff.nvim]: vim.fn.mkdir returned vimscript_false"
+    H.notify_error "[ff.nvim]: vim.fn.mkdir returned vimscript_false"
     return
   end
 
   -- io.open won't throw
   local file = io.open(path, "w")
   if file == nil then
-    N.notify_error "[ff.nvim]: io.open failed to open the file created with vim.fn.mkdir"
+    H.notify_error "[ff.nvim]: io.open failed to open the file created with vim.fn.mkdir"
     return
   end
 
@@ -174,7 +161,7 @@ F.write = function(path, data)
   if encode_ok then
     file:write(encoded_data)
   else
-    N.notify_error "[ff.nvim]: vim.json.encode threw"
+    H.notify_error "[ff.nvim]: vim.json.encode threw"
   end
 
   file:close()
@@ -372,8 +359,8 @@ P.tick = 0
 P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 
 -- [-math.huge, math.huge]
--- just below math.huge is aprox the length of the string
--- just above -math.huge is aprox 0
+-- just below math.huge is approx the length of the string
+-- just above -math.huge is approx 0
 P.MAX_FZY_SCORE = 20
 P.MAX_FRECENCY_SCORE = 99
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
@@ -386,12 +373,13 @@ P.format_filename = function(rel_file, score, icon_char)
     H.fit_decimals(score or 0, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
   )
-  local formatted = ("%s %s%s"):format(
+  local formatted_icon_char = icon_char and icon_char .. " " or ""
+  local formatted_filename = ("%s %s%s"):format(
     formatted_score,
-    icon_char and icon_char .. " " or "",
+    formatted_icon_char,
     rel_file
   )
-  return formatted
+  return formatted_filename
 end
 
 --- @param fzy_score number
@@ -501,7 +489,6 @@ P.get_find_files = function(opts)
   L.benchmark_step_heading(("query: '%s'"):format(opts.query))
   L.benchmark_step("start", "Entire script")
 
-
   --- @class ConsideredFile
   --- @field file string
   --- @field score number
@@ -514,7 +501,7 @@ P.get_find_files = function(opts)
   --- @param considered_files ConsideredFile[]
   --- @param abs_file string
   local function populate_considered_files(considered_files, abs_file)
-    if #considered_files > opts.max_results_considered then return true end
+    if #considered_files >= opts.max_results_considered then return true end
 
     if opts.query == "" then
       table.insert(considered_files, {
@@ -665,10 +652,11 @@ P.get_find_files = function(opts)
     --- @type string[]
     local formatted_files = {}
     for idx, weighted_entry in ipairs(weighted_files) do
-      if idx > opts.max_results_rendered then break end
+      if idx >= opts.max_results_rendered then break end
 
       local formatted = P.format_filename(weighted_entry.file, weighted_entry.score, weighted_entry.icon_char)
       table.insert(formatted_files, formatted)
+
       if idx % opts.batch_size == 0 then
         coroutine.yield()
       end
@@ -817,7 +805,7 @@ end
 --- @param fd_cmd? string
 M.refresh_fd_cache = function(fd_cmd)
   if not P.setup_called then
-    N.notify_error "[ff.nvim]: `setup` must be called before `refresh_fd_cache`"
+    H.notify_error "[ff.nvim]: `setup` must be called before `refresh_fd_cache`"
   end
   fd_cmd = H.default(fd_cmd, P.setup_opts.fd_cmd)
   P.populate_fd_cache(fd_cmd)
@@ -861,7 +849,7 @@ end
 --- @param opts? FindOpts
 P.find = function(opts)
   if not P.setup_called then
-    N.notify_error "[ff.nvim]: `setup` must be called before `find`"
+    H.notify_error "[ff.nvim]: `setup` must be called before `find`"
     return
   end
   opts = H.default(opts, {})
@@ -1006,7 +994,7 @@ P.find = function(opts)
       vim.api.nvim_set_current_win(results_win)
       local result = vim.api.nvim_get_current_line()
       close()
-      H.pcall_edit(parse_result(result))
+      pcall(vim.cmd, "edit " .. parse_result(result))
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
@@ -1017,6 +1005,7 @@ P.find = function(opts)
           current_line = current_line + 1
           vim.cmd "normal! j"
         end
+
         vim.hl.range(results_buf, P.ns_id, "Search",
           { current_line, vim.o.columns, },
           { current_line, vim.o.columns, },
@@ -1033,6 +1022,7 @@ P.find = function(opts)
           current_line = current_line - 1
           vim.cmd "normal! k"
         end
+
         vim.hl.range(results_buf, P.ns_id, "Search",
           { current_line, vim.o.columns, },
           { current_line, vim.o.columns, },
@@ -1072,7 +1062,6 @@ end
 if _G.FF_TEST then
   M._internal = {
     H = H,
-    N = N,
     F = F,
     L = L,
     P = P,
