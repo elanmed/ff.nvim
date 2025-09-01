@@ -215,10 +215,6 @@ F.compute_date_at_score_one = function(opts)
   return opts.now + math.log(opts.score) / F.decay_rate
 end
 
---- @class ScoredFile
---- @field score number
---- @field filename string
-
 --- @class UpdateFileScoreOpts
 --- @field update_type "increase" | "remove"
 --- @field _db_dir? string
@@ -226,11 +222,15 @@ end
 --- @param filename string
 --- @param opts UpdateFileScoreOpts
 F.update_file_score = function(filename, opts)
+  local cwd = vim.uv.cwd()
   local now = F._now()
 
   opts._db_dir = H.default(opts._db_dir, F.default_db_dir)
   local dated_files_path = F.get_dated_files_path(opts._db_dir)
   local dated_files = F.read(dated_files_path)
+  if not dated_files[cwd] then
+    dated_files[cwd] = {}
+  end
 
   local updated_date_at_score_one = (function()
     if opts.update_type == "increase" then
@@ -241,7 +241,7 @@ F.update_file_score = function(filename, opts)
       end
 
       local score = 0
-      local date_at_score_one = dated_files[filename]
+      local date_at_score_one = dated_files[cwd][filename]
       if date_at_score_one then
         score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
       end
@@ -253,24 +253,8 @@ F.update_file_score = function(filename, opts)
     return nil
   end)()
 
-  dated_files[filename] = updated_date_at_score_one
+  dated_files[cwd][filename] = updated_date_at_score_one
   F.write(dated_files_path, dated_files)
-
-  --- @type ScoredFile[]
-  local scored_files = {}
-  local updated_dated_files = {}
-  for dated_file_entry, date_at_one_point_entry in pairs(dated_files) do
-    local recomputed_score = F.compute_score { now = now, date_at_score_one = date_at_one_point_entry, }
-
-    local stat_result = vim.uv.fs_stat(dated_file_entry)
-    local readable = stat_result ~= nil and stat_result.type == "file"
-    if readable then
-      table.insert(scored_files, { filename = dated_file_entry, score = recomputed_score, })
-      updated_dated_files[dated_file_entry] = date_at_one_point_entry
-    end
-  end
-
-  F.write(dated_files_path, updated_dated_files)
 end
 
 -- ======================================================
@@ -421,9 +405,6 @@ P.caches = {
   --- @type string[]
   fd_files = {},
 
-  --- @type string[]
-  frecency_files = {},
-
   --- @type table<string, number>
   frecency_file_to_score = {},
 
@@ -459,9 +440,9 @@ P.populate_frecency_scores_cache = function()
   L.benchmark_step("end", "Frecency dated_files fs read")
 
   local now = os.time()
+  local cwd = vim.uv.cwd()
   L.benchmark_step("start", "Calculate frecency_file_to_score")
-  for _, abs_file in ipairs(P.caches.frecency_files) do
-    local date_at_score_one = dated_files[abs_file]
+  for abs_file, date_at_score_one in ipairs(dated_files[cwd]) do
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_file] = score
   end
@@ -523,7 +504,7 @@ P.get_find_files = function(opts)
     -- TODO: change type, only need file and score
     --- @type AnnotatedFile[]
     local fuzzy_files = {}
-    L.benchmark_step("start", "Calculate fuzzy_files")
+    L.benchmark_step("start", "Calculate fuzzy_files with fd")
     for idx, abs_file in ipairs(P.caches.fd_files) do
       if opts.query == "" then
         if idx <= opts.max_results then
@@ -562,8 +543,10 @@ P.get_find_files = function(opts)
       if idx % opts.batch_size == 0 then
         coroutine.yield()
       end
+
+      ::continue::
     end
-    L.benchmark_step("end", "Calculate fuzzy_files")
+    L.benchmark_step("end", "Calculate fuzzy_files with fd")
 
     local mini_icons = require "mini.icons"
     L.benchmark_step("start", "Calculate weighted_files")
@@ -966,7 +949,7 @@ P.find = function(opts)
   )
 
   local function close()
-    L.benchmark_mean_heading "Aggregated benchmarks"
+    L.benchmark_mean_heading "Mean benchmarks"
     L.benchmark_mean()
     L.benchmark_mean_closing()
     L.ongoing_benchmarks = {}
