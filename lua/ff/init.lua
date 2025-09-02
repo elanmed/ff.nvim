@@ -768,15 +768,29 @@ M.setup = function(opts)
   end
   L.benchmark_step_closing()
 
+  local timer_id = nil
   vim.api.nvim_create_autocmd({ "BufWinEnter", }, {
     group = vim.api.nvim_create_augroup("FFSetup", { clear = true, }),
     callback = function(ev)
+      if timer_id then
+        vim.fn.timer_stop(timer_id)
+      end
+
       local current_win = vim.api.nvim_get_current_win()
       -- :h nvim_win_get_config({window}) "relative is empty for normal buffers"
       if vim.api.nvim_win_get_config(current_win).relative == "" then
         -- `nvim_buf_get_name` for unnamed buffers is an empty string
-        local bname = vim.api.nvim_buf_get_name(ev.buf)
-        if #bname > 0 then F.update_file_score(bname, { update_type = "increase", }) end
+        local buf_name = vim.api.nvim_buf_get_name(ev.buf)
+        if #buf_name > 0 then
+          timer_id = vim.fn.timer_start(1000, function()
+            local abs_file = vim.fs.joinpath(H.cwd, buf_name)
+
+            F.update_file_score(buf_name, { update_type = "increase", })
+            if not P.caches.frecency_file_to_score[abs_file] then
+              P.populate_fd_cache(opts.fd_cmd)
+            end
+          end)
+        end
       end
     end,
   })
