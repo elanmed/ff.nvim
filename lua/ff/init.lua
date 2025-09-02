@@ -397,7 +397,7 @@ P.caches = {
   --- @type table<string, {icon_char: string, icon_hl: string|nil}>
   icon_cache = {},
 
-  --- @type table<string, boolea>
+  --- @type table<string, boolean>
   open_buffer_to_modified = {},
 }
 
