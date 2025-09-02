@@ -779,23 +779,18 @@ M.setup = function(opts)
 
       local current_win = vim.api.nvim_get_current_win()
       local is_buf_normal = vim.api.nvim_win_get_config(current_win).relative == ""
-
       if not is_buf_normal then return end
       local abs_file = vim.api.nvim_buf_get_name(ev.buf)
       if abs_file == "" then return end
+      if last_updated_abs_file == abs_file then return end
 
       timer_id = vim.fn.timer_start(1000, function()
-        if last_updated_abs_file == abs_file then
-          timer_id = nil
-          return
-        end
         last_updated_abs_file = abs_file
 
         F.update_file_score(abs_file, { update_type = "increase", })
         if not P.caches.frecency_file_to_score[abs_file] then
           P.populate_fd_cache(opts.fd_cmd)
         end
-        timer_id = nil
       end)
     end,
   })
