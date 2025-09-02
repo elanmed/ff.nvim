@@ -18,6 +18,9 @@ T["H"]["#rel_file"] = MiniTest.new_set {
     pre_case = function()
       H.cwd = "path/to/dir"
     end,
+    post_case = function()
+      H.cwd = nil
+    end,
   },
 }
 
@@ -140,7 +143,10 @@ T["F"]["#update_file_score"] = MiniTest.new_set {
       H.cwd = cwd
       cleanup()
     end,
-    post_case = cleanup,
+    post_case = function()
+      H.cwd = nil
+      cleanup()
+    end,
     post_once = function()
       vim.fn.delete(root_dir, "rf")
     end,
