@@ -65,7 +65,6 @@ vim.keymap.set("n", "<leader>f", function()
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
-    max_results_rendered = 200,
     max_results_considered = 200 * 3,
     min_score_considered = 10, -- scores have a normalized range of [0, 100]
     fuzzy_score_multiple = 0.7,
@@ -120,7 +119,6 @@ M.setup = function(opts) end
 --- @field batch_size? number
 --- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
---- @field max_results_rendered? number
 --- @field max_results_considered? number
 --- @field min_score_considered? number
 --- @field fuzzy_score_multiple? number
@@ -169,7 +167,6 @@ M.refresh_fd_cache = function(fd_cmd) end
 - Icons are cached by extension to avoid calling `mini.icons` when possible
 - Results are only processed if they have a fuzzy score of at least `opts.min_score_considered`
 - A max of `opts.max_results_considered` results are processed
-- A max of `opts.max_results_rendered` results are rendered to keep the picker buffer small
 - Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around ~40ms per keystroke on a codebase of 50k files. Enable the `benchmark_step` and `benchmark_mean` options to try it yourself.
