@@ -469,7 +469,7 @@ end
 --- @field curr_bufname string
 --- @field alt_bufname string
 --- @field curr_tick number
---- @field callback function
+--- @field callback fun(weighted_files:WeightedFile[]):nil
 --- @field weights FindWeights
 --- @field batch_size number
 --- @field icons_enabled boolean
@@ -497,6 +497,7 @@ P.get_find_files = function(opts)
   --- @class WeightedFile : ConsideredFile
   --- @field icon_char string
   --- @field icon_hl string
+  --- @field formatted_filename string
 
   --- @param considered_files ConsideredFile[]
   --- @param abs_file string
@@ -619,6 +620,8 @@ P.get_find_files = function(opts)
         end
       end
 
+      local formatted_filename = P.format_filename(abs_file, weighted_score, icon_char)
+
       table.insert(
         weighted_files,
         {
@@ -627,6 +630,7 @@ P.get_find_files = function(opts)
           hl_idxs = fuzzy_entry.hl_idxs,
           icon_hl = icon_hl,
           icon_char = icon_char,
+          formatted_filename = formatted_filename,
         }
       )
 
@@ -642,28 +646,13 @@ P.get_find_files = function(opts)
     end)
     L.benchmark_step("end", "Sort weighted_files")
 
-    L.benchmark_step("start", "Format weighted_files")
-    --- @type string[]
-    local formatted_files = {}
-    for idx, weighted_entry in ipairs(weighted_files) do
-      if idx >= opts.max_results_rendered then break end
-
-      local formatted = P.format_filename(weighted_entry.file, weighted_entry.score, weighted_entry.icon_char)
-      table.insert(formatted_files, formatted)
-
-      if idx % opts.batch_size == 0 then
-        coroutine.yield()
-      end
-    end
-    L.benchmark_step("end", "Format weighted_files")
-
     if P.tick ~= opts.curr_tick then
       L.benchmark_step_interrupted()
       L.benchmark_step_closing()
       return
     end
     L.benchmark_step("start", "Callback")
-    opts.callback(formatted_files)
+    opts.callback(weighted_files)
     L.benchmark_step("end", "Callback")
 
     if not opts.hi_enabled then
@@ -679,23 +668,23 @@ P.get_find_files = function(opts)
     local icon_char_idx = formatted_score_last_idx + 2
 
     L.benchmark_step("start", "Highlight loop")
-    for idx, formatted_file in ipairs(formatted_files) do
+    for idx, weighted_file in ipairs(weighted_files) do
       local row_0_indexed = idx - 1
 
-      if weighted_files[idx].icon_hl then
+      if weighted_file.icon_hl then
         local icon_hl_col_1_indexed = icon_char_idx
         local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
 
         vim.hl.range(
           opts.results_buf,
           P.ns_id,
-          weighted_files[idx].icon_hl,
+          weighted_file.icon_hl,
           { row_0_indexed, icon_hl_col_0_indexed, },
           { row_0_indexed, icon_hl_col_0_indexed + 1, }
         )
       end
 
-      local file_offset = #formatted_file - formatted_file:reverse():find " " + 1
+      local file_offset = #weighted_file.formatted_filename - weighted_file.formatted_filename:reverse():find " " + 1
       for _, hl_idx in ipairs(weighted_files[idx].hl_idxs) do
         local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
 
@@ -949,8 +938,10 @@ P.find = function(opts)
       min_score_considered = opts.min_score_considered,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
-      callback = function(results)
-        vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, results)
+      callback = function(weighted_files)
+        vim.api.nvim_buf_set_lines(results_buf, 0, -1, false,
+          vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
+        )
       end,
     }
   end
