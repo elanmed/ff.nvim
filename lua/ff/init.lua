@@ -680,7 +680,9 @@ P.get_find_files = function(opts)
         )
       end
 
-      local file_offset = #weighted_file.formatted_filename - weighted_file.formatted_filename:reverse():find " " + 1
+      local space_offset = 1
+      local icon_offset = 1
+      local file_offset = P.MAX_SCORE_LEN + space_offset + (opts.icons_enabled and (space_offset + icon_offset) or 0)
       for _, hl_idx in ipairs(weighted_files[idx].hl_idxs) do
         local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
 
