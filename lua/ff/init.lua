@@ -972,15 +972,13 @@ P.find = function(opts)
     select = function()
       vim.api.nvim_set_current_win(results_win)
       local result = vim.api.nvim_get_current_line()
+      if #result == 0 then return end
       close()
       vim.cmd("edit " .. parse_result(result))
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
-        local line_count = vim.api.nvim_buf_line_count(results_buf)
-        if line_count == 0 then return end
-
-        if vim.api.nvim_win_get_cursor(results_win)[1] == line_count then
+        if vim.api.nvim_win_get_cursor(results_win)[1] == vim.api.nvim_buf_line_count(results_buf) then
           vim.cmd "normal! gg"
         else
           vim.cmd "normal! j"
@@ -990,9 +988,6 @@ P.find = function(opts)
     end,
     prev = function()
       vim.api.nvim_win_call(results_win, function()
-        local line_count = vim.api.nvim_buf_line_count(results_buf)
-        if line_count == 0 then return end
-
         if vim.api.nvim_win_get_cursor(results_win)[1] == 1 then
           vim.cmd "normal! G"
         else
