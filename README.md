@@ -14,7 +14,7 @@ A small, simple fuzzy finder with intelligent weights.
     - The basename of the current file (with and without an extension)
     - The fuzzy score of the filename against the current input
 
-## Example
+## Configuration example
 ```lua
 local ff = require "ff"
 ff.setup {
@@ -65,7 +65,7 @@ vim.keymap.set("n", "<leader>f", function()
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
-    max_results_considered = 200 * 3,
+    max_results_considered = 500,
     min_score_considered = 10, -- scores have a normalized range of [0, 100]
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
