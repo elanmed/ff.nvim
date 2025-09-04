@@ -65,8 +65,7 @@ vim.keymap.set("n", "<leader>f", function()
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
-    max_results_considered = 500,
-    min_score_considered = 10, -- scores have a normalized range of [0, 100]
+    max_results_considered = 5000,
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
     input_win_config = {
@@ -120,7 +119,6 @@ M.setup = function(opts) end
 --- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
 --- @field max_results_considered? number
---- @field min_score_considered? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -165,11 +163,12 @@ M.refresh_fd_cache = function(fd_cmd) end
 - Frecency scores are calculated once and cached when the picker is opened - not on every keystroke
 - Open buffers are pulled once and cached when the picker is opened
 - Icons are cached by extension to avoid calling `mini.icons` when possible
-- Results are only processed if they have a fuzzy score of at least `opts.min_score_considered`
 - A max of `opts.max_results_considered` results are processed
+- Results are cached for each user input
+- Results from the previous input (or more accurately, the current input minus the last character) are used as the source files when filtering results for the current input. This _dramatically_ reduces the number of files to process as the input grows
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around ~40ms per keystroke on a codebase of 50k files. Enable the `benchmark_step` and `benchmark_mean` options to try it yourself.
+With these optimizations in place, I average around **15ms per keystroke on a codebase of 50k files**. Enable the `benchmark_step` and `benchmark_mean` options to try yourself!
 
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched

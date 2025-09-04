@@ -475,9 +475,22 @@ end
 --- @field icons_enabled boolean
 --- @field hi_enabled boolean
 --- @field max_results_considered number
---- @field min_score_considered number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
+
+--- @class WeightedFile
+--- @field abs_file string
+--- @field rel_file string
+--- @field weighted_score number
+--- @field fzy_score number
+--- @field buf_and_frecency_score number
+--- @field hl_idxs table
+--- @field icon_char string
+--- @field icon_hl string
+--- @field formatted_filename string
+
+--- @type table<string, WeightedFile[]>
+P.weighted_files_per_query = {}
 
 --- @param opts GetSmartFilesOpts
 P.get_find_files = function(opts)
@@ -489,14 +502,6 @@ P.get_find_files = function(opts)
   opts.query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
   L.benchmark_step_heading(("query: '%s'"):format(opts.query))
   L.benchmark_step("start", "Entire script")
-
-  --- @class WeightedFile
-  --- @field file string
-  --- @field score number
-  --- @field hl_idxs table
-  --- @field icon_char string
-  --- @field icon_hl string
-  --- @field formatted_filename string
 
   --- @param abs_file string
   local function get_icon_info(abs_file)
@@ -526,107 +531,191 @@ P.get_find_files = function(opts)
     return icon_info
   end
 
-  --- @param weighted_files WeightedFile[]
-  --- @param abs_file string
-  local function populate_weighted_files(weighted_files, abs_file)
-    if opts.query == "" then
-      local icon_info = get_icon_info(abs_file)
-      table.insert(
-        weighted_files,
-        {
-          file = abs_file,
-          score = 0,
+  local function get_weighted_files()
+    if #opts.query == 0 then
+      --- @param abs_file string
+      local function get_weighted_file_for_empty_query(abs_file)
+        local rel_file = H.rel_file(abs_file)
+        local icon_info = get_icon_info(abs_file)
+        return {
+          abs_file = abs_file,
+          rel_file = rel_file,
+          weighted_score = 0,
+          buf_and_frecency_score = 0,
+          fzy_score = 0,
           hl_idxs = {},
           icon_hl = icon_info.icon_hl,
           icon_char = icon_info.icon_char,
           formatted_filename = P.format_filename(abs_file, 0, icon_info.icon_char),
         }
-      )
-      return
-    end
-
-    local rel_file = H.rel_file(abs_file)
-    if not fzy.has_match(opts.query, rel_file) then
-      return
-    end
-
-    local fzy_score = fzy.score(opts.query, rel_file)
-    local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
-    if scaled_fzy_score < opts.min_score_considered then
-      return
-    end
-
-    local hl_idxs = {}
-    if opts.hi_enabled then
-      hl_idxs = fzy.positions(opts.query, rel_file)
-    end
-
-    local buf_score = 0
-    local basename_with_ext = H.basename(abs_file, { with_ext = true, })
-    local basename_without_ext = H.basename(abs_file, { with_ext = false, })
-
-    if opts.query == basename_with_ext or opts.query == basename_without_ext then
-      buf_score = opts.weights.basename_boost
-    elseif P.caches.open_buffer_to_modified[abs_file] ~= nil then
-      local modified = P.caches.open_buffer_to_modified[abs_file]
-
-      if abs_file == opts.curr_bufname then
-        buf_score = opts.weights.current_buf_boost
-      elseif abs_file == opts.alt_bufname then
-        buf_score = opts.weights.alternate_buf_boost
-      elseif modified then
-        buf_score = opts.weights.modified_buf_boost
-      else
-        buf_score = opts.weights.open_buf_boost
       end
-    end
 
-    local frecency_and_buf_score = buf_score
-    if P.caches.frecency_file_to_score[abs_file] ~= nil then
-      frecency_and_buf_score = frecency_and_buf_score + P.caches.frecency_file_to_score[abs_file]
-    end
+      --- @type WeightedFile[]
+      local weighted_files_for_empty_query = {}
 
-    local weighted_score =
-        opts.fuzzy_score_multiple * scaled_fzy_score +
-        opts.file_score_multiple * frecency_and_buf_score
+      L.benchmark_step("start", "Populate weighted files for empty query with frecency")
+      for idx, abs_file in pairs(P.caches.frecency_files) do
+        if #weighted_files_for_empty_query > opts.max_results_considered then break end
+        table.insert(weighted_files_for_empty_query, get_weighted_file_for_empty_query(abs_file))
 
-    local icon_info = get_icon_info(abs_file)
-    table.insert(
-      weighted_files,
-      {
-        file = abs_file,
-        score = weighted_score,
-        hl_idxs = hl_idxs,
-        icon_hl = icon_info.icon_hl,
-        icon_char = icon_info.icon_char,
-        formatted_filename = P.format_filename(abs_file, weighted_score, icon_info.icon_char),
-      }
-    )
-  end
-
-  local process_files = coroutine.create(function()
-    --- @type WeightedFile[]
-    local weighted_files = {}
-
-    L.benchmark_step("start", "Populate weighted_files with frecency")
-    for idx, abs_file in pairs(P.caches.frecency_files) do
-      if #weighted_files >= opts.max_results_considered then break end
-      populate_weighted_files(weighted_files, abs_file)
-
-      if idx % opts.batch_size == 0 then
-        coroutine.yield()
+        if idx % opts.batch_size == 0 then
+          coroutine.yield()
+        end
       end
-    end
-    L.benchmark_step("end", "Populate weighted_files with frecency")
+      L.benchmark_step("end", "Populate weighted files for empty query with frecency")
 
-    L.benchmark_step("start", "Populate weighted_files with fd")
-    for idx, abs_file in ipairs(P.caches.fd_files) do
-      if #weighted_files >= opts.max_results_considered then break end
-      if P.caches.frecency_file_to_score[abs_file] ~= nil then
+      L.benchmark_step("start", "Populate weighted files for empty query with fd")
+      for idx, abs_file in ipairs(P.caches.fd_files) do
+        if P.caches.frecency_file_to_score[abs_file] ~= nil then
+          goto continue
+        end
+        if #weighted_files_for_empty_query > opts.max_results_considered then break end
+        table.insert(weighted_files_for_empty_query, get_weighted_file_for_empty_query(abs_file))
+
+        if idx % opts.batch_size == 0 then
+          coroutine.yield()
+        end
+
+        ::continue::
+      end
+      L.benchmark_step("end", "Populate weighted files for empty query with fd")
+
+      return weighted_files_for_empty_query
+    end
+
+    if #opts.query == 1 then
+      --- @param abs_file string
+      local function get_weighted_file_for_initial_query(abs_file)
+        local rel_file = H.rel_file(abs_file)
+
+        if not fzy.has_match(opts.query, rel_file) then
+          return nil
+        end
+
+        local fzy_score = fzy.score(opts.query, rel_file)
+        local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
+
+        local hl_idxs = {}
+        if opts.hi_enabled then
+          hl_idxs = fzy.positions(opts.query, rel_file)
+        end
+
+        local buf_score = 0
+        local basename_with_ext = H.basename(abs_file, { with_ext = true, })
+        local basename_without_ext = H.basename(abs_file, { with_ext = false, })
+
+        if opts.query == basename_with_ext or opts.query == basename_without_ext then
+          buf_score = opts.weights.basename_boost
+        elseif P.caches.open_buffer_to_modified[abs_file] ~= nil then
+          local modified = P.caches.open_buffer_to_modified[abs_file]
+
+          if abs_file == opts.curr_bufname then
+            buf_score = opts.weights.current_buf_boost
+          elseif abs_file == opts.alt_bufname then
+            buf_score = opts.weights.alternate_buf_boost
+          elseif modified then
+            buf_score = opts.weights.modified_buf_boost
+          else
+            buf_score = opts.weights.open_buf_boost
+          end
+        end
+
+        local buf_and_frecency_score = buf_score
+        if P.caches.frecency_file_to_score[abs_file] ~= nil then
+          buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_file]
+        end
+
+        local weighted_score =
+            opts.fuzzy_score_multiple * scaled_fzy_score +
+            opts.file_score_multiple * buf_and_frecency_score
+
+        local icon_info = get_icon_info(abs_file)
+        return {
+          abs_file = abs_file,
+          rel_file = rel_file,
+          weighted_score = weighted_score,
+          fzy_score = scaled_fzy_score,
+          buf_and_frecency_score = buf_and_frecency_score,
+          hl_idxs = hl_idxs,
+          icon_hl = icon_info.icon_hl,
+          icon_char = icon_info.icon_char,
+          formatted_filename = P.format_filename(abs_file, weighted_score, icon_info.icon_char),
+        }
+      end
+
+      --- @type WeightedFile[]
+      local weighted_files_for_initial_query = {}
+
+      L.benchmark_step("start", "Populate weighted files for first query with frecency")
+      for idx, abs_file in pairs(P.caches.frecency_files) do
+        if #weighted_files_for_initial_query > opts.max_results_considered then break end
+        local weighted_file = get_weighted_file_for_initial_query(abs_file)
+        if weighted_file then
+          table.insert(weighted_files_for_initial_query, weighted_file)
+        end
+
+        if idx % opts.batch_size == 0 then
+          coroutine.yield()
+        end
+      end
+      L.benchmark_step("end", "Populate weighted files for first query with frecency")
+
+      L.benchmark_step("start", "Populate weighted files for first query with fd")
+      for idx, abs_file in ipairs(P.caches.fd_files) do
+        if P.caches.frecency_file_to_score[abs_file] ~= nil then
+          goto continue
+        end
+
+        if #weighted_files_for_initial_query > opts.max_results_considered then break end
+        local weighted_file = get_weighted_file_for_initial_query(abs_file)
+        if weighted_file then
+          table.insert(weighted_files_for_initial_query, weighted_file)
+        end
+
+
+        if idx % opts.batch_size == 0 then
+          coroutine.yield()
+        end
+
+        ::continue::
+      end
+      L.benchmark_step("end", "Populate weighted files for first query with fd")
+
+      return weighted_files_for_initial_query
+    end
+
+    L.benchmark_step("start", "Update weighted files for current query")
+    local weighted_files_for_curr_query = {}
+    local prev_query = opts.query:sub(1, #opts.query - 1)
+
+    for idx, weighted_file in ipairs(P.weighted_files_per_query[prev_query]) do
+      if not fzy.has_match(opts.query, weighted_file.rel_file) then
         goto continue
       end
 
-      populate_weighted_files(weighted_files, abs_file)
+      local fzy_score = fzy.score(opts.query, weighted_file.rel_file)
+      local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
+
+      local hl_idxs = {}
+      if opts.hi_enabled then
+        hl_idxs = fzy.positions(opts.query, weighted_file.rel_file)
+      end
+
+      local weighted_score =
+          opts.fuzzy_score_multiple * scaled_fzy_score +
+          opts.file_score_multiple * weighted_file.buf_and_frecency_score
+
+      table.insert(weighted_files_for_curr_query, {
+        abs_file = weighted_file.abs_file,
+        rel_file = weighted_file.rel_file,
+        weighted_score = weighted_score,
+        fzy_score = scaled_fzy_score,
+        buf_and_frecency_score = weighted_file.buf_and_frecency_score,
+        hl_idxs = hl_idxs,
+        icon_char = weighted_file.icon_char,
+        icon_hl = weighted_file.icon_hl,
+        formatted_filename = weighted_file.formatted_filename,
+      })
 
       if idx % opts.batch_size == 0 then
         coroutine.yield()
@@ -634,22 +723,33 @@ P.get_find_files = function(opts)
 
       ::continue::
     end
-    L.benchmark_step("end", "Populate weighted_files with fd")
+    L.benchmark_step("end", "Update weighted files for current query")
 
-    L.benchmark_step("start", "Sort weighted_files")
+    return weighted_files_for_curr_query
+  end
+
+  local process_files = coroutine.create(function()
+    if not P.weighted_files_per_query[opts.query] then
+      P.weighted_files_per_query[opts.query] = get_weighted_files()
+    end
+
+    local weighted_files = P.weighted_files_per_query[opts.query]
+
+
+    L.benchmark_step("start", "Sort weighted files")
     table.sort(weighted_files, function(a, b)
-      return a.score > b.score
+      return a.weighted_score > b.weighted_score
     end)
-    L.benchmark_step("end", "Sort weighted_files")
+    L.benchmark_step("end", "Sort weighted files")
 
     if P.tick ~= opts.curr_tick then
       L.benchmark_step_interrupted()
       L.benchmark_step_closing()
       return
     end
-    L.benchmark_step("start", "Callback")
+    L.benchmark_step("start", "Render results")
     opts.callback(weighted_files)
-    L.benchmark_step("end", "Callback")
+    L.benchmark_step("end", "Render results")
 
     if not opts.hi_enabled then
       L.benchmark_step("end", "Entire script")
@@ -663,8 +763,9 @@ P.get_find_files = function(opts)
     )
     local icon_char_idx = formatted_score_last_idx + 2
 
-    L.benchmark_step("start", "Highlight loop")
+    L.benchmark_step("start", "Highlight results")
     for idx, weighted_file in ipairs(weighted_files) do
+      if idx > 100 then break end
       local row_0_indexed = idx - 1
 
       if weighted_file.icon_hl then
@@ -680,10 +781,8 @@ P.get_find_files = function(opts)
         )
       end
 
-      local space_offset = 1
-      local icon_offset = 1
-      local file_offset = P.MAX_SCORE_LEN + space_offset + (opts.icons_enabled and (space_offset + icon_offset) or 0)
-      for _, hl_idx in ipairs(weighted_files[idx].hl_idxs) do
+      local file_offset = #weighted_file.formatted_filename - weighted_file.formatted_filename:reverse():find " " + 1
+      for _, hl_idx in ipairs(weighted_file.hl_idxs) do
         local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
 
         vim.hl.range(
@@ -699,7 +798,7 @@ P.get_find_files = function(opts)
         coroutine.yield()
       end
     end
-    L.benchmark_step("end", "Highlight loop")
+    L.benchmark_step("end", "Highlight results")
     L.benchmark_step("end", "Entire script")
     L.benchmark_step_closing()
   end)
@@ -801,7 +900,6 @@ end
 --- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
 --- @field max_results_considered? number
---- @field min_score_considered? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -850,8 +948,7 @@ P.find = function(opts)
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
-  opts.max_results_considered = H.default(opts.max_results_considered, 500)
-  opts.min_score_considered = H.default(opts.min_score_considered, 10)
+  opts.max_results_considered = H.default(opts.max_results_considered, 5000)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
   opts.on_picker_open = H.default(opts.on_picker_open, function() end)
@@ -930,7 +1027,6 @@ P.find = function(opts)
       hi_enabled = opts.hi_enabled,
       icons_enabled = opts.icons_enabled,
       max_results_considered = opts.max_results_considered,
-      min_score_considered = opts.min_score_considered,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
       callback = function(weighted_files)
@@ -962,6 +1058,7 @@ P.find = function(opts)
     L.benchmark_mean_closing()
     L.ongoing_benchmarks = {}
     L.collected_benchmarks = {}
+    P.weighted_files_per_query = {}
 
     vim.api.nvim_win_close(input_win, true)
     vim.api.nvim_win_close(results_win, true)
