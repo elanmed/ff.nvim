@@ -531,8 +531,9 @@ P.get_find_files = function(opts)
     return icon_info
   end
 
-  local function get_weighted_files()
-    if #opts.query == 0 then
+  --- @param query  string
+  local function get_weighted_files(query)
+    if #query == 0 then
       --- @param abs_file string
       local function get_weighted_file_for_empty_query(abs_file)
         local rel_file = H.rel_file(abs_file)
@@ -583,28 +584,28 @@ P.get_find_files = function(opts)
       return weighted_files_for_empty_query
     end
 
-    if #opts.query == 1 then
+    if #query == 1 then
       --- @param abs_file string
       local function get_weighted_file_for_initial_query(abs_file)
         local rel_file = H.rel_file(abs_file)
 
-        if not fzy.has_match(opts.query, rel_file) then
+        if not fzy.has_match(query, rel_file) then
           return nil
         end
 
-        local fzy_score = fzy.score(opts.query, rel_file)
+        local fzy_score = fzy.score(query, rel_file)
         local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
 
         local hl_idxs = {}
         if opts.hi_enabled then
-          hl_idxs = fzy.positions(opts.query, rel_file)
+          hl_idxs = fzy.positions(query, rel_file)
         end
 
         local buf_score = 0
         local basename_with_ext = H.basename(abs_file, { with_ext = true, })
         local basename_without_ext = H.basename(abs_file, { with_ext = false, })
 
-        if opts.query == basename_with_ext or opts.query == basename_without_ext then
+        if query == basename_with_ext or query == basename_without_ext then
           buf_score = opts.weights.basename_boost
         elseif P.caches.open_buffer_to_modified[abs_file] ~= nil then
           local modified = P.caches.open_buffer_to_modified[abs_file]
@@ -686,19 +687,23 @@ P.get_find_files = function(opts)
 
     L.benchmark_step("start", "Update weighted files for current query")
     local weighted_files_for_curr_query = {}
-    local prev_query = opts.query:sub(1, #opts.query - 1)
+    local prev_query = query:sub(1, #query - 1)
+
+    if not P.weighted_files_per_query[prev_query] then
+      P.weighted_files_per_query[prev_query] = get_weighted_files(prev_query)
+    end
 
     for idx, weighted_file in ipairs(P.weighted_files_per_query[prev_query]) do
-      if not fzy.has_match(opts.query, weighted_file.rel_file) then
+      if not fzy.has_match(query, weighted_file.rel_file) then
         goto continue
       end
 
-      local fzy_score = fzy.score(opts.query, weighted_file.rel_file)
+      local fzy_score = fzy.score(query, weighted_file.rel_file)
       local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
 
       local hl_idxs = {}
       if opts.hi_enabled then
-        hl_idxs = fzy.positions(opts.query, weighted_file.rel_file)
+        hl_idxs = fzy.positions(query, weighted_file.rel_file)
       end
 
       local weighted_score =
@@ -730,7 +735,7 @@ P.get_find_files = function(opts)
 
   local process_files = coroutine.create(function()
     if not P.weighted_files_per_query[opts.query] then
-      P.weighted_files_per_query[opts.query] = get_weighted_files()
+      P.weighted_files_per_query[opts.query] = get_weighted_files(opts.query)
     end
 
     local weighted_files = P.weighted_files_per_query[opts.query]
