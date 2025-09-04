@@ -765,7 +765,7 @@ P.get_find_files = function(opts)
 
     L.benchmark_step("start", "Highlight results")
     for idx, weighted_file in ipairs(weighted_files) do
-      if idx > 100 then break end
+      if idx > P.results_height then break end
       local row_0_indexed = idx - 1
 
       if weighted_file.icon_hl then
@@ -829,7 +829,6 @@ P.setup_opts = {}
 P.setup_opts_defaults = {
   refresh_fd_cache = "module-load",
 }
-
 P.setup_called = false
 
 --- @param opts? SetupOpts
@@ -957,7 +956,7 @@ P.find = function(opts)
   local input_height = 1
   local border_height = 2
   local available_height = editor_height - input_height - (border_height * 3)
-  local results_height = math.floor(available_height / 2)
+  P.results_height = math.floor(available_height / 2)
   local input_row = editor_height
   local results_row = input_row - input_height - border_height
 
@@ -977,7 +976,7 @@ P.find = function(opts)
     anchor = "SW",
     relative = "editor",
     width = vim.o.columns,
-    height = results_height,
+    height = P.results_height,
     row = results_row,
     col = 0,
     border = "rounded",
