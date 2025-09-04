@@ -1,9 +1,9 @@
 # `ff.nvim`
 
-A small, simple fuzzy finder with intelligent weights.
+A small, fast fuzzy finder with intelligent weights.
 
-- **Small**: ~1000 LOC,
-- **Simple**: 1 source file, 1 test file
+- **Small**: ~1100 LOC, 1 source file, 1 test file
+- **Fast**: Average ~15ms on a codebase of 60k files
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
 - **Intelligent weights**: Sorts the results by weighing:
     - Frecent (frequently + recently opened) files
@@ -13,6 +13,24 @@ A small, simple fuzzy finder with intelligent weights.
     - The current buffer
     - The basename of the current file (with and without an extension)
     - The fuzzy score of the filename against the current input
+
+## Performance
+`ff.nvim` prioritizes performance in a few ways:
+
+- Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
+- Results from the previous input* are used as the source files when filtering results for the current input. This _dramatically_ reduces the number of files to process as the input grows
+   - (*or more accurately, the current input minus the last character)
+- Extensive caching:
+    - `fd` is executed once and cached when the plugin first loads
+    - Frecency scores are calculated once and cached when the picker is opened - not on every keystroke
+    - Info about open buffers are pulled once and cached when the picker is opened
+    - Icons are cached by extension to avoid calling `mini.icons` when possible
+    - Results are cached for each user input
+- A max of `opts.max_results_considered` results are processed
+- Only visible results in the results window are highlighted
+- Icons and highlights can be disabled for especially large codebases
+
+With these optimizations in place, I average around 15ms per keystroke on a codebase of 60k files. Enable the `benchmark_step` and `benchmark_mean` options to try yourself
 
 ## Configuration example
 ```lua
@@ -37,21 +55,20 @@ vim.keymap.set("n", "<leader>f", function()
   ff.find {
     -- no keymaps are set by default
     keymaps = {
-      n = {
-        ["<cr>"] = "select",
-        ["<c-n>"] = "next",
-        ["<c-p>"] = "prev",
-        ["<c-c>"] = "close",
-        ["<esc>"] = "close",
-
-        ["q"] = "close",
-      },
       i = {
         ["<cr>"] = "select",
         ["<c-n>"] = "next",
         ["<c-p>"] = "prev",
         ["<c-c>"] = "close",
         ["<esc>"] = "close",
+      },
+      n = {
+        ["<cr>"] = "select",
+        ["<c-n>"] = "next",
+        ["<c-p>"] = "prev",
+        ["<c-c>"] = "close",
+        ["<esc>"] = "close",
+        ["q"] = "close",
       },
     },
     -- defaults:
@@ -154,21 +171,6 @@ M.find = function(opts) end
 --- @param fd_cmd string
 M.refresh_fd_cache = function(fd_cmd) end
 ```
-
-## Performance
-`ff.nvim` prioritizes performance in a few ways:
-
-- Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
-- `fd` calls are executed once and cached when the plugin first loads
-- Frecency scores are calculated once and cached when the picker is opened - not on every keystroke
-- Open buffers are pulled once and cached when the picker is opened
-- Icons are cached by extension to avoid calling `mini.icons` when possible
-- A max of `opts.max_results_considered` results are processed
-- Results are cached for each user input
-- Results from the previous input (or more accurately, the current input minus the last character) are used as the source files when filtering results for the current input. This _dramatically_ reduces the number of files to process as the input grows
-- Icons and highlights can be disabled for especially large codebases
-
-With these optimizations in place, I average around **15ms per keystroke on a codebase of 50k files**. Enable the `benchmark_step` and `benchmark_mean` options to try yourself!
 
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
