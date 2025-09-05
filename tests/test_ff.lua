@@ -4,6 +4,7 @@ _G.FF_TEST = true
 local ff = require "ff"
 local H = ff._internal.H
 local F = ff._internal.F
+local P = ff._internal.P
 
 T["H"] = MiniTest.new_set()
 
@@ -310,5 +311,27 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
 end
+
+T["P"] = MiniTest.new_set {
+  hooks = {
+    post_case = function()
+      P.caches.fd_files = {}
+      P.caches.frecency_files = {}
+      P.caches.frecency_file_to_score = {}
+      P.caches.icon_cache = {}
+      P.caches.open_buffer_to_modified = {}
+      P.caches.weighted_files_for_empty_query = {}
+      P.caches.weighted_files_per_query = {}
+    end,
+  },
+}
+
+T["P"]["format_filename"] = MiniTest.new_set()
+
+T["P"]["scale_fzy_to_frecency"] = MiniTest.new_set()
+
+T["P"]["get_icon_info"] = MiniTest.new_set()
+
+T["P"]["get_weighted_files"] = MiniTest.new_set()
 
 return T
