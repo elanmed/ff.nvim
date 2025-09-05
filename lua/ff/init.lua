@@ -1,3 +1,6 @@
+local mini_icons = require "mini.icons"
+local fzy = require "fzy-lua-native"
+
 local M = {}
 
 -- ======================================================
@@ -402,6 +405,9 @@ P.caches = {
 
   --- @type WeightedFile[]
   weighted_files_for_empty_query = {},
+
+  --- @type table<string, WeightedFile[]>
+  weighted_files_per_query = {},
 }
 
 P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
@@ -477,7 +483,6 @@ P.refresh_files_cache = function(opts)
   L.benchmark_step("end", "Sort weighted_files_for_empty_query caches")
 end
 
-
 P.refresh_open_buffers_cache = function()
   P.caches.open_buffer_to_modified = {}
 
@@ -507,11 +512,6 @@ end
 --- @field icon_char string
 --- @field icon_hl string
 --- @field formatted_filename string
-
---- @type table<string, WeightedFile[]>
-P.weighted_files_per_query = {}
-
-local mini_icons = require "mini.icons"
 
 --- @class GetIconInfoOpts
 --- @field icons_enabled boolean
@@ -543,8 +543,6 @@ P.get_icon_info = function(opts)
   end
   return icon_info
 end
-
-local fzy = require "fzy-lua-native"
 
 --- @class GetWeightedFilesOpts
 --- @field query string
@@ -649,7 +647,6 @@ P.get_weighted_files = function(opts)
         table.insert(weighted_files_for_initial_query, weighted_file)
       end
 
-
       if idx % opts.batch_size == 0 then
         coroutine.yield()
       end
@@ -665,8 +662,8 @@ P.get_weighted_files = function(opts)
   local weighted_files_for_curr_query = {}
   local prev_query = opts.query:sub(1, #opts.query - 1)
 
-  if not P.weighted_files_per_query[prev_query] then
-    P.weighted_files_per_query[prev_query] = P.get_weighted_files {
+  if not P.caches.weighted_files_per_query[prev_query] then
+    P.caches.weighted_files_per_query[prev_query] = P.get_weighted_files {
       query = prev_query,
       alt_bufname = opts.alt_bufname,
       batch_size = opts.batch_size,
@@ -679,7 +676,7 @@ P.get_weighted_files = function(opts)
     }
   end
 
-  for idx, weighted_file in ipairs(P.weighted_files_per_query[prev_query]) do
+  for idx, weighted_file in ipairs(P.caches.weighted_files_per_query[prev_query]) do
     if not fzy.has_match(opts.query, weighted_file.rel_file) then
       goto continue
     end
@@ -742,8 +739,8 @@ P.get_find_files = function(opts)
   L.benchmark_step("start", "Entire script")
 
   local process_files = coroutine.create(function()
-    if not P.weighted_files_per_query[opts.query] then
-      P.weighted_files_per_query[opts.query] = P.get_weighted_files {
+    if not P.caches.weighted_files_per_query[opts.query] then
+      P.caches.weighted_files_per_query[opts.query] = P.get_weighted_files {
         alt_bufname = opts.alt_bufname,
         batch_size = opts.batch_size,
         curr_bufname = opts.curr_bufname,
@@ -755,7 +752,7 @@ P.get_find_files = function(opts)
         weights = opts.weights,
       }
     end
-    local weighted_files = P.weighted_files_per_query[opts.query]
+    local weighted_files = P.caches.weighted_files_per_query[opts.query]
 
     L.benchmark_step("start", "Sort weighted files")
     table.sort(weighted_files, function(a, b)
@@ -848,9 +845,6 @@ end
 --- @field icons_enabled? boolean
 
 P.setup_opts = {}
-P.setup_opts_defaults = {
-  refresh_files_cache = "module-load",
-}
 P.setup_called = false
 
 --- @param opts? SetupOpts
@@ -866,7 +860,7 @@ M.setup = function(opts)
   L.SHOULD_LOG_MEAN = opts.benchmark_mean
 
   opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
-  opts.refresh_files_cache = H.default(opts.refresh_files_cache, P.setup_opts_defaults.refresh_files_cache)
+  opts.refresh_files_cache = H.default(opts.refresh_files_cache, "module-load")
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   P.setup_opts = opts
 
@@ -1076,7 +1070,7 @@ P.find = function(opts)
     L.benchmark_mean_closing()
     L.ongoing_benchmarks = {}
     L.collected_benchmarks = {}
-    P.weighted_files_per_query = {}
+    P.caches.weighted_files_per_query = {}
 
     vim.api.nvim_win_close(input_win, true)
     vim.api.nvim_win_close(results_win, true)
