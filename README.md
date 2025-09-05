@@ -28,7 +28,7 @@ A small, fast fuzzy finder with intelligent weights.
     - Info about open buffers are pulled once and cached when the picker is opened
     - Icons are cached by extension to avoid calling `mini.icons` when possible
     - Results are cached for each user input
-- Only visible results in the results window are highlighted
+- A max of `opts.max_results_rendered` results are rendered in the results window, prevent unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around 15ms per keystroke on a codebase of 60k files. Enable the `benchmark_step` and `benchmark_mean` options to try yourself
@@ -86,6 +86,7 @@ vim.keymap.set("n", "<leader>f", function()
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
     max_results_considered = 1000,
+    max_results_rendered = results_height * 2,
     input_win_config = {
       style = "minimal",
       anchor = "SW",
@@ -139,6 +140,7 @@ M.setup = function(opts) end
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field max_results_considered? number
+--- @field max_results_rendered? number
 --- @field input_win_config? vim.api.keyset.win_config
 --- @field results_win_config? vim.api.keyset.win_config
 --- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil

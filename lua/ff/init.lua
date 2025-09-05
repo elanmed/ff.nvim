@@ -552,6 +552,7 @@ end
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 --- @field max_results_considered number
+--- @field max_results_rendered number
 --- @field curr_bufname string
 --- @field alt_bufname string
 --- @field weights FindWeights
@@ -562,7 +563,7 @@ P.get_weighted_files = function(opts)
   end
 
   --- @param abs_file string
-  local function get_weighted_file_for_initial_query(abs_file)
+  local function get_weighted_file_for_query(abs_file)
     local rel_file = H.rel_file(abs_file)
 
     if not fzy.has_match(opts.query, rel_file) then
@@ -626,7 +627,7 @@ P.get_weighted_files = function(opts)
   for idx, abs_file in pairs(P.caches.frecency_files) do
     if #weighted_files_for_query >= opts.max_results_considered then break end
 
-    local weighted_file = get_weighted_file_for_initial_query(abs_file)
+    local weighted_file = get_weighted_file_for_query(abs_file)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -644,7 +645,7 @@ P.get_weighted_files = function(opts)
       goto continue
     end
 
-    local weighted_file = get_weighted_file_for_initial_query(abs_file)
+    local weighted_file = get_weighted_file_for_query(abs_file)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -674,6 +675,7 @@ end
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 --- @field max_results_considered number
+--- @field max_results_rendered number
 
 --- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
@@ -729,7 +731,7 @@ P.get_find_files = function(opts)
 
     L.benchmark_step("start", "Highlight results")
     for idx, weighted_file in ipairs(weighted_files) do
-      if idx > P.results_height then break end
+      if idx > opts.max_results_rendered then break end
       local row_0_indexed = idx - 1
 
       if weighted_file.icon_hl then
@@ -863,6 +865,7 @@ end
 --- @field batch_size? number
 --- @field hi_enabled? boolean
 --- @field max_results_considered? number
+--- @field max_results_rendered? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -919,10 +922,11 @@ P.find = function(opts)
   local input_height = 1
   local border_height = 2
   local available_height = editor_height - input_height - (border_height * 3)
-  P.results_height = math.floor(available_height / 2)
+  local results_height = math.floor(available_height / 2)
   local input_row = editor_height
   local results_row = input_row - input_height - border_height
 
+  opts.max_results_rendered = H.default(opts.max_results_rendered, results_height * 2)
   opts.input_win_config = H.default(opts.input_win_config, {
     style = "minimal",
     anchor = "SW",
@@ -939,7 +943,7 @@ P.find = function(opts)
     anchor = "SW",
     relative = "editor",
     width = vim.o.columns,
-    height = P.results_height,
+    height = results_height,
     row = results_row,
     col = 0,
     border = "rounded",
@@ -991,10 +995,14 @@ P.find = function(opts)
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
       max_results_considered = opts.max_results_considered,
+      max_results_rendered = opts.max_results_rendered,
       callback = function(weighted_files)
-        vim.api.nvim_buf_set_lines(results_buf, 0, -1, false,
-          vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
-        )
+        local formatted_filenames = {}
+        for idx, weighted_file in ipairs(weighted_files) do
+          if idx >= opts.max_results_considered then break end
+          table.insert(formatted_filenames, weighted_file.formatted_filename)
+        end
+        vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, formatted_filenames)
       end,
     }
   end
