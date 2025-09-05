@@ -368,7 +368,7 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @param icon_char string|nil
 P.format_filename = function(abs_file, score, icon_char)
   local formatted_score = H.pad_str(
-    H.fit_decimals(score or 0, P.MAX_SCORE_LEN),
+    H.fit_decimals(score, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
   )
   local formatted_icon_char = icon_char and icon_char .. " " or ""

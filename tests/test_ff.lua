@@ -326,11 +326,115 @@ T["P"] = MiniTest.new_set {
   },
 }
 
-T["P"]["format_filename"] = MiniTest.new_set()
+T["P"]["format_filename"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      H.cwd = "path/to/dir"
+    end,
+    post_case = function()
+      H.cwd = nil
+    end,
+  },
+}
+
+T["P"]["format_filename"]["formats with score, icon, and relative path"] = function()
+  local result = P.format_filename("path/to/dir/src/file.lua", 12.34, "📄")
+  MiniTest.expect.equality(result, "12.34 📄 src/file.lua")
+end
+T["P"]["format_filename"]["formats without icon when icon_char is nil"] = function()
+  local result = P.format_filename("path/to/dir/src/file.lua", 12.34, nil)
+  MiniTest.expect.equality(result, "12.34 src/file.lua")
+end
+T["P"]["format_filename"]["pads score to MAX_SCORE_LEN"] = function()
+  local result = P.format_filename("path/to/dir/file.lua", 1.2, nil)
+  MiniTest.expect.equality(result, " 1.20 file.lua")
+end
+T["P"]["format_filename"]["uses fit_decimals for score formatting"] = function()
+  local result = P.format_filename("path/to/dir/file.lua", 123.456789, nil)
+  MiniTest.expect.equality(result, "123.4 file.lua")
+end
+T["P"]["format_filename"]["handles absolute path when not in cwd"] = function()
+  H.cwd = "path/to/another_dir"
+  local result = P.format_filename("path/to/dir/file.lua", 12.34, nil)
+  MiniTest.expect.equality(result, "12.34 path/to/dir/file.lua")
+end
 
 T["P"]["scale_fzy_to_frecency"] = MiniTest.new_set()
+T["P"]["scale_fzy_to_frecency"]["returns MAX_FRECENCY_SCORE for math.huge"] = function()
+  local result = P.scale_fzy_to_frecency(math.huge)
+  MiniTest.expect.equality(result, P.MAX_FRECENCY_SCORE)
+end
+T["P"]["scale_fzy_to_frecency"]["returns 0 for -math.huge"] = function()
+  local result = P.scale_fzy_to_frecency(-math.huge)
+  MiniTest.expect.equality(result, 0)
+end
+T["P"]["scale_fzy_to_frecency"]["scales positive scores proportionally"] = function()
+  local result = P.scale_fzy_to_frecency(20)
+  MiniTest.expect.equality(result, 99)
+end
+T["P"]["scale_fzy_to_frecency"]["scales half max score to half max frecency"] = function()
+  local result = P.scale_fzy_to_frecency(10)
+  MiniTest.expect.equality(result, 49.5)
+end
+T["P"]["scale_fzy_to_frecency"]["scales zero score to zero"] = function()
+  local result = P.scale_fzy_to_frecency(0)
+  MiniTest.expect.equality(result, 0)
+end
+T["P"]["scale_fzy_to_frecency"]["scales negative scores proportionally"] = function()
+  local result = P.scale_fzy_to_frecency(-10)
+  MiniTest.expect.equality(result, -49.5)
+end
+T["P"]["scale_fzy_to_frecency"]["handles scores above MAX_FZY_SCORE"] = function()
+  local result = P.scale_fzy_to_frecency(40)
+  MiniTest.expect.equality(result, 198)
+end
+T["P"]["scale_fzy_to_frecency"]["handles fractional scores"] = function()
+  local result = P.scale_fzy_to_frecency(5.5)
+  MiniTest.expect.equality(result, 27.225)
+end
 
 T["P"]["get_icon_info"] = MiniTest.new_set()
+T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
+  local result = P.get_icon_info {
+    icons_enabled = false,
+    abs_file = "path/to/file.lua",
+  }
+  MiniTest.expect.equality(result.icon_char, nil)
+  MiniTest.expect.equality(result.icon_hl, nil)
+end
+T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = function()
+  P.caches.icon_cache["lua"] = {
+    icon_char = "🌙",
+    icon_hl = "LuaIcon",
+  }
+
+  local result = P.get_icon_info {
+    icons_enabled = true,
+    abs_file = "path/to/file.lua",
+  }
+
+  MiniTest.expect.equality(result.icon_char, "🌙")
+  MiniTest.expect.equality(result.icon_hl, "LuaIcon")
+end
+T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function()
+  local result_one = P.get_icon_info {
+    icons_enabled = true,
+    abs_file = "path/to/file.js",
+  }
+
+  MiniTest.expect.equality(result_one.icon_char, "󰌞")
+  MiniTest.expect.equality(result_one.icon_hl, "MiniIconsYellow")
+
+  MiniTest.expect.equality(P.caches.icon_cache["js"].icon_char, "󰌞")
+  MiniTest.expect.equality(P.caches.icon_cache["js"].icon_hl, "MiniIconsYellow")
+
+  local result_two = P.get_icon_info {
+    icons_enabled = true,
+    abs_file = "path/to/file.js",
+  }
+  MiniTest.expect.equality(result_two.icon_char, "󰌞")
+  MiniTest.expect.equality(result_two.icon_hl, "MiniIconsYellow")
+end
 
 T["P"]["get_weighted_files"] = MiniTest.new_set()
 
