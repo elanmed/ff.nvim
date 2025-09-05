@@ -455,13 +455,13 @@ P.refresh_files_cache = function(opts)
     local weighted_file = {
       abs_file = abs_file,
       rel_file = rel_file,
-      weighted_score = 0,
-      buf_and_frecency_score = buf_and_frecency_score,
+      weighted_score = buf_and_frecency_score,
+      buf_and_frecency_score = 0,
       fzy_score = 0,
       hl_idxs = {},
       icon_hl = icon_info.icon_hl,
       icon_char = icon_info.icon_char,
-      formatted_filename = P.format_filename(abs_file, 0, icon_info.icon_char),
+      formatted_filename = P.format_filename(abs_file, buf_and_frecency_score, icon_info.icon_char),
     }
     table.insert(P.caches.weighted_files_for_empty_query, weighted_file)
     table.insert(P.caches.fd_files, abs_file)
@@ -469,6 +469,12 @@ P.refresh_files_cache = function(opts)
     ::continue::
   end
   L.benchmark_step("end", "Refresh fd, weighted_files_for_empty_query caches")
+
+  L.benchmark_step("start", "Sort weighted_files_for_empty_query caches")
+  table.sort(P.caches.weighted_files_for_empty_query, function(a, b)
+    return a.weighted_score > b.weighted_score
+  end)
+  L.benchmark_step("end", "Sort weighted_files_for_empty_query caches")
 end
 
 
@@ -490,19 +496,6 @@ P.refresh_open_buffers_cache = function()
   end
   L.benchmark_step("end", "open_buffer_to_modified loop")
 end
-
---- @class GetSmartFilesOpts
---- @field query string
---- @field results_buf number
---- @field curr_bufname string
---- @field alt_bufname string
---- @field curr_tick number
---- @field callback fun(weighted_files:WeightedFile[]):nil
---- @field weights FindWeights
---- @field batch_size number
---- @field hi_enabled boolean
---- @field fuzzy_score_multiple number
---- @field file_score_multiple number
 
 --- @class WeightedFile
 --- @field abs_file string
@@ -726,7 +719,21 @@ P.get_weighted_files = function(opts)
   return weighted_files_for_curr_query
 end
 
---- @param opts GetSmartFilesOpts
+--- @class GetFindFilesOpts
+--- @field query string
+--- @field results_buf number
+--- @field curr_bufname string
+--- @field alt_bufname string
+--- @field curr_tick number
+--- @field callback fun(weighted_files:WeightedFile[]):nil
+--- @field weights FindWeights
+--- @field batch_size number
+--- @field hi_enabled boolean
+--- @field icons_enabled boolean
+--- @field fuzzy_score_multiple number
+--- @field file_score_multiple number
+
+--- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
   vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
 
@@ -914,7 +921,6 @@ end
 --- @field keymaps? FindKeymapsPerMode
 --- @field weights? FindWeights
 --- @field batch_size? number
---- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
@@ -962,7 +968,6 @@ P.find = function(opts)
   opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
 
   opts.batch_size = H.default(opts.batch_size, 250)
-  opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
@@ -1026,7 +1031,7 @@ P.find = function(opts)
 
   --- @param formatted_result string
   local function parse_result(formatted_result)
-    return vim.split(vim.trim(formatted_result), "%s+")[opts.icons_enabled and 3 or 2]
+    return vim.split(vim.trim(formatted_result), "%s+")[P.setup_opts.icons_enabled and 3 or 2]
   end
 
   --- @param query string
@@ -1040,7 +1045,7 @@ P.find = function(opts)
       weights = opts.weights,
       batch_size = opts.batch_size,
       hi_enabled = opts.hi_enabled,
-      icons_enabled = opts.icons_enabled,
+      icons_enabled = P.setup_opts.icons_enabled,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
       callback = function(weighted_files)
@@ -1055,7 +1060,7 @@ P.find = function(opts)
     function()
       L.benchmark_step_heading "Refresh function-level caches"
       if P.setup_opts.refresh_files_cache == "find-call" then
-        P.refresh_files_cache(P.setup_opts.fd_cmd)
+        P.refresh_files_cache { fd_cmd = P.setup_opts.fd_cmd, icons_enabled = P.setup_opts.icons_enabled, }
       end
       P.refresh_open_buffers_cache()
       L.benchmark_step_closing()
