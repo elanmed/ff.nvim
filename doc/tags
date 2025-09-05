@@ -9,6 +9,7 @@ ff-performance	ff.txt	/*ff-performance*
 ff-refresh_fd_cache	ff.txt	/*ff-refresh_fd_cache*
 ff-setup	ff.txt	/*ff-setup*
 ff-similar-plugins	ff.txt	/*ff-similar-plugins*
+ff-status	ff.txt	/*ff-status*
 ff-table-of-contents	ff.txt	/*ff-table-of-contents*
 ff-todo	ff.txt	/*ff-todo*
 ff.txt	ff.txt	/*ff.txt*

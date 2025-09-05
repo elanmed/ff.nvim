@@ -14,6 +14,9 @@ A small, fast fuzzy finder with intelligent weights.
     - The basename of the current file (with and without an extension)
     - The fuzzy score of the filename against the current input
 
+## Status
+- Works fine, API is not yet stable
+
 ## Performance
 `ff.nvim` prioritizes performance in a few ways:
 
@@ -26,7 +29,6 @@ A small, fast fuzzy finder with intelligent weights.
     - Info about open buffers are pulled once and cached when the picker is opened
     - Icons are cached by extension to avoid calling `mini.icons` when possible
     - Results are cached for each user input
-- A max of `opts.max_results_considered` results are processed
 - Only visible results in the results window are highlighted
 - Icons and highlights can be disabled for especially large codebases
 
@@ -82,7 +84,6 @@ vim.keymap.set("n", "<leader>f", function()
     batch_size = 250,
     icons_enabled = true,
     hi_enabled = true,
-    max_results_considered = 5000,
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
     input_win_config = {
@@ -122,6 +123,7 @@ end)
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field fd_cmd? string
+--- @field icons_enabled? boolean
 
 --- @param opts? SetupOpts
 M.setup = function(opts) end
@@ -133,9 +135,7 @@ M.setup = function(opts) end
 --- @field keymaps? FindKeymapsPerMode
 --- @field weights? FindWeights
 --- @field batch_size? number
---- @field icons_enabled? boolean
 --- @field hi_enabled? boolean
---- @field max_results_considered? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
@@ -168,8 +168,13 @@ M.find = function(opts) end
 
 ### `refresh_fd_cache`
 ```lua
---- @param fd_cmd string
-M.refresh_fd_cache = function(fd_cmd) end
+--- @class RefreshFilesCacheOpts
+--- @field fd_cmd string
+--- @field icons_enabled boolean
+--- @param opts RefreshFilesCacheOpts
+
+--- @param opts RefreshFilesCacheOpts
+M.refresh_fd_cache = function(opts) end
 ```
 
 ## Highlight Groups
@@ -195,7 +200,7 @@ after calling`setup`
 ## Features excluded for simplicity
 - Multi-select
 - Shared options between `setup` and `find`
-- A preview window
+- A preview window (maybe?)
 
 ## Similar plugins
 - [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)
