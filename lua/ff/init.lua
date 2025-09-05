@@ -1,6 +1,3 @@
-local mini_icons = require "mini.icons"
-local fzy = require "fzy-lua-native"
-
 local M = {}
 
 -- ======================================================
@@ -145,7 +142,6 @@ end
 --- @param data table
 --- @return nil
 F.write = function(path, data)
-  -- vim.fn.mkdir won't throw
   local path_dir = vim.fs.dirname(path)
   local mkdir_res = vim.fn.mkdir(path_dir, "p")
   if mkdir_res == H.vimscript_false then
@@ -153,14 +149,12 @@ F.write = function(path, data)
     return
   end
 
-  -- io.open won't throw
   local file = io.open(path, "w")
   if file == nil then
     H.notify_error "[ff.nvim]: io.open failed to open the file created with vim.fn.mkdir"
     return
   end
 
-  -- vim.json.encode will throw
   local encoded_data = vim.json.encode(data)
   file:write(encoded_data)
   file:close()
@@ -518,6 +512,7 @@ end
 --- @field abs_file string
 --- @param opts GetIconInfoOpts
 P.get_icon_info = function(opts)
+  local mini_icons = require "mini.icons"
   if not opts.icons_enabled then
     return {
       icon_char = nil,
@@ -558,6 +553,7 @@ end
 --- @field weights FindWeights
 --- @param opts GetWeightedFilesOpts
 P.get_weighted_files = function(opts)
+  local fzy = require "fzy-lua-native"
   if #opts.query == 0 then
     return P.caches.weighted_files_for_empty_query
   end
