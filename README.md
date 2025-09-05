@@ -21,8 +21,7 @@ A small, fast fuzzy finder with intelligent weights.
 `ff.nvim` prioritizes performance in a few ways:
 
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
-- Results from the previous input* are used as the source files when filtering results for the current input. This _dramatically_ reduces the number of files to process as the input grows
-   - (*or more accurately, the current input minus the last character)
+- A max of `opts.max_results_considered` files with a fuzzy match are processed
 - Extensive caching:
     - `fd` is executed once and cached when the plugin first loads
     - Frecency scores are calculated once and cached when the picker is opened - not on every keystroke
@@ -86,6 +85,7 @@ vim.keymap.set("n", "<leader>f", function()
     hi_enabled = true,
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
+    max_results_considered = 1000,
     input_win_config = {
       style = "minimal",
       anchor = "SW",
@@ -138,6 +138,7 @@ M.setup = function(opts) end
 --- @field hi_enabled? boolean
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
+--- @field max_results_considered? number
 --- @field input_win_config? vim.api.keyset.win_config
 --- @field results_win_config? vim.api.keyset.win_config
 --- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
