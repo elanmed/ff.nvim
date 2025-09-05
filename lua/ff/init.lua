@@ -620,15 +620,15 @@ P.get_weighted_files = function(opts)
   end
 
   --- @type WeightedFile[]
-  local weighted_files_for_initial_query = {}
+  local weighted_files_for_query = {}
 
   L.benchmark_step("start", "Populate weighted files for first query with frecency")
   for idx, abs_file in pairs(P.caches.frecency_files) do
-    if idx >= opts.max_results_considered then break end
+    if #weighted_files_for_query >= opts.max_results_considered then break end
 
     local weighted_file = get_weighted_file_for_initial_query(abs_file)
     if weighted_file then
-      table.insert(weighted_files_for_initial_query, weighted_file)
+      table.insert(weighted_files_for_query, weighted_file)
     end
 
     if idx % opts.batch_size == 0 then
@@ -639,14 +639,14 @@ P.get_weighted_files = function(opts)
 
   L.benchmark_step("start", "Populate weighted files for first query with fd")
   for idx, abs_file in ipairs(P.caches.fd_files) do
-    if idx >= opts.max_results_considered then break end
+    if #weighted_files_for_query >= opts.max_results_considered then break end
     if P.caches.frecency_file_to_score[abs_file] ~= nil then
       goto continue
     end
 
     local weighted_file = get_weighted_file_for_initial_query(abs_file)
     if weighted_file then
-      table.insert(weighted_files_for_initial_query, weighted_file)
+      table.insert(weighted_files_for_query, weighted_file)
     end
 
     if idx % opts.batch_size == 0 then
@@ -657,7 +657,7 @@ P.get_weighted_files = function(opts)
   end
   L.benchmark_step("end", "Populate weighted files for first query with fd")
 
-  return weighted_files_for_initial_query
+  return weighted_files_for_query
 end
 
 --- @class GetFindFilesOpts
