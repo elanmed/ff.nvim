@@ -3,7 +3,7 @@
 A small, fast fuzzy finder with intelligent weights.
 
 - **Small**: ~1100 LOC, 1 source file, 1 test file
-- **Fast**: Average ~15ms on a codebase of 60k files
+- **Fast**: Average ~20ms per keystroke on a codebase of 60k files
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
 - **Intelligent weights**: Sorts the results by weighing:
     - Frecent (frequently + recently opened) files
@@ -31,7 +31,7 @@ A small, fast fuzzy finder with intelligent weights.
 - A max of `opts.max_results_rendered` results are rendered in the results window, prevent unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around 15ms per keystroke on a codebase of 60k files. Enable the `benchmark_step` and `benchmark_mean` options to try yourself
+With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files. Enable the `benchmark_step` and `benchmark_mean` options to try yourself
 
 ## Configuration example
 ```lua
