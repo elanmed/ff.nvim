@@ -438,43 +438,44 @@ P.refresh_files_cache = function(opts)
 
   L.benchmark_step("start", "Refresh fd, weighted_files_for_empty_query caches")
   local fd_cmd_tbl = vim.split(opts.fd_cmd, " ")
-  local obj = vim.system(fd_cmd_tbl, { text = true, }):wait()
-  local lines = vim.split(obj.stdout, "\n")
-  for _, abs_file in ipairs(lines) do
-    if #abs_file == 0 then goto continue end
+  vim.system(fd_cmd_tbl, { text = true, }, function(obj)
+    local lines = vim.split(obj.stdout, "\n")
+    for _, abs_file in ipairs(lines) do
+      if #abs_file == 0 then goto continue end
 
-    local buf_and_frecency_score = (function()
-      if P.caches.frecency_file_to_score[abs_file] ~= nil then
-        return P.caches.frecency_file_to_score[abs_file]
-      end
-      return 0
-    end)()
+      local buf_and_frecency_score = (function()
+        if P.caches.frecency_file_to_score[abs_file] ~= nil then
+          return P.caches.frecency_file_to_score[abs_file]
+        end
+        return 0
+      end)()
 
-    local rel_file = H.rel_file(abs_file)
-    local icon_info = P.get_icon_info { abs_file = abs_file, icons_enabled = opts.icons_enabled, }
-    local weighted_file = {
-      abs_file = abs_file,
-      rel_file = rel_file,
-      weighted_score = buf_and_frecency_score,
-      buf_and_frecency_score = 0,
-      fzy_score = 0,
-      hl_idxs = {},
-      icon_hl = icon_info.icon_hl,
-      icon_char = icon_info.icon_char,
-      formatted_filename = P.format_filename(abs_file, buf_and_frecency_score, icon_info.icon_char),
-    }
-    table.insert(P.caches.weighted_files_for_empty_query, weighted_file)
-    table.insert(P.caches.fd_files, abs_file)
+      local rel_file = H.rel_file(abs_file)
+      local icon_info = P.get_icon_info { abs_file = abs_file, icons_enabled = opts.icons_enabled, }
+      local weighted_file = {
+        abs_file = abs_file,
+        rel_file = rel_file,
+        weighted_score = buf_and_frecency_score,
+        buf_and_frecency_score = 0,
+        fzy_score = 0,
+        hl_idxs = {},
+        icon_hl = icon_info.icon_hl,
+        icon_char = icon_info.icon_char,
+        formatted_filename = P.format_filename(abs_file, buf_and_frecency_score, icon_info.icon_char),
+      }
+      table.insert(P.caches.weighted_files_for_empty_query, weighted_file)
+      table.insert(P.caches.fd_files, abs_file)
 
-    ::continue::
-  end
-  L.benchmark_step("end", "Refresh fd, weighted_files_for_empty_query caches")
+      ::continue::
+    end
+    L.benchmark_step("end", "Refresh fd, weighted_files_for_empty_query caches")
 
-  L.benchmark_step("start", "Sort weighted_files_for_empty_query caches")
-  table.sort(P.caches.weighted_files_for_empty_query, function(a, b)
-    return a.weighted_score > b.weighted_score
+    L.benchmark_step("start", "Sort weighted_files_for_empty_query caches")
+    table.sort(P.caches.weighted_files_for_empty_query, function(a, b)
+      return a.weighted_score > b.weighted_score
+    end)
+    L.benchmark_step("end", "Sort weighted_files_for_empty_query caches")
   end)
-  L.benchmark_step("end", "Sort weighted_files_for_empty_query caches")
 end
 
 P.refresh_open_buffers_cache = function()
@@ -824,7 +825,9 @@ M.setup = function(opts)
 
   L.benchmark_step_heading "Refresh file-level caches"
   if opts.refresh_files_cache == "module-load" then
-    P.refresh_files_cache { fd_cmd = opts.fd_cmd, icons_enabled = opts.icons_enabled, }
+    vim.schedule(function()
+      P.refresh_files_cache { fd_cmd = opts.fd_cmd, icons_enabled = opts.icons_enabled, }
+    end)
   end
   L.benchmark_step_closing()
 
