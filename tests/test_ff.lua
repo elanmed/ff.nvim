@@ -438,4 +438,6 @@ end
 
 T["P"]["get_weighted_files"] = MiniTest.new_set()
 
+T["P"]["highlight_weighted_files"] = MiniTest.new_set()
+
 return T
