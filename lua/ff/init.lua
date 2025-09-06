@@ -521,7 +521,7 @@ P.get_icon_info = function(opts)
   end
 
   local ext = H.get_ext(opts.abs_file)
-  if P.caches.icon_cache[ext] then
+  if ext and P.caches.icon_cache[ext] then
     return {
       icon_char = P.caches.icon_cache[ext].icon_char,
       icon_hl = P.caches.icon_cache[ext].icon_hl,
@@ -619,7 +619,7 @@ P.get_weighted_files = function(opts)
   --- @type WeightedFile[]
   local weighted_files_for_query = {}
 
-  L.benchmark_step("start", "Populate weighted files for first query with frecency")
+  L.benchmark_step("start", "Populate weighted files for non-empty query with frecency")
   for idx, abs_file in pairs(P.caches.frecency_files) do
     if #weighted_files_for_query >= opts.max_results_considered then break end
 
@@ -632,9 +632,9 @@ P.get_weighted_files = function(opts)
       coroutine.yield()
     end
   end
-  L.benchmark_step("end", "Populate weighted files for first query with frecency")
+  L.benchmark_step("end", "Populate weighted files for non-empty query with frecency")
 
-  L.benchmark_step("start", "Populate weighted files for first query with fd")
+  L.benchmark_step("start", "Populate weighted files for non-empty query with fd")
   for idx, abs_file in ipairs(P.caches.fd_files) do
     if #weighted_files_for_query >= opts.max_results_considered then break end
     if P.caches.frecency_file_to_score[abs_file] ~= nil then
@@ -652,7 +652,7 @@ P.get_weighted_files = function(opts)
 
     ::continue::
   end
-  L.benchmark_step("end", "Populate weighted files for first query with fd")
+  L.benchmark_step("end", "Populate weighted files for non-empty query with fd")
 
   return weighted_files_for_query
 end
@@ -949,6 +949,8 @@ P.find = function(opts)
 
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
+  curr_bufname = curr_bufname or ""
+  alt_bufname = alt_bufname or ""
 
   local results_buf = vim.api.nvim_create_buf(false, true)
   local results_win = vim.api.nvim_open_win(results_buf, false, opts.results_win_config)
@@ -981,8 +983,8 @@ P.find = function(opts)
     P.get_find_files {
       query = query,
       results_buf = results_buf,
-      curr_bufname = curr_bufname or "",
-      alt_bufname = alt_bufname or "",
+      curr_bufname = curr_bufname,
+      alt_bufname = alt_bufname,
       curr_tick = P.tick,
       weights = opts.weights,
       batch_size = opts.batch_size,
