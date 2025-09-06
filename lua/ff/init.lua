@@ -397,9 +397,6 @@ P.caches = {
   --- @type table<string, boolean>
   open_buffer_to_modified = {},
 
-  --- @type WeightedFile[]
-  weighted_files_for_empty_query = {},
-
   --- @type table<string, WeightedFile[]>
   weighted_files_per_query = {},
 }
@@ -411,10 +408,11 @@ P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules 
 --- @field icons_enabled boolean
 --- @param opts RefreshFilesCacheOpts
 P.refresh_files_cache = function(opts)
+  L.benchmark_step_heading "Refresh files cache"
+
   P.caches.fd_files = {}
   P.caches.frecency_files = {}
   P.caches.frecency_file_to_score = {}
-  P.caches.weighted_files_for_empty_query = {}
 
   L.benchmark_step("start", "Frecency dated_files fs read")
   local dated_files_path = F.get_dated_files_path()
@@ -436,51 +434,25 @@ P.refresh_files_cache = function(opts)
   end
   L.benchmark_step("end", "Calculate frecency_file_to_score")
 
-  L.benchmark_step("start", "Refresh fd, weighted_files_for_empty_query caches")
+  L.benchmark_step("start", "Refresh fd cache")
   local fd_cmd_tbl = vim.split(opts.fd_cmd, " ")
   vim.system(fd_cmd_tbl, { text = true, }, function(obj)
     local lines = vim.split(obj.stdout, "\n")
     for _, abs_file in ipairs(lines) do
       if #abs_file == 0 then goto continue end
-
-      local buf_and_frecency_score = (function()
-        if P.caches.frecency_file_to_score[abs_file] ~= nil then
-          return P.caches.frecency_file_to_score[abs_file]
-        end
-        return 0
-      end)()
-
-      local rel_file = H.rel_file(abs_file)
-      local icon_info = P.get_icon_info { abs_file = abs_file, icons_enabled = opts.icons_enabled, }
-      local weighted_file = {
-        abs_file = abs_file,
-        rel_file = rel_file,
-        weighted_score = buf_and_frecency_score,
-        buf_and_frecency_score = 0,
-        fzy_score = 0,
-        hl_idxs = {},
-        icon_hl = icon_info.icon_hl,
-        icon_char = icon_info.icon_char,
-        formatted_filename = P.format_filename(abs_file, buf_and_frecency_score, icon_info.icon_char),
-      }
-      table.insert(P.caches.weighted_files_for_empty_query, weighted_file)
       table.insert(P.caches.fd_files, abs_file)
 
       ::continue::
     end
-    L.benchmark_step("end", "Refresh fd, weighted_files_for_empty_query caches")
-
-    L.benchmark_step("start", "Sort weighted_files_for_empty_query caches")
-    table.sort(P.caches.weighted_files_for_empty_query, function(a, b)
-      return a.weighted_score > b.weighted_score
-    end)
-    L.benchmark_step("end", "Sort weighted_files_for_empty_query caches")
+    L.benchmark_step("end", "Refresh fd cache")
+    L.benchmark_step_closing()
   end)
 end
 
 P.refresh_open_buffers_cache = function()
   P.caches.open_buffer_to_modified = {}
 
+  L.benchmark_step_heading "Refresh open buffers cache"
   L.benchmark_step("start", "open_buffer_to_modified loop")
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
@@ -495,6 +467,7 @@ P.refresh_open_buffers_cache = function()
     ::continue::
   end
   L.benchmark_step("end", "open_buffer_to_modified loop")
+  L.benchmark_step_closing()
 end
 
 --- @class WeightedFile
@@ -550,18 +523,41 @@ end
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
 --- @field max_results_considered number
+--- @field max_results_rendered number
 --- @field batch_size number
 --- @param opts GetWeightedFilesOpts
 P.get_weighted_files = function(opts)
+  if P.caches.weighted_files_per_query[opts.query] then
+    return P.caches.weighted_files_per_query[opts.query]
+  end
+
   local fzy = require "fzy-lua-native"
 
-  if #opts.query == 0 then
-    return P.caches.weighted_files_for_empty_query
-  end
+  --- @type WeightedFile[]
+  local weighted_files_for_query = {}
 
   --- @param abs_file string
   local function get_weighted_file_for_query(abs_file)
     local rel_file = H.rel_file(abs_file)
+    if #opts.query == 0 then
+      local icon_info = P.get_icon_info { abs_file = abs_file, icons_enabled = opts.icons_enabled, }
+
+      local frecency_score = 0
+      if P.caches.frecency_file_to_score[abs_file] ~= nil then
+        frecency_score = P.caches.frecency_file_to_score[abs_file]
+      end
+      return {
+        abs_file = abs_file,
+        rel_file = rel_file,
+        weighted_score = frecency_score,
+        buf_and_frecency_score = 0,
+        fzy_score = 0,
+        hl_idxs = {},
+        icon_hl = icon_info.icon_hl,
+        icon_char = icon_info.icon_char,
+        formatted_filename = P.format_filename(abs_file, frecency_score, icon_info.icon_char),
+      }
+    end
 
     if not fzy.has_match(opts.query, rel_file) then
       return nil
@@ -617,12 +613,16 @@ P.get_weighted_files = function(opts)
     }
   end
 
-  --- @type WeightedFile[]
-  local weighted_files_for_query = {}
+  local max_results = (function()
+    if opts.query == "" then
+      return opts.max_results_rendered
+    end
+    return opts.max_results_considered
+  end)()
 
-  L.benchmark_step("start", "Populate weighted files for non-empty query with frecency")
+  L.benchmark_step("start", "Populate weighted files for query with frecency")
   for idx, abs_file in pairs(P.caches.frecency_files) do
-    if #weighted_files_for_query >= opts.max_results_considered then break end
+    if #weighted_files_for_query >= max_results then break end
 
     local weighted_file = get_weighted_file_for_query(abs_file)
     if weighted_file then
@@ -633,11 +633,11 @@ P.get_weighted_files = function(opts)
       coroutine.yield()
     end
   end
-  L.benchmark_step("end", "Populate weighted files for non-empty query with frecency")
+  L.benchmark_step("end", "Populate weighted files for query with frecency")
 
-  L.benchmark_step("start", "Populate weighted files for non-empty query with fd")
+  L.benchmark_step("start", "Populate weighted files for query with fd")
   for idx, abs_file in ipairs(P.caches.fd_files) do
-    if #weighted_files_for_query >= opts.max_results_considered then break end
+    if #weighted_files_for_query >= max_results then break end
     if P.caches.frecency_file_to_score[abs_file] ~= nil then
       goto continue
     end
@@ -653,7 +653,7 @@ P.get_weighted_files = function(opts)
 
     ::continue::
   end
-  L.benchmark_step("end", "Populate weighted files for non-empty query with fd")
+  L.benchmark_step("end", "Populate weighted files for query with fd")
 
   P.caches.weighted_files_per_query[opts.query] = weighted_files_for_query
   return weighted_files_for_query
@@ -744,6 +744,7 @@ P.get_find_files = function(opts)
       hi_enabled = opts.hi_enabled,
       icons_enabled = opts.icons_enabled,
       max_results_considered = opts.max_results_considered,
+      max_results_rendered = opts.max_results_rendered,
       query = opts.query,
       weights = opts.weights,
     }
@@ -823,13 +824,9 @@ M.setup = function(opts)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   P.setup_opts = opts
 
-  L.benchmark_step_heading "Refresh file-level caches"
   if opts.refresh_files_cache == "module-load" then
-    vim.schedule(function()
-      P.refresh_files_cache { fd_cmd = opts.fd_cmd, icons_enabled = opts.icons_enabled, }
-    end)
+    P.refresh_files_cache { fd_cmd = opts.fd_cmd, icons_enabled = opts.icons_enabled, }
   end
-  L.benchmark_step_closing()
 
   local timer_id = nil
   local last_updated_abs_file = nil
@@ -1024,12 +1021,10 @@ P.find = function(opts)
 
   vim.schedule(
     function()
-      L.benchmark_step_heading "Refresh function-level caches"
       if P.setup_opts.refresh_files_cache == "find-call" then
         P.refresh_files_cache { fd_cmd = P.setup_opts.fd_cmd, icons_enabled = P.setup_opts.icons_enabled, }
       end
       P.refresh_open_buffers_cache()
-      L.benchmark_step_closing()
 
       get_find_files_with_query ""
     end
