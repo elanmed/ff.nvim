@@ -545,7 +545,7 @@ end
 --- @field curr_bufname string
 --- @field alt_bufname string
 --- @field curr_tick number
---- @field callback fun(weighted_files:WeightedFile[]):nil
+--- @field render_results fun(weighted_files:WeightedFile[]):nil
 --- @field weights FindWeights
 --- @field batch_size number
 --- @field hi_enabled boolean
@@ -682,7 +682,7 @@ P.get_find_files = function(opts)
       return
     end
     L.benchmark_step("start", "Render results")
-    opts.callback(weighted_files)
+    opts.render_results(weighted_files)
     L.benchmark_step("end", "Render results")
 
     if not opts.hi_enabled then
@@ -966,7 +966,7 @@ P.find = function(opts)
       file_score_multiple = opts.file_score_multiple,
       max_results_considered = opts.max_results_considered,
       max_results_rendered = opts.max_results_rendered,
-      callback = function(weighted_files)
+      render_results = function(weighted_files)
         local formatted_filenames = {}
         for idx, weighted_file in ipairs(weighted_files) do
           if idx >= opts.max_results_considered then break end
