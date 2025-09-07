@@ -9,7 +9,7 @@ Configuration example ............................. |ff-configuration-example|
 API ................................................................. |ff-api|
 `setup` ........................................................... |ff-setup|
 `find` ............................................................. |ff-find|
-`refresh_fd_cache` ..................................... |ff-refresh_fd_cache|
+`refresh_files_cache` ............................... |ff-refresh_files_cache|
 Highlight Groups ....................................... |ff-highlight-groups|
 Deps ............................................................... |ff-deps|
 TODO ............................................................... |ff-todo|
@@ -69,7 +69,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
     local ff = require "ff"
     ff.setup {
       -- defaults to:
-      refresh_fd_cache = "module-load",
+      refresh_files_cache = "module-load",
       benchmark_step = false,
       benchmark_mean = false,
       fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
@@ -156,11 +156,10 @@ API                                                                   *ff-api*
 
 >lua
     --- @class SetupOpts
-    --- @field refresh_fd_cache? "module-load"|"find-call"
+    --- @field refresh_files_cache? "module-load"|"find-call"
     --- @field benchmark_step? boolean
     --- @field benchmark_mean? boolean
     --- @field fd_cmd? string
-    --- @field icons_enabled? boolean
     
     --- @param opts? SetupOpts
     M.setup = function(opts) end
@@ -175,6 +174,7 @@ API                                                                   *ff-api*
     --- @field weights? FindWeights
     --- @field batch_size? number
     --- @field hi_enabled? boolean
+    --- @field icons_enabled? boolean
     --- @field fuzzy_score_multiple? number
     --- @field file_score_multiple? number
     --- @field max_results_considered? number
@@ -208,16 +208,11 @@ API                                                                   *ff-api*
 <
 
                                                                               
-`REFRESH_FD_CACHE`                                       *ff-refresh_fd_cache*
+`REFRESH_FILES_CACHE`                                 *ff-refresh_files_cache*
 
 >lua
-    --- @class RefreshFilesCacheOpts
-    --- @field fd_cmd string
-    --- @field icons_enabled boolean
-    --- @param opts RefreshFilesCacheOpts
-    
-    --- @param opts RefreshFilesCacheOpts
-    M.refresh_fd_cache = function(opts) end
+    --- @param fd_cmd string
+    M.refresh_files_cache = function(fd_cmd) end
 <
 
 ------------------------------------------------------------------------------

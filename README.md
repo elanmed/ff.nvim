@@ -38,7 +38,7 @@ With these optimizations in place, I average around 20ms per keystroke on a code
 local ff = require "ff"
 ff.setup {
   -- defaults to:
-  refresh_fd_cache = "module-load",
+  refresh_files_cache = "module-load",
   benchmark_step = false,
   benchmark_mean = false,
   fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
@@ -120,11 +120,10 @@ end)
 ### `setup`
 ```lua 
 --- @class SetupOpts
---- @field refresh_fd_cache? "module-load"|"find-call"
+--- @field refresh_files_cache? "module-load"|"find-call"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field fd_cmd? string
---- @field icons_enabled? boolean
 
 --- @param opts? SetupOpts
 M.setup = function(opts) end
@@ -137,6 +136,7 @@ M.setup = function(opts) end
 --- @field weights? FindWeights
 --- @field batch_size? number
 --- @field hi_enabled? boolean
+--- @field icons_enabled? boolean
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
 --- @field max_results_considered? number
@@ -169,15 +169,10 @@ M.setup = function(opts) end
 M.find = function(opts) end
 ```
 
-### `refresh_fd_cache`
+### `refresh_files_cache`
 ```lua
---- @class RefreshFilesCacheOpts
---- @field fd_cmd string
---- @field icons_enabled boolean
---- @param opts RefreshFilesCacheOpts
-
---- @param opts RefreshFilesCacheOpts
-M.refresh_fd_cache = function(opts) end
+--- @param fd_cmd string
+M.refresh_files_cache = function(fd_cmd) end
 ```
 
 ## Highlight Groups

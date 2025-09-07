@@ -403,14 +403,27 @@ P.caches = {
 
 P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
 
---- @class RefreshFilesCacheOpts
---- @field fd_cmd string
---- @field icons_enabled boolean
---- @param opts RefreshFilesCacheOpts
-P.refresh_files_cache = function(opts)
-  L.benchmark_step_heading "Refresh files cache"
-
+--- @param fd_cmd string
+P.refresh_files_cache = function(fd_cmd)
   P.caches.fd_files = {}
+
+  L.benchmark_step_heading "Refresh files cache"
+  L.benchmark_step("start", "Refresh fd cache")
+  local fd_cmd_tbl = vim.split(fd_cmd, " ")
+  vim.system(fd_cmd_tbl, { text = true, }, function(obj)
+    local lines = vim.split(obj.stdout, "\n")
+    for _, abs_file in ipairs(lines) do
+      if #abs_file == 0 then goto continue end
+      table.insert(P.caches.fd_files, abs_file)
+
+      ::continue::
+    end
+    L.benchmark_step("end", "Refresh fd cache")
+    L.benchmark_step_closing()
+  end)
+end
+
+P.refresh_frecency_cache = function()
   P.caches.frecency_files = {}
   P.caches.frecency_file_to_score = {}
 
@@ -433,26 +446,11 @@ P.refresh_files_cache = function(opts)
     ::continue::
   end
   L.benchmark_step("end", "Calculate frecency_file_to_score")
-
-  L.benchmark_step("start", "Refresh fd cache")
-  local fd_cmd_tbl = vim.split(opts.fd_cmd, " ")
-  vim.system(fd_cmd_tbl, { text = true, }, function(obj)
-    local lines = vim.split(obj.stdout, "\n")
-    for _, abs_file in ipairs(lines) do
-      if #abs_file == 0 then goto continue end
-      table.insert(P.caches.fd_files, abs_file)
-
-      ::continue::
-    end
-    L.benchmark_step("end", "Refresh fd cache")
-    L.benchmark_step_closing()
-  end)
 end
 
 P.refresh_open_buffers_cache = function()
   P.caches.open_buffer_to_modified = {}
 
-  L.benchmark_step_heading "Refresh open buffers cache"
   L.benchmark_step("start", "open_buffer_to_modified loop")
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
@@ -467,7 +465,6 @@ P.refresh_open_buffers_cache = function()
     ::continue::
   end
   L.benchmark_step("end", "open_buffer_to_modified loop")
-  L.benchmark_step_closing()
 end
 
 --- @class WeightedFile
@@ -821,11 +818,10 @@ M.setup = function(opts)
 
   opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
   opts.refresh_files_cache = H.default(opts.refresh_files_cache, "module-load")
-  opts.icons_enabled = H.default(opts.icons_enabled, true)
   P.setup_opts = opts
 
   if opts.refresh_files_cache == "module-load" then
-    P.refresh_files_cache { fd_cmd = opts.fd_cmd, icons_enabled = opts.icons_enabled, }
+    P.refresh_files_cache(opts.fd_cmd)
   end
 
   local timer_id = nil
@@ -849,7 +845,7 @@ M.setup = function(opts)
 
         F.update_file_score(abs_file, { update_type = "increase", })
         if not P.caches.frecency_file_to_score[abs_file] then
-          P.refresh_files_cache { fd_cmd = P.setup_opts.fd_cmd, icons_enabled = P.setup_opts.icons_enabled, }
+          P.refresh_files_cache(opts.fd_cmd)
         end
       end)
     end,
@@ -858,15 +854,13 @@ M.setup = function(opts)
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { link = "CursorLine", })
 end
 
---- @param opts? RefreshFilesCacheOpts
-M.refresh_files_cache = function(opts)
+--- @param fd_cmd? string
+M.refresh_files_cache = function(fd_cmd)
   if not P.setup_called then
     H.notify_error "[ff.nvim]: `setup` must be called before `refresh_files_cache`"
   end
-  opts = H.default(opts, {})
-  opts.fd_cmd = H.default(opts.fd_cmd, P.setup_opts.fd_cmd)
-  opts.icons_enabled = H.default(opts.icons_enabled, P.setup_opts.icons_enabled)
-  P.refresh_files_cache { fd_cmd = opts.fd_cmd, icons_enabled = opts.icons_enabled, }
+  fd_cmd = H.default(fd_cmd, P.setup_opts.fd_cmd)
+  P.refresh_files_cache(fd_cmd)
 end
 
 --- @class FindOpts
@@ -874,6 +868,7 @@ end
 --- @field weights? FindWeights
 --- @field batch_size? number
 --- @field hi_enabled? boolean
+--- @field icons_enabled? boolean
 --- @field max_results_considered? number
 --- @field max_results_rendered? number
 --- @field fuzzy_score_multiple? number
@@ -923,6 +918,7 @@ P.find = function(opts)
 
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.hi_enabled = H.default(opts.hi_enabled, true)
+  opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
@@ -989,7 +985,7 @@ P.find = function(opts)
 
   --- @param formatted_result string
   local function parse_result(formatted_result)
-    return vim.split(vim.trim(formatted_result), "%s+")[P.setup_opts.icons_enabled and 3 or 2]
+    return vim.split(vim.trim(formatted_result), "%s+")[opts.icons_enabled and 3 or 2]
   end
 
   --- @param query string
@@ -1003,7 +999,7 @@ P.find = function(opts)
       weights = opts.weights,
       batch_size = opts.batch_size,
       hi_enabled = opts.hi_enabled,
-      icons_enabled = P.setup_opts.icons_enabled,
+      icons_enabled = opts.icons_enabled,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
       max_results_considered = opts.max_results_considered,
@@ -1022,9 +1018,13 @@ P.find = function(opts)
   vim.schedule(
     function()
       if P.setup_opts.refresh_files_cache == "find-call" then
-        P.refresh_files_cache { fd_cmd = P.setup_opts.fd_cmd, icons_enabled = P.setup_opts.icons_enabled, }
+        P.refresh_files_cache(P.setup_opts.fd_cmd)
       end
+
+      L.benchmark_step_heading "Refresh file-level caches"
       P.refresh_open_buffers_cache()
+      P.refresh_frecency_cache()
+      L.benchmark_step_closing()
 
       get_find_files_with_query ""
     end
