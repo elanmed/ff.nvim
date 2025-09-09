@@ -1,12 +1,17 @@
 ff-api	ff.txt	/*ff-api*
+ff-benchmark_mean_end	ff.txt	/*ff-benchmark_mean_end*
+ff-benchmark_mean_start	ff.txt	/*ff-benchmark_mean_start*
 ff-configuration-example	ff.txt	/*ff-configuration-example*
 ff-deps	ff.txt	/*ff-deps*
 ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
 ff-find	ff.txt	/*ff-find*
+ff-get_weighted_files	ff.txt	/*ff-get_weighted_files*
 ff-highlight-groups	ff.txt	/*ff-highlight-groups*
 ff-performance	ff.txt	/*ff-performance*
 ff-refresh_files_cache	ff.txt	/*ff-refresh_files_cache*
+ff-refresh_frecency_cache	ff.txt	/*ff-refresh_frecency_cache*
+ff-refresh_open_buffers_cache	ff.txt	/*ff-refresh_open_buffers_cache*
 ff-setup	ff.txt	/*ff-setup*
 ff-similar-plugins	ff.txt	/*ff-similar-plugins*
 ff-status	ff.txt	/*ff-status*

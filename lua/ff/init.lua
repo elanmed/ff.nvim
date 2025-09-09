@@ -300,7 +300,7 @@ end
 L.ongoing_benchmarks = {}
 
 --- @type table<string, number[]>
-L.collected_benchmarks = {}
+L.benchmarks_for_mean = {}
 
 --- @param type "start"|"end"
 --- @param label string
@@ -318,10 +318,10 @@ L.benchmark_step = function(type, label, opts)
     local formatted_ms = H.pad_str(H.exact_decimals(elapsed_ms, 3), 8)
 
     if L.SHOULD_LOG_MEAN and opts.record_mean then
-      if not L.collected_benchmarks[label] then
-        L.collected_benchmarks[label] = {}
+      if not L.benchmarks_for_mean[label] then
+        L.benchmarks_for_mean[label] = {}
       end
-      table.insert(L.collected_benchmarks[label], elapsed_ms)
+      table.insert(L.benchmarks_for_mean[label], elapsed_ms)
     end
 
     if L.SHOULD_LOG_STEP then
@@ -334,7 +334,7 @@ end
 L.benchmark_mean = function()
   if not L.SHOULD_LOG_MEAN then return end
 
-  for label, benchmarks in pairs(L.collected_benchmarks) do
+  for label, benchmarks in pairs(L.benchmarks_for_mean) do
     local sum = 0
     for _, bench in ipairs(benchmarks) do
       sum = sum + bench
@@ -379,11 +379,11 @@ P.format_filename = function(abs_file, score, icon_char)
   )
 end
 
---- @param fzy_score number
-P.scale_fzy_to_frecency = function(fzy_score)
-  if fzy_score == math.huge then return P.MAX_FRECENCY_SCORE end
-  if fzy_score == -math.huge then return 0 end
-  return (fzy_score) / (P.MAX_FZY_SCORE) * P.MAX_FRECENCY_SCORE
+--- @param fuzzy_score number
+P.scale_fzy_to_frecency = function(fuzzy_score)
+  if fuzzy_score == math.huge then return P.MAX_FRECENCY_SCORE end
+  if fuzzy_score == -math.huge then return 0 end
+  return (fuzzy_score) / (P.MAX_FZY_SCORE) * P.MAX_FRECENCY_SCORE
 end
 
 P.caches = {
@@ -428,7 +428,7 @@ P.refresh_files_cache = function(fd_cmd)
   end)
 end
 
-P.refresh_frecency_cache = function()
+M.refresh_frecency_cache = function()
   L.benchmark_step_heading "Refresh frecency cache"
   P.caches.frecency_files = {}
   P.caches.frecency_file_to_score = {}
@@ -455,7 +455,8 @@ P.refresh_frecency_cache = function()
   L.benchmark_step_closing()
 end
 
-P.refresh_open_buffers_cache = function()
+M.refresh_open_buffers_cache = function()
+  P.caches.weighted_files_per_query = {}
   P.caches.open_buffer_to_modified = {}
 
   L.benchmark_step_heading "Refresh open buffers cache"
@@ -480,7 +481,7 @@ end
 --- @field abs_file string
 --- @field rel_file string
 --- @field weighted_score number
---- @field fzy_score number
+--- @field fuzzy_score number
 --- @field buf_and_frecency_score number
 --- @field hl_idxs table
 --- @field icon_char string
@@ -523,16 +524,36 @@ end
 --- @field query string
 --- @field curr_bufname string
 --- @field alt_bufname string
---- @field weights FindWeights
---- @field icons_enabled boolean
+--- @field weights Weights
+--- @field batch_size number | false
 --- @field hi_enabled boolean
---- @field fuzzy_score_multiple number
---- @field file_score_multiple number
+--- @field icons_enabled boolean
 --- @field max_results_considered number
 --- @field max_results_rendered number
---- @field batch_size number | false
+--- @field fuzzy_score_multiple number
+--- @field file_score_multiple number
 --- @param opts GetWeightedFilesOpts
-P.get_weighted_files = function(opts)
+M.get_weighted_files = function(opts)
+  L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
+  H.cwd = vim.uv.cwd()
+
+  opts = H.default(opts, {})
+  opts.curr_bufname = H.default(opts.curr_bufname, "")
+  opts.alt_bufname = H.default(opts.alt_bufname, "")
+  opts.weights = H.default(opts.weights, {})
+  opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
+  opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
+  opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
+  opts.weights.basename_boost = H.default(opts.weights.basename_boost, 40)
+  opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
+  opts.batch_size = H.default(opts.batch_size, false) -- different from M.find
+  opts.hi_enabled = H.default(opts.hi_enabled, true)
+  opts.icons_enabled = H.default(opts.icons_enabled, true)
+  opts.max_results_considered = H.default(opts.max_results_considered, 1000)
+  opts.max_results_rendered = H.default(opts.max_results_rendered, 50) -- different from M.find
+  opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
+  opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
+
   if P.caches.weighted_files_per_query[opts.query] then
     return P.caches.weighted_files_per_query[opts.query]
   end
@@ -557,7 +578,7 @@ P.get_weighted_files = function(opts)
         rel_file = rel_file,
         weighted_score = frecency_score,
         buf_and_frecency_score = 0,
-        fzy_score = 0,
+        fuzzy_score = 0,
         hl_idxs = {},
         icon_hl = icon_info.icon_hl,
         icon_char = icon_info.icon_char,
@@ -594,8 +615,8 @@ P.get_weighted_files = function(opts)
       buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_file]
     end
 
-    local fzy_score = fzy.score(opts.query, rel_file)
-    local scaled_fzy_score = P.scale_fzy_to_frecency(fzy_score)
+    local fuzzy_score = fzy.score(opts.query, rel_file)
+    local scaled_fzy_score = P.scale_fzy_to_frecency(fuzzy_score)
     local weighted_score =
         opts.fuzzy_score_multiple * scaled_fzy_score +
         opts.file_score_multiple * buf_and_frecency_score
@@ -610,7 +631,7 @@ P.get_weighted_files = function(opts)
       abs_file = abs_file,
       rel_file = rel_file,
       weighted_score = weighted_score,
-      fzy_score = scaled_fzy_score,
+      fuzzy_score = scaled_fzy_score,
       buf_and_frecency_score = buf_and_frecency_score,
       hl_idxs = hl_idxs,
       icon_hl = icon_info.icon_hl,
@@ -666,6 +687,7 @@ P.get_weighted_files = function(opts)
     return a.weighted_score > b.weighted_score
   end)
   L.benchmark_step("end", "Sort weighted files")
+  L.benchmark_step_closing()
 
   P.caches.weighted_files_per_query[opts.query] = weighted_files_for_query
   return weighted_files_for_query
@@ -729,7 +751,7 @@ end
 --- @field alt_bufname string
 --- @field curr_tick number
 --- @field render_results fun(weighted_files:WeightedFile[]):nil
---- @field weights FindWeights
+--- @field weights Weights
 --- @field batch_size number | false
 --- @field hi_enabled boolean
 --- @field icons_enabled boolean
@@ -743,11 +765,10 @@ P.get_find_files = function(opts)
   vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
 
   opts.query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
-  L.benchmark_step_heading(("query: '%s'"):format(opts.query))
-  L.benchmark_step("start", "Entire script")
+  L.benchmark_step("start", "Per keystroke")
 
   local process_files = coroutine.create(function()
-    local weighted_files = P.get_weighted_files {
+    local weighted_files = M.get_weighted_files {
       alt_bufname = opts.alt_bufname,
       batch_size = opts.batch_size,
       curr_bufname = opts.curr_bufname,
@@ -767,12 +788,14 @@ P.get_find_files = function(opts)
       return
     end
 
+    L.benchmark_step_heading "Process weighted files"
+
     L.benchmark_step("start", "Render results")
     opts.render_results(weighted_files)
     L.benchmark_step("end", "Render results")
 
     if not opts.hi_enabled then
-      L.benchmark_step("end", "Entire script")
+      L.benchmark_step("end", "Per keystroke")
       L.benchmark_step_closing()
       return
     end
@@ -784,7 +807,7 @@ P.get_find_files = function(opts)
       weighted_files = weighted_files,
     }
 
-    L.benchmark_step("end", "Entire script")
+    L.benchmark_step("end", "Per keystroke")
     L.benchmark_step_closing()
   end)
 
@@ -898,9 +921,20 @@ M.refresh_files_cache = function(fd_cmd)
   P.refresh_files_cache(fd_cmd)
 end
 
+M.benchmark_mean_start = function()
+  L.ongoing_benchmarks = {}
+  L.benchmarks_for_mean = {}
+end
+
+M.benchmark_mean_end = function()
+  L.benchmark_mean_heading "Mean benchmarks"
+  L.benchmark_mean()
+  L.benchmark_mean_closing()
+end
+
 --- @class FindOpts
 --- @field keymaps? FindKeymapsPerMode
---- @field weights? FindWeights
+--- @field weights? Weights
 --- @field batch_size? number | false
 --- @field hi_enabled? boolean
 --- @field icons_enabled? boolean
@@ -920,7 +954,7 @@ end
 --- @field input_win number
 --- @field input_buf number
 
---- @class FindWeights
+--- @class Weights
 --- @field open_buf_boost? number
 --- @field modified_buf_boost? number
 --- @field alternate_buf_boost? number
@@ -935,15 +969,14 @@ end
 --- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
 
 --- @param opts? FindOpts
-P.find = function(opts)
+M.find = function(opts)
   if not P.setup_called then
     H.notify_error "[ff.nvim]: `setup` must be called before `find`"
     return
   end
-  H.cwd = vim.uv.cwd()
+  M.benchmark_mean_start()
   L.ongoing_benchmarks = {}
-  L.collected_benchmarks = {}
-  P.caches.weighted_files_per_query = {}
+  L.benchmarks_for_mean = {}
   P.preview_active = false
 
   local cursorline_opts = {
@@ -1079,8 +1112,8 @@ P.find = function(opts)
       if P.setup_opts.refresh_files_cache == "find" then
         P.refresh_files_cache(P.setup_opts.fd_cmd)
       end
-      P.refresh_open_buffers_cache()
-      P.refresh_frecency_cache()
+      M.refresh_open_buffers_cache()
+      M.refresh_frecency_cache()
 
       get_find_files_with_query ""
     end
@@ -1088,12 +1121,9 @@ P.find = function(opts)
 
   local function close()
     vim.api.nvim_buf_clear_namespace(results_buf, P.ns_id, 0, -1)
-    L.benchmark_mean_heading "Mean benchmarks"
-    L.benchmark_mean()
-    L.benchmark_mean_closing()
-
     vim.api.nvim_win_close(input_win, true)
     vim.api.nvim_win_close(results_win, true)
+    M.benchmark_mean_end()
     vim.cmd "stopinsert"
   end
 
@@ -1208,5 +1238,4 @@ if _G.FF_TEST then
   }
 end
 
-M.find = P.find
 return M

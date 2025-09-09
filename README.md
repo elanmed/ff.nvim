@@ -33,7 +33,8 @@ A small, fast fuzzy finder with intelligent weights.
 - A max of `opts.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files. Enable the `benchmark_step` and `benchmark_mean` options to try yourself
+With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files. 
+Enable the `benchmark_step` and `benchmark_mean` options to try yourself
 
 ## Configuration example
 ```lua
@@ -120,8 +121,8 @@ end)
 ```lua 
 --- @class SetupOpts
 --- @field refresh_files_cache? "setup"|"find"
---- @field benchmark_step? boolean
---- @field benchmark_mean? boolean
+--- @field benchmark_step? boolean benchmark each keystroke
+--- @field benchmark_mean? boolean benchmark the mean of all keystrokes in a session
 --- @field fd_cmd? string
 
 --- @param opts? SetupOpts
@@ -134,12 +135,12 @@ M.setup = function(opts) end
 --- @field keymaps? FindKeymapsPerMode
 --- @field weights? FindWeights
 --- @field batch_size? number | false `false` to disable coroutines
---- @field hi_enabled? boolean
+--- @field hi_enabled? boolean highlighting the fuzzy matched characters
 --- @field icons_enabled? boolean
---- @field fuzzy_score_multiple? number
---- @field file_score_multiple? number
---- @field max_results_considered? number
---- @field max_results_rendered? number
+--- @field fuzzy_score_multiple? number how much to weight the fuzzy match score vs the frecency + other weights
+--- @field file_score_multiple? number how much to weight the frecency + other weights
+--- @field max_results_considered? number a max of `max_results_considered` files with a fuzzy match are sorted
+--- @field max_results_rendered? number a max of `max_results_rendered` sorted files are rendered in the results buffer
 --- @field input_win_config? vim.api.keyset.win_config
 --- @field results_win_config? vim.api.keyset.win_config
 --- @field results_win_opts? vim.wo
@@ -176,6 +177,115 @@ M.find = function(opts) end
 M.refresh_files_cache = function(fd_cmd) end
 ```
 
+By default, `refresh_files_cache` is called once when `setup` is run. When performing actions on the file system, 
+it can be helpful to refresh the cache so the picker shows the latest files. This can be done with an autocommand like:
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = {
+    "MiniFilesActionCreate",
+    "MiniFilesActionDelete",
+    "MiniFilesActionRename",
+    "MiniFilesActionCopy",
+    "MiniFilesActionMove",
+  },
+  callback = function()
+    ff.refresh_files_cache()
+  end,
+})
+```
+
+---
+
+To use another frontend for `ff.nvim`, the following functions may be useful. When calling `find` directly, there's no need to call any of these.
+
+```lua
+vim.keymap.set("n", "<leader>ff", function()
+  -- setup still needs to be called
+
+  local ff = require "ff"
+  ff.refresh_frecency_cache()
+  ff.refresh_open_buffers_cache()
+
+  ff.benchmark_mean_start()
+  local weighted_files = ff.get_weighted_files {
+    query = "[user input]",
+    -- defaults
+    weights = {
+      open_buf_boost = 10,
+      modified_buf_boost = 20,
+      alternate_buf_boost = 30,
+      basename_boost = 40,
+      current_buf_boost = -1000,
+    },
+    batch_size = false, -- `false` disables calling `coroutine.yield()` from `get_weighted_files`
+    icons_enabled = true,
+    hi_enabled = true,
+    fuzzy_score_multiple = 0.7,
+    file_score_multiple = 0.3,
+    max_results_considered = 1000,
+    max_results_rendered = 50,
+  }
+  print(vim.inspect(weighted_files))
+  ff.benchmark_mean_end()
+
+end)
+
+```
+
+### `get_weighted_files`
+```lua
+--- @class WeightedFile
+--- @field abs_file string
+--- @field rel_file string
+--- @field weighted_score number fuzzy_score_multiple * fuzzy_score + file_score_multiple * buf_and_frecency_score
+--- @field fuzzy_score number
+--- @field buf_and_frecency_score number
+--- @field hl_idxs table the indexes of the `rel_file` that are fuzzy matched
+--- @field icon_char string
+--- @field icon_hl string
+--- @field formatted_filename string
+
+--- @class GetWeightedFilesOpts
+--- @field query string
+--- @field curr_bufname string absolute path of the current buffer
+--- @field alt_bufname string absolute path of the alternate buffer
+--- @field weights Weights
+--- @field batch_size number | false
+--- @field hi_enabled? boolean `false` will set `hl_idxs` to `{}`
+--- @field icons_enabled boolean
+--- @field max_results_considered? number a max of `max_results_considered` files with a fuzzy match are sorted
+--- @field max_results_rendered? number a max of `max_results_rendered` sorted files are rendered in the results buffer
+--- @field fuzzy_score_multiple? number how much to weight the fuzzy match score vs the frecency + other weights
+--- @field file_score_multiple? number how much to weight the frecency + other weights
+
+--- @param opts GetWeightedFilesOpts
+--- @return WeightedFile[]
+M.get_weighted_files = function(opts) end
+```
+
+### `refresh_frecency_cache`
+```lua
+M.refresh_frecency_cache = function() end
+```
+
+### `refresh_open_buffers_cache`
+```lua
+M.refresh_open_buffers_cache = function() end
+```
+
+### `benchmark_mean_start`
+```lua
+M.benchmark_mean_start = function() end
+-- clears previous benchmarks
+```
+
+### `benchmark_mean_end`
+```lua
+M.benchmark_mean_end = function() end
+-- prints current benchmarks
+```
+
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
   - Defaults to `Search`
@@ -195,7 +305,6 @@ after calling`setup`
 - [ ] Support alternatives to `mini.icons`
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
-- [ ] Add a small second file for lazier setups
 
 ## Features excluded for simplicity
 - Multi-select
