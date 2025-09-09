@@ -11,8 +11,8 @@ A small, fast fuzzy finder with intelligent weights.
     - Modified buffers
     - The alternate buffer
     - The current buffer
-    - The basename of the current file (with and without an extension)
-    - The fuzzy score of the filename against the current input
+    - The basename of the result (with and without an extension)
+    - The fuzzy score of the result against the current input
 
 ## Status
 - Works fine, API is not yet stable
@@ -23,12 +23,12 @@ A small, fast fuzzy finder with intelligent weights.
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
 - A max of `opts.max_results_considered` files with a fuzzy match are processed
 - Extensive caching:
-    - `fd` is executed once and cached when the plugin first loads
-    - Frecency scores are calculated once and cached when the picker is opened - not on every keystroke
-    - Info about open buffers are pulled once and cached when the picker is opened
+    - `fd` is executed once and cached when `setup` is called
+    - Frecency scores are calculated once and cached when `find` is called - not on every keystroke
+    - Info on open buffers are pulled once and cached when `find` is called
     - Icons are cached by extension to avoid calling `mini.icons` when possible
     - Results are cached for each user input
-- A max of `opts.max_results_rendered` results are rendered in the results window, prevent unecessary highlighting
+- A max of `opts.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files. Enable the `benchmark_step` and `benchmark_mean` options to try yourself
@@ -194,6 +194,7 @@ after calling`setup`
 - [ ] Support alternatives to `mini.icons`
 - [ ] Support alternatives to `fd`
 - [ ] Support Windows
+- [ ] Add a small second file for lazier setups
 
 ## Features excluded for simplicity
 - Multi-select
