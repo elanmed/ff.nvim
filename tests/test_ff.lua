@@ -437,6 +437,25 @@ T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function
 end
 
 T["P"]["get_weighted_files"] = MiniTest.new_set()
+T["P"]["get_weighted_files"]["when the query is cached, it should use the cache"] = function() end
+T["P"]["get_weighted_files"]["when the query is not cached, it should update the cache"] = function() end
+T["P"]["get_weighted_files"]["should loop through frecent files, then fd files"] = function() end
+T["P"]["get_weighted_files"]["should sort the files based on the weighted_score"] = function() end
+
+T["P"]["get_weighted_files"]["get_weighted_file"] = MiniTest.new_set()
+T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"] = MiniTest.new_set()
+T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is a frecency score, it should use it as the weighted_score"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is no frecency score, it should set the weighted_score to 0"] = function() end
+
+T["P"]["get_weighted_files"]["get_weighted_file"]["with no fuzzy match, it should not process the file"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the current_buf_boost"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the modified_buf_boost"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the open_buf_boost"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the frecency score"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function() end
 
 T["P"]["highlight_weighted_files"] = MiniTest.new_set()
 
