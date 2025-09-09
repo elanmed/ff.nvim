@@ -352,6 +352,7 @@ end
 local P = {}
 
 P.tick = 0
+P.preview_active = false
 P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 
 -- [-math.huge, math.huge]
@@ -803,6 +804,31 @@ P.get_find_files = function(opts)
   vim.schedule(continue_processing)
 end
 
+--- @param win number
+P.save_minimal_opts = function(win)
+  -- :help nvim_open_win
+  local minimal_opts_to_save = {
+    "number", "relativenumber", "cursorline", "cursorcolumn",
+    "foldcolumn", "spell", "list", "signcolumn", "colorcolumn",
+    "statuscolumn", "fillchars", "winhighlight",
+  }
+
+  local saved_minimal_opts = {}
+  for _, opt in ipairs(minimal_opts_to_save) do
+    saved_minimal_opts[opt] = vim.api.nvim_get_option_value(opt, { win = win, })
+  end
+
+  return saved_minimal_opts
+end
+
+--- @param win number
+--- @param opts vim.wo
+P.set_opts = function(win, opts)
+  for opt, value in pairs(opts) do
+    vim.api.nvim_set_option_value(opt, value, { win = win, })
+  end
+end
+
 P.set_cursorline_opts = function(win)
   vim.api.nvim_set_option_value("cursorline", true, { win = win, })
   vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = win, })
@@ -909,7 +935,7 @@ end
 --- @field n? FindKeymaps
 
 --- @class FindKeymaps
---- @field [string] "select"|"next"|"prev"|"close"|function
+--- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
 
 --- @param opts? FindOpts
 P.find = function(opts)
@@ -921,6 +947,7 @@ P.find = function(opts)
   L.ongoing_benchmarks = {}
   L.collected_benchmarks = {}
   P.caches.weighted_files_per_query = {}
+  P.preview_active = false
 
   opts = H.default(opts, {})
   opts.keymaps = H.default(opts.keymaps, {})
@@ -980,17 +1007,18 @@ P.find = function(opts)
   curr_bufname = curr_bufname and vim.fs.normalize(curr_bufname) or ""
   alt_bufname = alt_bufname and vim.fs.normalize(alt_bufname) or ""
 
+  local preview_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_option_value("buftype", "nofile", { buf = preview_buf, })
+
   local results_buf = vim.api.nvim_create_buf(false, true)
   local results_win = vim.api.nvim_open_win(results_buf, false, opts.results_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf, })
-  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = results_buf, })
-  vim.api.nvim_set_option_value("cursorline", true, { win = results_win, })
+  local minimal_opts = P.save_minimal_opts(results_win)
   P.set_cursorline_opts(results_win)
 
   local input_buf = vim.api.nvim_create_buf(false, true)
   local input_win = vim.api.nvim_open_win(input_buf, false, opts.input_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf, })
-  vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = input_buf, })
   vim.api.nvim_set_current_win(input_win)
 
   opts.on_picker_open {
@@ -1054,6 +1082,8 @@ P.find = function(opts)
 
   local keymap_fns = {
     select = function()
+      if P.preview_active then return end
+
       vim.api.nvim_set_current_win(results_win)
       local result = vim.api.nvim_get_current_line()
       if #result == 0 then return end
@@ -1061,6 +1091,8 @@ P.find = function(opts)
       vim.cmd("edit " .. vim.split(result, "|")[2])
     end,
     next = function()
+      if P.preview_active then return end
+
       vim.api.nvim_win_call(results_win, function()
         if vim.api.nvim_win_get_cursor(results_win)[1] == vim.api.nvim_buf_line_count(results_buf) then
           vim.cmd "normal! gg"
@@ -1071,6 +1103,8 @@ P.find = function(opts)
       end)
     end,
     prev = function()
+      if P.preview_active then return end
+
       vim.api.nvim_win_call(results_win, function()
         if vim.api.nvim_win_get_cursor(results_win)[1] == 1 then
           vim.cmd "normal! G"
@@ -1081,6 +1115,51 @@ P.find = function(opts)
       end)
     end,
     close = close,
+    ["preview-toggle"] = function()
+      if P.preview_active then
+        P.preview_active = not P.preview_active
+        vim.api.nvim_win_set_buf(results_win, results_buf)
+        P.set_opts(results_win, minimal_opts)
+        P.set_cursorline_opts(results_win)
+        return
+      end
+
+      P.preview_active = not P.preview_active
+      local result
+      vim.api.nvim_win_call(results_win, function()
+        result = vim.api.nvim_get_current_line()
+      end)
+      if #result == 0 then return end
+
+      vim.api.nvim_win_set_buf(results_win, preview_buf)
+      P.set_opts(results_win, minimal_opts)
+
+      local filename = vim.split(result, "|")[2]
+      local lines = vim.fn.readfile(filename, "", 100)
+      vim.api.nvim_buf_set_lines(preview_buf, 0, -1, false, lines)
+
+      local filetype = vim.filetype.match { filename = filename, }
+      if filetype == nil then return end
+
+      local lang_ok, lang = pcall(vim.treesitter.language.get_lang, filetype)
+      if not lang_ok then return end
+
+      pcall(vim.treesitter.start, preview_buf, lang)
+    end,
+    ["preview-scroll-down"] = function()
+      if not P.preview_active then return end
+      vim.api.nvim_win_call(results_win, function()
+        vim.cmd "normal! 15j"
+        vim.cmd "redraw"
+      end)
+    end,
+    ["preview-scroll-up"] = function()
+      if not P.preview_active then return end
+      vim.api.nvim_win_call(results_win, function()
+        vim.cmd "normal! 15k"
+        vim.cmd "redraw"
+      end)
+    end,
   }
 
   for mode, keymaps in pairs(opts.keymaps) do
