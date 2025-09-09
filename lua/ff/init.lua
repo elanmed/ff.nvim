@@ -651,6 +651,11 @@ P.get_weighted_files = function(opts)
     ::continue::
   end
   L.benchmark_step("end", "Populate weighted files for query with fd")
+  L.benchmark_step("start", "Sort weighted files")
+  table.sort(weighted_files_for_query, function(a, b)
+    return a.weighted_score > b.weighted_score
+  end)
+  L.benchmark_step("end", "Sort weighted files")
 
   P.caches.weighted_files_per_query[opts.query] = weighted_files_for_query
   return weighted_files_for_query
@@ -745,12 +750,6 @@ P.get_find_files = function(opts)
       query = opts.query,
       weights = opts.weights,
     }
-
-    L.benchmark_step("start", "Sort weighted files")
-    table.sort(weighted_files, function(a, b)
-      return a.weighted_score > b.weighted_score
-    end)
-    L.benchmark_step("end", "Sort weighted files")
 
     if P.tick ~= opts.curr_tick then
       L.benchmark_step_interrupted()
