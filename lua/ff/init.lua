@@ -903,6 +903,10 @@ P.find = function(opts)
     return
   end
   H.cwd = vim.uv.cwd()
+  L.ongoing_benchmarks = {}
+  L.collected_benchmarks = {}
+  P.caches.weighted_files_per_query = {}
+
   opts = H.default(opts, {})
   opts.keymaps = H.default(opts.keymaps, {})
   opts.keymaps.i = H.default(opts.keymaps.i, {})
@@ -1029,9 +1033,6 @@ P.find = function(opts)
     L.benchmark_mean_heading "Mean benchmarks"
     L.benchmark_mean()
     L.benchmark_mean_closing()
-    L.ongoing_benchmarks = {}
-    L.collected_benchmarks = {}
-    P.caches.weighted_files_per_query = {}
 
     vim.api.nvim_win_close(input_win, true)
     vim.api.nvim_win_close(results_win, true)
