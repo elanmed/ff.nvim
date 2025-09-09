@@ -538,8 +538,14 @@ M.get_weighted_files = function(opts)
   H.cwd = vim.uv.cwd()
 
   opts = H.default(opts, {})
+  opts.query = H.default(opts.query, "")
+
   opts.curr_bufname = H.default(opts.curr_bufname, "")
+  opts.curr_bufname = vim.fs.normalize(opts.curr_bufname)
+
   opts.alt_bufname = H.default(opts.alt_bufname, "")
+  opts.alt_bufname = vim.fs.normalize(opts.alt_bufname)
+
   opts.weights = H.default(opts.weights, {})
   opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
   opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
@@ -769,17 +775,17 @@ P.get_find_files = function(opts)
 
   local process_files = coroutine.create(function()
     local weighted_files = M.get_weighted_files {
-      alt_bufname = opts.alt_bufname,
-      batch_size = opts.batch_size,
+      query = opts.query,
       curr_bufname = opts.curr_bufname,
-      file_score_multiple = opts.file_score_multiple,
-      fuzzy_score_multiple = opts.fuzzy_score_multiple,
+      alt_bufname = opts.alt_bufname,
+      weights = opts.weights,
+      batch_size = opts.batch_size,
       hi_enabled = opts.hi_enabled,
       icons_enabled = opts.icons_enabled,
       max_results_considered = opts.max_results_considered,
       max_results_rendered = opts.max_results_rendered,
-      query = opts.query,
-      weights = opts.weights,
+      fuzzy_score_multiple = opts.fuzzy_score_multiple,
+      file_score_multiple = opts.file_score_multiple,
     }
 
     if P.tick ~= opts.curr_tick then
@@ -1040,10 +1046,10 @@ M.find = function(opts)
     focusable = false,
   })
 
-  local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
-  local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
-  curr_bufname = curr_bufname and vim.fs.normalize(curr_bufname) or ""
-  alt_bufname = alt_bufname and vim.fs.normalize(alt_bufname) or ""
+  local curr_bufname_ok, curr_bufname_res = pcall(vim.api.nvim_buf_get_name, 0)
+  local alt_bufname_ok, alt_bufname_res = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
+  local curr_bufname = curr_bufname_ok and curr_bufname_res or nil
+  local alt_bufname = alt_bufname_ok and alt_bufname_res or nil
 
   local preview_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = preview_buf, })

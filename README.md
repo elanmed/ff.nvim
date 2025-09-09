@@ -2,7 +2,7 @@
 
 A small, fast fuzzy finder with intelligent weights.
 
-- **Small**: ~1100 LOC, 1 source file, 1 test file
+- **Small**: ~1200 LOC, 1 source file, 1 test file
 - **Fast**: Average ~20ms per keystroke on a codebase of 60k files
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
 - **Intelligent weights**: Sorts the results by considering:
@@ -213,9 +213,8 @@ vim.keymap.set("n", "<leader>ff", function()
   ff.refresh_open_buffers_cache()
 
   vim.ui.input({ prompt = "ff> ", }, function(query)
-    query = query or ""
     local weighted_files = ff.get_weighted_files {
-      query = query,
+      query = query, -- defaults to "" if passed `nil`
       curr_bufname = curr_bufname, -- defaults to "" if not passed
       alt_bufname = alt_bufname, -- defaults to "" if not passed
       -- defaults to:
