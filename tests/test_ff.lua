@@ -14,7 +14,7 @@ T["H"]["#default"]["returns default when value is nil"] = function()
   MiniTest.expect.equality(H.default(nil, false), false)
 end
 
-T["H"]["#rel_file"] = MiniTest.new_set {
+T["H"]["#rel_path"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
       H.cwd = "path/to/dir"
@@ -25,12 +25,12 @@ T["H"]["#rel_file"] = MiniTest.new_set {
   },
 }
 
-T["H"]["#rel_file"]["returns the rel file path when able"] = function()
-  MiniTest.expect.equality(H.rel_file "path/to/dir/file.txt", "file.txt")
-  MiniTest.expect.equality(H.rel_file "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
+T["H"]["#rel_path"]["returns the rel file path when able"] = function()
+  MiniTest.expect.equality(H.rel_path "path/to/dir/file.txt", "file.txt")
+  MiniTest.expect.equality(H.rel_path "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
 end
-T["H"]["#rel_file"]["returns the abs file path as a fallback"] = function()
-  MiniTest.expect.equality(H.rel_file "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
+T["H"]["#rel_path"]["returns the abs file path as a fallback"] = function()
+  MiniTest.expect.equality(H.rel_path "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
 end
 
 T["H"]["#get_ext"] = MiniTest.new_set()
@@ -397,7 +397,7 @@ T["P"]["get_icon_info"] = MiniTest.new_set()
 T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
   local result = P.get_icon_info {
     icons_enabled = false,
-    abs_file = "path/to/file.lua",
+    abs_path = "path/to/file.lua",
   }
   MiniTest.expect.equality(result.icon_char, nil)
   MiniTest.expect.equality(result.icon_hl, nil)
@@ -410,7 +410,7 @@ T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = 
 
   local result = P.get_icon_info {
     icons_enabled = true,
-    abs_file = "path/to/file.lua",
+    abs_path = "path/to/file.lua",
   }
 
   MiniTest.expect.equality(result.icon_char, "🌙")
@@ -419,7 +419,7 @@ end
 T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function()
   local result_one = P.get_icon_info {
     icons_enabled = true,
-    abs_file = "path/to/file.js",
+    abs_path = "path/to/file.js",
   }
 
   MiniTest.expect.equality(result_one.icon_char, "󰌞")
@@ -430,7 +430,7 @@ T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function
 
   local result_two = P.get_icon_info {
     icons_enabled = true,
-    abs_file = "path/to/file.js",
+    abs_path = "path/to/file.js",
   }
   MiniTest.expect.equality(result_two.icon_char, "󰌞")
   MiniTest.expect.equality(result_two.icon_hl, "MiniIconsYellow")

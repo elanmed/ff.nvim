@@ -250,12 +250,12 @@ end)
 ### `get_weighted_files`
 ```lua
 --- @class WeightedFile
---- @field abs_file string
---- @field rel_file string
+--- @field abs_path string
+--- @field rel_path string
 --- @field weighted_score number fuzzy_score_multiple * fuzzy_score + file_score_multiple * buf_and_frecency_score
 --- @field fuzzy_score number
 --- @field buf_and_frecency_score number
---- @field hl_idxs table the indexes of the `rel_file` that are fuzzy matched
+--- @field hl_idxs table the indexes of the `rel_path` that are fuzzy matched
 --- @field icon_char string
 --- @field icon_hl string
 --- @field formatted_filename string

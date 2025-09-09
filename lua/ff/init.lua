@@ -18,11 +18,11 @@ H.default = function(val, default_val)
   return val
 end
 
---- @param abs_file string
-H.rel_file = function(abs_file)
+--- @param abs_path string
+H.rel_path = function(abs_path)
   --- @type string
-  if not vim.startswith(abs_file, H.cwd) then return abs_file end
-  return abs_file:sub(#H.cwd + 2)
+  if not vim.startswith(abs_path, H.cwd) then return abs_path end
+  return abs_path:sub(#H.cwd + 2)
 end
 
 --- @param path string
@@ -39,11 +39,11 @@ H.basename = function(path, opts)
   return basename
 end
 
---- @param filename string
-H.get_ext = function(filename)
-  local last_dot_pos = filename:find "%.[^.]*$"
+--- @param abs_path string
+H.get_ext = function(abs_path)
+  local last_dot_pos = abs_path:find "%.[^.]*$"
   if last_dot_pos and last_dot_pos > 1 then
-    return filename:sub(last_dot_pos + 1)
+    return abs_path:sub(last_dot_pos + 1)
   end
   return nil
 end
@@ -105,9 +105,9 @@ H.notify_error = function(msg, ...)
   vim.notify(formatted, vim.log.levels.ERROR)
 end
 
---- @param abs_file string
-H.readable = function(abs_file)
-  local stat_result = vim.uv.fs_stat(abs_file)
+--- @param abs_path string
+H.readable = function(abs_path)
+  local stat_result = vim.uv.fs_stat(abs_path)
   return stat_result ~= nil and stat_result.type == "file"
 end
 
@@ -189,9 +189,9 @@ end
 --- @field update_type "increase" | "remove"
 --- @field _db_dir? string
 
---- @param filename string
+--- @param abs_path string
 --- @param opts UpdateFileScoreOpts
-F.update_file_score = function(filename, opts)
+F.update_file_score = function(abs_path, opts)
   local now = F._now()
 
   opts._db_dir = H.default(opts._db_dir, F.default_db_dir)
@@ -203,12 +203,12 @@ F.update_file_score = function(filename, opts)
 
   local updated_date_at_score_one = (function()
     if opts.update_type == "increase" then
-      if not H.readable(filename) then
+      if not H.readable(abs_path) then
         return nil
       end
 
       local score = 0
-      local date_at_score_one = dated_files[H.cwd][filename]
+      local date_at_score_one = dated_files[H.cwd][abs_path]
       if date_at_score_one then
         score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
       end
@@ -220,7 +220,7 @@ F.update_file_score = function(filename, opts)
     return nil
   end)()
 
-  dated_files[H.cwd][filename] = updated_date_at_score_one
+  dated_files[H.cwd][abs_path] = updated_date_at_score_one
 
   local readable_dated_files_cwd = {}
   for dated_file, date_at_score_one in pairs(dated_files[H.cwd]) do
@@ -362,20 +362,20 @@ P.MAX_FZY_SCORE = 20 -- approx the longest reasonable query
 P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
---- @param abs_file string
+--- @param abs_path string
 --- @param score number
 --- @param icon_char string|nil
-P.format_filename = function(abs_file, score, icon_char)
+P.format_filename = function(abs_path, score, icon_char)
   local formatted_score = H.pad_str(
     H.fit_decimals(score, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
   )
   local formatted_icon_char = icon_char and icon_char .. " " or ""
-  local rel_file = H.rel_file(abs_file)
+  local rel_path = H.rel_path(abs_path)
   return ("%s %s|%s"):format(
     formatted_score,
     formatted_icon_char,
-    rel_file
+    rel_path
   )
 end
 
@@ -417,9 +417,9 @@ P.refresh_files_cache = function(fd_cmd)
   local fd_cmd_tbl = vim.split(fd_cmd, " ")
   vim.system(fd_cmd_tbl, { text = true, }, function(obj)
     local lines = vim.split(obj.stdout, "\n")
-    for _, abs_file in ipairs(lines) do
-      if #abs_file == 0 then goto continue end
-      table.insert(P.caches.fd_files, vim.fs.normalize(abs_file))
+    for _, abs_path in ipairs(lines) do
+      if #abs_path == 0 then goto continue end
+      table.insert(P.caches.fd_files, vim.fs.normalize(abs_path))
 
       ::continue::
     end
@@ -443,11 +443,11 @@ M.refresh_frecency_cache = function()
 
   local now = os.time()
   L.benchmark_step("start", "Calculate frecency_file_to_score")
-  for abs_file, date_at_score_one in pairs(dated_files[H.cwd]) do
-    if not H.readable(abs_file) then goto continue end
+  for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
+    if not H.readable(abs_path) then goto continue end
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
-    P.caches.frecency_file_to_score[abs_file] = score
-    table.insert(P.caches.frecency_files, abs_file)
+    P.caches.frecency_file_to_score[abs_path] = score
+    table.insert(P.caches.frecency_files, abs_path)
 
     ::continue::
   end
@@ -478,8 +478,8 @@ M.refresh_open_buffers_cache = function()
 end
 
 --- @class WeightedFile
---- @field abs_file string
---- @field rel_file string
+--- @field abs_path string
+--- @field rel_path string
 --- @field weighted_score number
 --- @field fuzzy_score number
 --- @field buf_and_frecency_score number
@@ -490,7 +490,7 @@ end
 
 --- @class GetIconInfoOpts
 --- @field icons_enabled boolean
---- @field abs_file string
+--- @field abs_path string
 --- @param opts GetIconInfoOpts
 P.get_icon_info = function(opts)
   local mini_icons = require "mini.icons"
@@ -501,7 +501,7 @@ P.get_icon_info = function(opts)
     }
   end
 
-  local ext = H.get_ext(opts.abs_file)
+  local ext = H.get_ext(opts.abs_path)
   if ext and P.caches.icon_cache[ext] then
     return {
       icon_char = P.caches.icon_cache[ext].icon_char,
@@ -509,7 +509,7 @@ P.get_icon_info = function(opts)
     }
   end
 
-  local _, icon_char_res, icon_hl_res = pcall(mini_icons.get, "file", opts.abs_file)
+  local _, icon_char_res, icon_hl_res = pcall(mini_icons.get, "file", opts.abs_path)
   local icon_info = {
     icon_char = icon_char_res or "?",
     icon_hl = icon_hl_res or nil,
@@ -569,45 +569,45 @@ M.get_weighted_files = function(opts)
   --- @type WeightedFile[]
   local weighted_files_for_query = {}
 
-  --- @param abs_file string
-  local function get_weighted_file(abs_file)
-    local rel_file = H.rel_file(abs_file)
+  --- @param abs_path string
+  local function get_weighted_file(abs_path)
+    local rel_path = H.rel_path(abs_path)
     if #opts.query == 0 then
-      local icon_info = P.get_icon_info { abs_file = abs_file, icons_enabled = opts.icons_enabled, }
+      local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
 
       local frecency_score = 0
-      if P.caches.frecency_file_to_score[abs_file] ~= nil then
-        frecency_score = P.caches.frecency_file_to_score[abs_file]
+      if P.caches.frecency_file_to_score[abs_path] ~= nil then
+        frecency_score = P.caches.frecency_file_to_score[abs_path]
       end
       return {
-        abs_file = abs_file,
-        rel_file = rel_file,
+        abs_path = abs_path,
+        rel_path = rel_path,
         weighted_score = frecency_score,
         buf_and_frecency_score = 0,
         fuzzy_score = 0,
         hl_idxs = {},
         icon_hl = icon_info.icon_hl,
         icon_char = icon_info.icon_char,
-        formatted_filename = P.format_filename(abs_file, frecency_score, icon_info.icon_char),
+        formatted_filename = P.format_filename(abs_path, frecency_score, icon_info.icon_char),
       }
     end
 
-    if not fzy.has_match(opts.query, rel_file) then
+    if not fzy.has_match(opts.query, rel_path) then
       return nil
     end
 
     local buf_score = 0
-    local basename_with_ext = H.basename(abs_file, { with_ext = true, })
-    local basename_without_ext = H.basename(abs_file, { with_ext = false, })
+    local basename_with_ext = H.basename(abs_path, { with_ext = true, })
+    local basename_without_ext = H.basename(abs_path, { with_ext = false, })
 
     if opts.query == basename_with_ext or opts.query == basename_without_ext then
       buf_score = opts.weights.basename_boost
-    elseif P.caches.open_buffer_to_modified[abs_file] ~= nil then
-      local modified = P.caches.open_buffer_to_modified[abs_file]
+    elseif P.caches.open_buffer_to_modified[abs_path] ~= nil then
+      local modified = P.caches.open_buffer_to_modified[abs_path]
 
-      if abs_file == opts.curr_bufname then
+      if abs_path == opts.curr_bufname then
         buf_score = opts.weights.current_buf_boost
-      elseif abs_file == opts.alt_bufname then
+      elseif abs_path == opts.alt_bufname then
         buf_score = opts.weights.alternate_buf_boost
       elseif modified then
         buf_score = opts.weights.modified_buf_boost
@@ -617,32 +617,32 @@ M.get_weighted_files = function(opts)
     end
 
     local buf_and_frecency_score = buf_score
-    if P.caches.frecency_file_to_score[abs_file] ~= nil then
-      buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_file]
+    if P.caches.frecency_file_to_score[abs_path] ~= nil then
+      buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_path]
     end
 
-    local fuzzy_score = fzy.score(opts.query, rel_file)
+    local fuzzy_score = fzy.score(opts.query, rel_path)
     local scaled_fzy_score = P.scale_fzy_to_frecency(fuzzy_score)
     local weighted_score =
         opts.fuzzy_score_multiple * scaled_fzy_score +
         opts.file_score_multiple * buf_and_frecency_score
 
-    local icon_info = P.get_icon_info { abs_file = abs_file, icons_enabled = opts.icons_enabled, }
+    local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
     local hl_idxs = {}
     if opts.hi_enabled then
-      hl_idxs = fzy.positions(opts.query, rel_file)
+      hl_idxs = fzy.positions(opts.query, rel_path)
     end
 
     return {
-      abs_file = abs_file,
-      rel_file = rel_file,
+      abs_path = abs_path,
+      rel_path = rel_path,
       weighted_score = weighted_score,
       fuzzy_score = scaled_fzy_score,
       buf_and_frecency_score = buf_and_frecency_score,
       hl_idxs = hl_idxs,
       icon_hl = icon_info.icon_hl,
       icon_char = icon_info.icon_char,
-      formatted_filename = P.format_filename(abs_file, weighted_score, icon_info.icon_char),
+      formatted_filename = P.format_filename(abs_path, weighted_score, icon_info.icon_char),
     }
   end
 
@@ -654,10 +654,10 @@ M.get_weighted_files = function(opts)
   end)()
 
   L.benchmark_step("start", "Populate weighted files with frecency")
-  for idx, abs_file in pairs(P.caches.frecency_files) do
+  for idx, abs_path in pairs(P.caches.frecency_files) do
     if #weighted_files_for_query >= max_results then break end
 
-    local weighted_file = get_weighted_file(abs_file)
+    local weighted_file = get_weighted_file(abs_path)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -669,13 +669,13 @@ M.get_weighted_files = function(opts)
   L.benchmark_step("end", "Populate weighted files with frecency")
 
   L.benchmark_step("start", "Populate weighted files with fd")
-  for idx, abs_file in ipairs(P.caches.fd_files) do
+  for idx, abs_path in ipairs(P.caches.fd_files) do
     if #weighted_files_for_query >= max_results then break end
-    if P.caches.frecency_file_to_score[abs_file] ~= nil then
+    if P.caches.frecency_file_to_score[abs_path] ~= nil then
       goto continue
     end
 
-    local weighted_file = get_weighted_file(abs_file)
+    local weighted_file = get_weighted_file(abs_path)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -900,15 +900,15 @@ M.setup = function(opts)
       local current_win = vim.api.nvim_get_current_win()
       local is_buf_normal = vim.api.nvim_win_get_config(current_win).relative == ""
       if not is_buf_normal then return end
-      local abs_file = vim.fs.normalize(vim.api.nvim_buf_get_name(ev.buf))
-      if abs_file == "" then return end
-      if last_updated_abs_file == abs_file then return end
+      local abs_path = vim.fs.normalize(vim.api.nvim_buf_get_name(ev.buf))
+      if abs_path == "" then return end
+      if last_updated_abs_file == abs_path then return end
 
       timer_id = vim.fn.timer_start(1000, function()
-        last_updated_abs_file = abs_file
+        last_updated_abs_file = abs_path
 
-        F.update_file_score(vim.fs.normalize(abs_file), { update_type = "increase", })
-        if not P.caches.frecency_file_to_score[abs_file] then
+        F.update_file_score(vim.fs.normalize(abs_path), { update_type = "increase", })
+        if not P.caches.frecency_file_to_score[abs_path] then
           P.refresh_files_cache(opts.fd_cmd)
         end
       end)
@@ -1186,11 +1186,11 @@ M.find = function(opts)
       vim.api.nvim_win_set_buf(results_win, preview_buf)
       set_preview_win_opts()
 
-      local filename = vim.split(result, "|")[2]
-      local lines = vim.fn.readfile(filename, "", 100)
+      local abs_path = vim.split(result, "|")[2]
+      local lines = vim.fn.readfile(abs_path, "", 100)
       vim.api.nvim_buf_set_lines(preview_buf, 0, -1, false, lines)
 
-      local filetype = vim.filetype.match { filename = filename, }
+      local filetype = vim.filetype.match { filename = abs_path, }
       if filetype == nil then return end
 
       local lang_ok, lang = pcall(vim.treesitter.language.get_lang, filetype)
