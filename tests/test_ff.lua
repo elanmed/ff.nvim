@@ -339,24 +339,24 @@ T["P"]["format_filename"] = MiniTest.new_set {
 
 T["P"]["format_filename"]["formats with score, icon, and relative path"] = function()
   local result = P.format_filename("path/to/dir/src/file.lua", 12.34, "📄")
-  MiniTest.expect.equality(result, "12.34 📄 src/file.lua")
+  MiniTest.expect.equality(result, "12.34 📄 |src/file.lua")
 end
 T["P"]["format_filename"]["formats without icon when icon_char is nil"] = function()
   local result = P.format_filename("path/to/dir/src/file.lua", 12.34, nil)
-  MiniTest.expect.equality(result, "12.34 src/file.lua")
+  MiniTest.expect.equality(result, "12.34 |src/file.lua")
 end
 T["P"]["format_filename"]["pads score to MAX_SCORE_LEN"] = function()
   local result = P.format_filename("path/to/dir/file.lua", 1.2, nil)
-  MiniTest.expect.equality(result, " 1.20 file.lua")
+  MiniTest.expect.equality(result, " 1.20 |file.lua")
 end
 T["P"]["format_filename"]["uses fit_decimals for score formatting"] = function()
   local result = P.format_filename("path/to/dir/file.lua", 123.456789, nil)
-  MiniTest.expect.equality(result, "123.4 file.lua")
+  MiniTest.expect.equality(result, "123.4 |file.lua")
 end
 T["P"]["format_filename"]["handles absolute path when not in cwd"] = function()
   H.cwd = "path/to/another_dir"
   local result = P.format_filename("path/to/dir/file.lua", 12.34, nil)
-  MiniTest.expect.equality(result, "12.34 path/to/dir/file.lua")
+  MiniTest.expect.equality(result, "12.34 |path/to/dir/file.lua")
 end
 
 T["P"]["scale_fzy_to_frecency"] = MiniTest.new_set()
