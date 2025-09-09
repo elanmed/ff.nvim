@@ -105,7 +105,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
             ["<C-u>"] = "preview-scroll-up",
           },
         },
-        -- defaults:
+        -- defaults to:
         weights = {
           open_buf_boost = 10,
           modified_buf_boost = 20,
@@ -250,33 +250,46 @@ be useful. When calling `find` directly, there's no need to call any of these.
 >lua
     vim.keymap.set("n", "<leader>ff", function()
       -- setup still needs to be called
+      local curr_bufname = vim.api.nvim_buf_get_name(0)
+      local alt_bufname = vim.api.nvim_buf_get_name(vim.fn.bufnr "#")
     
       local ff = require "ff"
+      ff.benchmark_mean_start()
       ff.refresh_frecency_cache()
       ff.refresh_open_buffers_cache()
     
-      ff.benchmark_mean_start()
-      local weighted_files = ff.get_weighted_files {
-        query = "[user input]",
-        -- defaults
-        weights = {
-          open_buf_boost = 10,
-          modified_buf_boost = 20,
-          alternate_buf_boost = 30,
-          basename_boost = 40,
-          current_buf_boost = -1000,
-        },
-        batch_size = false, -- `false` disables calling `coroutine.yield()` from `get_weighted_files`
-        icons_enabled = true,
-        hi_enabled = true,
-        fuzzy_score_multiple = 0.7,
-        file_score_multiple = 0.3,
-        max_results_considered = 1000,
-        max_results_rendered = 50,
-      }
-      print(vim.inspect(weighted_files))
-      ff.benchmark_mean_end()
+      vim.ui.input({ prompt = "ff> ", }, function(query)
+        query = query or ""
+        local weighted_files = ff.get_weighted_files {
+          query = query,
+          curr_bufname = curr_bufname, -- defaults to "" if not passed
+          alt_bufname = alt_bufname, -- defaults to "" if not passed
+          -- defaults to:
+          weights = {
+            open_buf_boost = 10,
+            modified_buf_boost = 20,
+            alternate_buf_boost = 30,
+            basename_boost = 40,
+            current_buf_boost = -1000,
+          },
+          batch_size = false, -- `false` disables calling `coroutine.yield()`
+          icons_enabled = true,
+          hi_enabled = true,
+          fuzzy_score_multiple = 0.7,
+          file_score_multiple = 0.3,
+          max_results_considered = 1000,
+          max_results_rendered = 50,
+        }
+        local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
     
+        vim.cmd "vnew"
+        vim.bo.buftype = "nofile"
+        vim.bo.bufhidden = "wipe"
+        vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+      end)
+    
+      -- this should be in an `on_close` function
+      ff.benchmark_mean_end()
     end)
 <
 
