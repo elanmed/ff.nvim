@@ -5,14 +5,14 @@ A small, fast fuzzy finder with intelligent weights.
 - **Small**: ~1100 LOC, 1 source file, 1 test file
 - **Fast**: Average ~20ms per keystroke on a codebase of 60k files
 - **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
-- **Intelligent weights**: Sorts the results by weighing:
-    - Frecent (frequently + recently opened) files
+- **Intelligent weights**: Sorts the results by considering:
     - Open buffers
     - Modified buffers
     - The alternate buffer
     - The current buffer
-    - The basename of the result (with and without an extension)
-    - The fuzzy score of the result against the current input
+    - The frecency (frequent + recently opened) score of a result
+    - The basename of a result (with and without an extension)
+    - The fuzzy score of a result
 
 ## Status
 - Works fine, API is not yet stable
