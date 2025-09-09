@@ -197,7 +197,9 @@ vim.api.nvim_create_autocmd("User", {
 
 ---
 
-To use another frontend for `ff.nvim`, the following functions may be useful. When calling `find` directly, there's no need to call any of these.
+## `ff.nvim` as a backend for another pick
+
+To use another picker as a frontend for `ff.nvim`, the following functions may be useful. When calling `find` directly, there's no need to call any of these.
 
 ```lua
 vim.keymap.set("n", "<leader>ff", function()
