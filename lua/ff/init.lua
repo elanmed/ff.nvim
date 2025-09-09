@@ -765,6 +765,7 @@ P.get_find_files = function(opts)
       L.benchmark_step_closing()
       return
     end
+
     L.benchmark_step("start", "Render results")
     opts.render_results(weighted_files)
     L.benchmark_step("end", "Render results")
@@ -799,7 +800,12 @@ P.get_find_files = function(opts)
     end
   end
 
-  continue_processing()
+  vim.schedule(continue_processing)
+end
+
+P.set_cursorline_opts = function(win)
+  vim.api.nvim_set_option_value("cursorline", true, { win = win, })
+  vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = win, })
 end
 
 --- @class SetupOpts
@@ -979,6 +985,7 @@ P.find = function(opts)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf, })
   vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = results_buf, })
   vim.api.nvim_set_option_value("cursorline", true, { win = results_win, })
+  P.set_cursorline_opts(results_win)
 
   local input_buf = vim.api.nvim_create_buf(false, true)
   local input_win = vim.api.nvim_open_win(input_buf, false, opts.input_win_config)
@@ -1088,16 +1095,13 @@ P.find = function(opts)
     end
   end
 
-  vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = results_win, })
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
     group = vim.api.nvim_create_augroup("FFPicker", { clear = true, }),
     buffer = input_buf,
     callback = function()
       P.tick = P.tick + 1
-      vim.schedule(function()
-        get_find_files_with_query(vim.api.nvim_get_current_line())
-      end)
+      get_find_files_with_query(vim.api.nvim_get_current_line())
     end,
   })
 end
