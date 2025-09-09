@@ -1,4 +1,4 @@
-*ff.txt*                                        Last change: 2025 September 06
+*ff.txt*                                        Last change: 2025 September 09
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -172,7 +172,7 @@ API                                                                   *ff-api*
     --- @class FindOpts
     --- @field keymaps? FindKeymapsPerMode
     --- @field weights? FindWeights
-    --- @field batch_size? number
+    --- @field batch_size? number | false `false` to disable coroutines
     --- @field hi_enabled? boolean
     --- @field icons_enabled? boolean
     --- @field fuzzy_score_multiple? number

@@ -134,7 +134,7 @@ M.setup = function(opts) end
 --- @class FindOpts
 --- @field keymaps? FindKeymapsPerMode
 --- @field weights? FindWeights
---- @field batch_size? number
+--- @field batch_size? number | false `false` to disable coroutines
 --- @field hi_enabled? boolean
 --- @field icons_enabled? boolean
 --- @field fuzzy_score_multiple? number

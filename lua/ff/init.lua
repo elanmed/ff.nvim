@@ -529,7 +529,7 @@ end
 --- @field file_score_multiple number
 --- @field max_results_considered number
 --- @field max_results_rendered number
---- @field batch_size number
+--- @field batch_size number | false
 --- @param opts GetWeightedFilesOpts
 P.get_weighted_files = function(opts)
   if P.caches.weighted_files_per_query[opts.query] then
@@ -634,7 +634,7 @@ P.get_weighted_files = function(opts)
       table.insert(weighted_files_for_query, weighted_file)
     end
 
-    if idx % opts.batch_size == 0 then
+    if opts.batch_size and idx % opts.batch_size == 0 then
       coroutine.yield()
     end
   end
@@ -652,7 +652,7 @@ P.get_weighted_files = function(opts)
       table.insert(weighted_files_for_query, weighted_file)
     end
 
-    if idx % opts.batch_size == 0 then
+    if opts.batch_size and idx % opts.batch_size == 0 then
       coroutine.yield()
     end
 
@@ -674,7 +674,7 @@ end
 --- @field weighted_files WeightedFile[]
 --- @field max_results_rendered number
 --- @field results_buf number
---- @field batch_size number
+--- @field batch_size number | false
 --- @param opts HighlightWeightedFilesOpts
 P.highlight_weighted_files = function(opts)
   local formatted_score_last_idx = #H.pad_str(
@@ -714,7 +714,7 @@ P.highlight_weighted_files = function(opts)
       )
     end
 
-    if idx % opts.batch_size == 0 then
+    if opts.batch_size and idx % opts.batch_size == 0 then
       coroutine.yield()
     end
   end
@@ -729,7 +729,7 @@ end
 --- @field curr_tick number
 --- @field render_results fun(weighted_files:WeightedFile[]):nil
 --- @field weights FindWeights
---- @field batch_size number
+--- @field batch_size number | false
 --- @field hi_enabled boolean
 --- @field icons_enabled boolean
 --- @field fuzzy_score_multiple number
@@ -874,7 +874,7 @@ end
 --- @class FindOpts
 --- @field keymaps? FindKeymapsPerMode
 --- @field weights? FindWeights
---- @field batch_size? number
+--- @field batch_size? number | false
 --- @field hi_enabled? boolean
 --- @field icons_enabled? boolean
 --- @field max_results_considered? number
