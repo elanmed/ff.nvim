@@ -1165,15 +1165,13 @@ P.find = function(opts)
     ["preview-scroll-down"] = function()
       if not P.preview_active then return end
       vim.api.nvim_win_call(results_win, function()
-        vim.cmd "normal! 15j"
-        vim.cmd "redraw"
+        vim.cmd 'execute "normal! \\<C-d>"'
       end)
     end,
     ["preview-scroll-up"] = function()
       if not P.preview_active then return end
       vim.api.nvim_win_call(results_win, function()
-        vim.cmd "normal! 15k"
-        vim.cmd "redraw"
+        vim.cmd 'execute "normal! \\<C-u>"'
       end)
     end,
   }
