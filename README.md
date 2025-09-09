@@ -22,11 +22,11 @@ A small, fast fuzzy finder with intelligent weights.
 
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
 - A max of `opts.max_results_considered` files with a fuzzy match are processed
-    - Frecent files are checked first for a fuzzy match
+    - Frecent files are checked for a fuzzy match first, then files from `fd`
     - For empty inputs, a max of `opts.max_results_rendered` files are processed
 - Extensive caching:
     - `fd` is executed once and cached when `setup` is called
-    - Frecency scores are calculated once and cached when `find` is called - not on every keystroke
+    - Frecency scores are calculated once and cached when `find` is called
     - Info on open buffers are pulled once and cached when `find` is called
     - Icons are cached by extension to avoid calling `mini.icons` when possible
     - Results are cached for each user input
