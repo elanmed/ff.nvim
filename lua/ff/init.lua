@@ -304,16 +304,20 @@ L.collected_benchmarks = {}
 
 --- @param type "start"|"end"
 --- @param label string
-L.benchmark_step = function(type, label)
+--- @param opts? {record_mean: boolean}
+L.benchmark_step = function(type, label, opts)
+  opts = H.default(opts, {})
+  opts.record_mean = H.default(opts.record_mean, true)
   if type == "start" then
     L.ongoing_benchmarks[label] = os.clock()
   else
     local end_time = os.clock()
     local start_time = L.ongoing_benchmarks[label]
+
     local elapsed_ms = (end_time - start_time) * 1000
     local formatted_ms = H.pad_str(H.exact_decimals(elapsed_ms, 3), 8)
 
-    if L.SHOULD_LOG_MEAN then
+    if L.SHOULD_LOG_MEAN and opts.record_mean then
       if not L.collected_benchmarks[label] then
         L.collected_benchmarks[label] = {}
       end
@@ -418,12 +422,13 @@ P.refresh_files_cache = function(fd_cmd)
 
       ::continue::
     end
-    L.benchmark_step("end", "Refresh fd cache")
+    L.benchmark_step("end", "Refresh fd cache", { record_mean = false, })
     L.benchmark_step_closing()
   end)
 end
 
 P.refresh_frecency_cache = function()
+  L.benchmark_step_heading "Refresh frecency cache"
   P.caches.frecency_files = {}
   P.caches.frecency_file_to_score = {}
 
@@ -433,7 +438,7 @@ P.refresh_frecency_cache = function()
   if not dated_files[H.cwd] then
     dated_files[H.cwd] = {}
   end
-  L.benchmark_step("end", "Frecency dated_files fs read")
+  L.benchmark_step("end", "Frecency dated_files fs read", { record_mean = false, })
 
   local now = os.time()
   L.benchmark_step("start", "Calculate frecency_file_to_score")
@@ -445,12 +450,14 @@ P.refresh_frecency_cache = function()
 
     ::continue::
   end
-  L.benchmark_step("end", "Calculate frecency_file_to_score")
+  L.benchmark_step("end", "Calculate frecency_file_to_score", { record_mean = false, })
+  L.benchmark_step_closing()
 end
 
 P.refresh_open_buffers_cache = function()
   P.caches.open_buffer_to_modified = {}
 
+  L.benchmark_step_heading "Refresh open buffers cache"
   L.benchmark_step("start", "open_buffer_to_modified loop")
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
@@ -464,7 +471,8 @@ P.refresh_open_buffers_cache = function()
 
     ::continue::
   end
-  L.benchmark_step("end", "open_buffer_to_modified loop")
+  L.benchmark_step("end", "open_buffer_to_modified loop", { record_mean = false, })
+  L.benchmark_step_closing()
 end
 
 --- @class WeightedFile
@@ -617,7 +625,7 @@ P.get_weighted_files = function(opts)
     return opts.max_results_considered
   end)()
 
-  L.benchmark_step("start", "Populate weighted files for query with frecency")
+  L.benchmark_step("start", "Populate weighted files with frecency")
   for idx, abs_file in pairs(P.caches.frecency_files) do
     if #weighted_files_for_query >= max_results then break end
 
@@ -630,9 +638,9 @@ P.get_weighted_files = function(opts)
       coroutine.yield()
     end
   end
-  L.benchmark_step("end", "Populate weighted files for query with frecency")
+  L.benchmark_step("end", "Populate weighted files with frecency")
 
-  L.benchmark_step("start", "Populate weighted files for query with fd")
+  L.benchmark_step("start", "Populate weighted files with fd")
   for idx, abs_file in ipairs(P.caches.fd_files) do
     if #weighted_files_for_query >= max_results then break end
     if P.caches.frecency_file_to_score[abs_file] ~= nil then
@@ -650,7 +658,8 @@ P.get_weighted_files = function(opts)
 
     ::continue::
   end
-  L.benchmark_step("end", "Populate weighted files for query with fd")
+  L.benchmark_step("end", "Populate weighted files with fd")
+
   L.benchmark_step("start", "Sort weighted files")
   table.sort(weighted_files_for_query, function(a, b)
     return a.weighted_score > b.weighted_score
@@ -1018,11 +1027,8 @@ P.find = function(opts)
       if P.setup_opts.refresh_files_cache == "find" then
         P.refresh_files_cache(P.setup_opts.fd_cmd)
       end
-
-      L.benchmark_step_heading "Refresh file-level caches"
       P.refresh_open_buffers_cache()
       P.refresh_frecency_cache()
-      L.benchmark_step_closing()
 
       get_find_files_with_query ""
     end
