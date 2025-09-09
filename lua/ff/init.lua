@@ -795,7 +795,7 @@ P.get_find_files = function(opts)
 end
 
 --- @class SetupOpts
---- @field refresh_files_cache? "module-load"|"find-call"
+--- @field refresh_files_cache? "setup"|"find"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field fd_cmd? string
@@ -817,10 +817,10 @@ M.setup = function(opts)
   L.SHOULD_LOG_MEAN = opts.benchmark_mean
 
   opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
-  opts.refresh_files_cache = H.default(opts.refresh_files_cache, "module-load")
+  opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
   P.setup_opts = opts
 
-  if opts.refresh_files_cache == "module-load" then
+  if opts.refresh_files_cache == "setup" then
     P.refresh_files_cache(opts.fd_cmd)
   end
 
@@ -1012,7 +1012,7 @@ P.find = function(opts)
 
   vim.schedule(
     function()
-      if P.setup_opts.refresh_files_cache == "find-call" then
+      if P.setup_opts.refresh_files_cache == "find" then
         P.refresh_files_cache(P.setup_opts.fd_cmd)
       end
 

@@ -38,7 +38,7 @@ With these optimizations in place, I average around 20ms per keystroke on a code
 local ff = require "ff"
 ff.setup {
   -- defaults to:
-  refresh_files_cache = "module-load",
+  refresh_files_cache = "setup",
   benchmark_step = false,
   benchmark_mean = false,
   fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
@@ -120,7 +120,7 @@ end)
 ### `setup`
 ```lua 
 --- @class SetupOpts
---- @field refresh_files_cache? "module-load"|"find-call"
+--- @field refresh_files_cache? "setup"|"find"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field fd_cmd? string
