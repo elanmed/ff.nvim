@@ -367,7 +367,7 @@ P.format_filename = function(abs_file, score, icon_char)
   )
   local formatted_icon_char = icon_char and icon_char .. " " or ""
   local rel_file = H.rel_file(abs_file)
-  return ("%s %s%s"):format(
+  return ("%s %s|%s"):format(
     formatted_score,
     formatted_icon_char,
     rel_file
@@ -414,7 +414,7 @@ P.refresh_files_cache = function(fd_cmd)
     local lines = vim.split(obj.stdout, "\n")
     for _, abs_file in ipairs(lines) do
       if #abs_file == 0 then goto continue end
-      table.insert(P.caches.fd_files, abs_file)
+      table.insert(P.caches.fd_files, vim.fs.normalize(abs_file))
 
       ::continue::
     end
@@ -455,7 +455,7 @@ P.refresh_open_buffers_cache = function()
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
     if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then goto continue end
-    local buf_name = vim.api.nvim_buf_get_name(bufnr)
+    local buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
     if buf_name == "" then goto continue end
     if not vim.startswith(buf_name, H.cwd) then goto continue end
 
@@ -534,7 +534,7 @@ P.get_weighted_files = function(opts)
   local weighted_files_for_query = {}
 
   --- @param abs_file string
-  local function get_weighted_file_for_query(abs_file)
+  local function get_weighted_file(abs_file)
     local rel_file = H.rel_file(abs_file)
     if #opts.query == 0 then
       local icon_info = P.get_icon_info { abs_file = abs_file, icons_enabled = opts.icons_enabled, }
@@ -621,7 +621,7 @@ P.get_weighted_files = function(opts)
   for idx, abs_file in pairs(P.caches.frecency_files) do
     if #weighted_files_for_query >= max_results then break end
 
-    local weighted_file = get_weighted_file_for_query(abs_file)
+    local weighted_file = get_weighted_file(abs_file)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -639,7 +639,7 @@ P.get_weighted_files = function(opts)
       goto continue
     end
 
-    local weighted_file = get_weighted_file_for_query(abs_file)
+    local weighted_file = get_weighted_file(abs_file)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -687,7 +687,7 @@ P.highlight_weighted_files = function(opts)
       )
     end
 
-    local file_offset = #weighted_file.formatted_filename - weighted_file.formatted_filename:reverse():find " " + 1
+    local file_offset = weighted_file.formatted_filename:find "|"
     for _, hl_idx in ipairs(weighted_file.hl_idxs) do
       local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
 
@@ -836,14 +836,14 @@ M.setup = function(opts)
       local current_win = vim.api.nvim_get_current_win()
       local is_buf_normal = vim.api.nvim_win_get_config(current_win).relative == ""
       if not is_buf_normal then return end
-      local abs_file = vim.api.nvim_buf_get_name(ev.buf)
+      local abs_file = vim.fs.normalize(vim.api.nvim_buf_get_name(ev.buf))
       if abs_file == "" then return end
       if last_updated_abs_file == abs_file then return end
 
       timer_id = vim.fn.timer_start(1000, function()
         last_updated_abs_file = abs_file
 
-        F.update_file_score(abs_file, { update_type = "increase", })
+        F.update_file_score(vim.fs.normalize(abs_file), { update_type = "increase", })
         if not P.caches.frecency_file_to_score[abs_file] then
           P.refresh_files_cache(opts.fd_cmd)
         end
@@ -959,8 +959,8 @@ P.find = function(opts)
 
   local _, curr_bufname = pcall(vim.api.nvim_buf_get_name, 0)
   local _, alt_bufname = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
-  curr_bufname = curr_bufname or ""
-  alt_bufname = alt_bufname or ""
+  curr_bufname = curr_bufname and vim.fs.normalize(curr_bufname) or ""
+  alt_bufname = alt_bufname and vim.fs.normalize(alt_bufname) or ""
 
   local results_buf = vim.api.nvim_create_buf(false, true)
   local results_win = vim.api.nvim_open_win(results_buf, false, opts.results_win_config)
@@ -982,11 +982,6 @@ P.find = function(opts)
   }
 
   vim.cmd "startinsert"
-
-  --- @param formatted_result string
-  local function parse_result(formatted_result)
-    return vim.split(vim.trim(formatted_result), "%s+")[opts.icons_enabled and 3 or 2]
-  end
 
   --- @param query string
   local function get_find_files_with_query(query)
@@ -1050,7 +1045,7 @@ P.find = function(opts)
       local result = vim.api.nvim_get_current_line()
       if #result == 0 then return end
       close()
-      vim.cmd("edit " .. parse_result(result))
+      vim.cmd("edit " .. vim.split(result, "|")[2])
     end,
     next = function()
       vim.api.nvim_win_call(results_win, function()
