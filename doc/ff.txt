@@ -94,14 +94,9 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
             ["<c-p>"] = "prev",
             ["<c-c>"] = "close",
             ["<esc>"] = "close",
-          },
-          n = {
-            ["<cr>"] = "select",
-            ["<c-n>"] = "next",
-            ["<c-p>"] = "prev",
-            ["<c-c>"] = "close",
-            ["<esc>"] = "close",
-            ["q"] = "close",
+            ["<tab>"] = "preview-toggle",
+            ["<C-d>"] = "preview-scroll-down",
+            ["<C-u>"] = "preview-scroll-up",
           },
         },
         -- defaults:
@@ -142,6 +137,8 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
           title = "Results",
           focusable = false,
         },
+        results_win_opts = {},
+        preview_win_opts = {},
         on_picker_open = function(on_picker_open_opts) end
       }
     end)
@@ -182,6 +179,8 @@ API                                                                   *ff-api*
     --- @field max_results_rendered? number
     --- @field input_win_config? vim.api.keyset.win_config
     --- @field results_win_config? vim.api.keyset.win_config
+    --- @field results_win_opts? vim.wo
+    --- @field preview_win_opts? vim.wo
     --- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
     
     --- @class OnPickerOpenOpts
@@ -252,7 +251,6 @@ FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*
 
 - Multi-select
 - Shared options between `setup` and `find`
-- A preview window (maybe?)
 
 ------------------------------------------------------------------------------
 SIMILAR PLUGINS                                           *ff-similar-plugins*

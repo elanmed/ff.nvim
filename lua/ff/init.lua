@@ -829,11 +829,6 @@ P.set_opts = function(win, opts)
   end
 end
 
-P.set_cursorline_opts = function(win)
-  vim.api.nvim_set_option_value("cursorline", true, { win = win, })
-  vim.api.nvim_set_option_value("winhighlight", "CursorLine:FFPickerCursorLine", { win = win, })
-end
-
 --- @class SetupOpts
 --- @field refresh_files_cache? "setup"|"find"
 --- @field benchmark_step? boolean
@@ -915,6 +910,8 @@ end
 --- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
 --- @field results_win_config? vim.api.keyset.win_config
+--- @field results_win_opts? vim.wo
+--- @field preview_win_opts? vim.wo
 --- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
 
 --- @class OnPickerOpenOpts
@@ -949,6 +946,11 @@ P.find = function(opts)
   P.caches.weighted_files_per_query = {}
   P.preview_active = false
 
+  local cursorline_opts = {
+    cursorline = true,
+    winhighlight = "CursorLine:FFPickerCursorLine",
+  }
+
   opts = H.default(opts, {})
   opts.keymaps = H.default(opts.keymaps, {})
   opts.keymaps.i = H.default(opts.keymaps.i, {})
@@ -968,6 +970,9 @@ P.find = function(opts)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
   opts.on_picker_open = H.default(opts.on_picker_open, function() end)
+
+  opts.results_win_opts = H.default(opts.results_win_opts, {})
+  opts.preview_win_opts = H.default(opts.preview_win_opts, {})
 
   local editor_height = vim.o.lines - 1
   local input_height = 1
@@ -1014,7 +1019,19 @@ P.find = function(opts)
   local results_win = vim.api.nvim_open_win(results_buf, false, opts.results_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf, })
   local minimal_opts = P.save_minimal_opts(results_win)
-  P.set_cursorline_opts(results_win)
+
+  local function set_results_win_opts()
+    P.set_opts(results_win, minimal_opts)
+    P.set_opts(results_win, cursorline_opts)
+    P.set_opts(results_win, opts.results_win_opts)
+  end
+
+  local function set_preview_win_opts()
+    P.set_opts(results_win, minimal_opts)
+    P.set_opts(results_win, opts.preview_win_opts)
+  end
+
+  set_results_win_opts()
 
   local input_buf = vim.api.nvim_create_buf(false, true)
   local input_win = vim.api.nvim_open_win(input_buf, false, opts.input_win_config)
@@ -1119,8 +1136,7 @@ P.find = function(opts)
       if P.preview_active then
         P.preview_active = not P.preview_active
         vim.api.nvim_win_set_buf(results_win, results_buf)
-        P.set_opts(results_win, minimal_opts)
-        P.set_cursorline_opts(results_win)
+        set_results_win_opts()
         return
       end
 
@@ -1132,7 +1148,7 @@ P.find = function(opts)
       if #result == 0 then return end
 
       vim.api.nvim_win_set_buf(results_win, preview_buf)
-      P.set_opts(results_win, minimal_opts)
+      set_preview_win_opts()
 
       local filename = vim.split(result, "|")[2]
       local lines = vim.fn.readfile(filename, "", 100)

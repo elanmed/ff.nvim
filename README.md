@@ -64,14 +64,9 @@ vim.keymap.set("n", "<leader>f", function()
         ["<c-p>"] = "prev",
         ["<c-c>"] = "close",
         ["<esc>"] = "close",
-      },
-      n = {
-        ["<cr>"] = "select",
-        ["<c-n>"] = "next",
-        ["<c-p>"] = "prev",
-        ["<c-c>"] = "close",
-        ["<esc>"] = "close",
-        ["q"] = "close",
+        ["<tab>"] = "preview-toggle",
+        ["<C-d>"] = "preview-scroll-down",
+        ["<C-u>"] = "preview-scroll-up",
       },
     },
     -- defaults:
@@ -112,6 +107,8 @@ vim.keymap.set("n", "<leader>f", function()
       title = "Results",
       focusable = false,
     },
+    results_win_opts = {},
+    preview_win_opts = {},
     on_picker_open = function(on_picker_open_opts) end
   }
 end)
@@ -145,6 +142,8 @@ M.setup = function(opts) end
 --- @field max_results_rendered? number
 --- @field input_win_config? vim.api.keyset.win_config
 --- @field results_win_config? vim.api.keyset.win_config
+--- @field results_win_opts? vim.wo
+--- @field preview_win_opts? vim.wo
 --- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
 
 --- @class OnPickerOpenOpts
@@ -201,7 +200,6 @@ after calling`setup`
 ## Features excluded for simplicity
 - Multi-select
 - Shared options between `setup` and `find`
-- A preview window (maybe?)
 
 ## Similar plugins
 - [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)
