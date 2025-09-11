@@ -44,7 +44,7 @@ ff.setup {
   refresh_files_cache = "setup",
   benchmark_step = false,
   benchmark_mean = false,
-  find_cmd = "fd --absolute-path --hidden --type f --exclude .git",
+  find_cmd = "fd --absolute-path --type f",
 }
 
 local editor_height = vim.o.lines - 1

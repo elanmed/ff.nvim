@@ -1,4 +1,4 @@
-*ff.txt*                                        Last change: 2025 September 09
+*ff.txt*                                        Last change: 2025 September 11
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -78,7 +78,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       refresh_files_cache = "setup",
       benchmark_step = false,
       benchmark_mean = false,
-      fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
+      find_cmd = "fd --absolute-path --type f",
     }
     
     local editor_height = vim.o.lines - 1
@@ -162,7 +162,7 @@ API                                                                   *ff-api*
     --- @field refresh_files_cache? "setup"|"find"
     --- @field benchmark_step? boolean benchmark each keystroke
     --- @field benchmark_mean? boolean benchmark the mean of all keystrokes in a session
-    --- @field fd_cmd? string
+    --- @field find_cmd? string defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
     
     --- @param opts? SetupOpts
     M.setup = function(opts) end
@@ -206,7 +206,7 @@ API                                                                   *ff-api*
     --- @field n? FindKeymaps
     
     --- @class FindKeymaps
-    --- @field [string] "select"|"next"|"prev"|"close"|function
+    --- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
     
     --- @param opts? FindOpts
     M.find = function(opts) end
@@ -216,8 +216,8 @@ API                                                                   *ff-api*
 `REFRESH_FILES_CACHE`                                 *ff-refresh_files_cache*
 
 >lua
-    --- @param fd_cmd string
-    M.refresh_files_cache = function(fd_cmd) end
+    --- @param find_cmd string defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
+    M.refresh_files_cache = function(find_cmd) end
 <
 By default, `refresh_files_cache` is called once when `setup` is run. When
 performing actions on the file system, it can be helpful to refresh the cache
@@ -296,12 +296,12 @@ be useful. When calling `find` directly, there's no need to call any of these.
 
 >lua
     --- @class WeightedFile
-    --- @field abs_file string
-    --- @field rel_file string
+    --- @field abs_path string
+    --- @field rel_path string
     --- @field weighted_score number fuzzy_score_multiple * fuzzy_score + file_score_multiple * buf_and_frecency_score
     --- @field fuzzy_score number
     --- @field buf_and_frecency_score number
-    --- @field hl_idxs table the indexes of the `rel_file` that are fuzzy matched
+    --- @field hl_idxs table the indexes of the `rel_path` that are fuzzy matched
     --- @field icon_char string
     --- @field icon_hl string
     --- @field formatted_filename string
@@ -380,8 +380,8 @@ TODO                                                                 *ff-todo*
 
 
 - [ ] Support alternatives to `mini.icons`
-- [ ] Support alternatives to `fd`
-- [ ] Support Windows
+- [x] Support Windows (I don't have a Windows machine to test this on, but it
+  should work)
 
 ------------------------------------------------------------------------------
 FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*

@@ -879,10 +879,7 @@ M.setup = function(opts)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
   L.SHOULD_LOG_MEAN = opts.benchmark_mean
 
-  opts.find_cmd = H.default(
-    opts.find_cmd,
-    "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
-  )
+  opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
   opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
   P.setup_opts = opts
 
