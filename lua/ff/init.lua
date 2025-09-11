@@ -388,7 +388,7 @@ end
 
 P.caches = {
   --- @type string[]
-  fd_files = {},
+  find_files = {},
 
   --- @type string[]
   frecency_files = {},
@@ -406,24 +406,23 @@ P.caches = {
   weighted_files_per_query = {},
 }
 
-P.default_fd_cmd = "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
 
---- @param fd_cmd string
-P.refresh_files_cache = function(fd_cmd)
-  P.caches.fd_files = {}
+--- @param find_cmd string
+P.refresh_files_cache = function(find_cmd)
+  P.caches.find_files = {}
 
   L.benchmark_step_heading "Refresh files cache"
-  L.benchmark_step("start", "Refresh fd cache")
-  local fd_cmd_tbl = vim.split(fd_cmd, " ")
-  vim.system(fd_cmd_tbl, { text = true, }, function(obj)
+  L.benchmark_step("start", "Refresh find cache")
+  local find_cmd_tbl = vim.split(find_cmd, " ")
+  vim.system(find_cmd_tbl, { text = true, }, function(obj)
     local lines = vim.split(obj.stdout, "\n")
     for _, abs_path in ipairs(lines) do
       if #abs_path == 0 then goto continue end
-      table.insert(P.caches.fd_files, vim.fs.normalize(abs_path))
+      table.insert(P.caches.find_files, vim.fs.normalize(abs_path))
 
       ::continue::
     end
-    L.benchmark_step("end", "Refresh fd cache", { record_mean = false, })
+    L.benchmark_step("end", "Refresh find cache", { record_mean = false, })
     L.benchmark_step_closing()
   end)
 end
@@ -668,8 +667,8 @@ M.get_weighted_files = function(opts)
   end
   L.benchmark_step("end", "Populate weighted files with frecency")
 
-  L.benchmark_step("start", "Populate weighted files with fd")
-  for idx, abs_path in ipairs(P.caches.fd_files) do
+  L.benchmark_step("start", "Populate weighted files with find")
+  for idx, abs_path in ipairs(P.caches.find_files) do
     if #weighted_files_for_query >= max_results then break end
     if P.caches.frecency_file_to_score[abs_path] ~= nil then
       goto continue
@@ -686,7 +685,7 @@ M.get_weighted_files = function(opts)
 
     ::continue::
   end
-  L.benchmark_step("end", "Populate weighted files with fd")
+  L.benchmark_step("end", "Populate weighted files with find")
 
   L.benchmark_step("start", "Sort weighted files")
   table.sort(weighted_files_for_query, function(a, b)
@@ -862,7 +861,7 @@ end
 --- @field refresh_files_cache? "setup"|"find"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
---- @field fd_cmd? string
+--- @field find_cmd? string
 --- @field icons_enabled? boolean
 
 P.setup_opts = {}
@@ -880,12 +879,15 @@ M.setup = function(opts)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
   L.SHOULD_LOG_MEAN = opts.benchmark_mean
 
-  opts.fd_cmd = H.default(opts.fd_cmd, P.default_fd_cmd)
+  opts.find_cmd = H.default(
+    opts.find_cmd,
+    "fd --absolute-path --hidden --type f --exclude node_modules --exclude .git --exclude dist"
+  )
   opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
   P.setup_opts = opts
 
   if opts.refresh_files_cache == "setup" then
-    P.refresh_files_cache(opts.fd_cmd)
+    P.refresh_files_cache(opts.find_cmd)
   end
 
   local timer_id = nil
@@ -909,7 +911,7 @@ M.setup = function(opts)
 
         F.update_file_score(vim.fs.normalize(abs_path), { update_type = "increase", })
         if not P.caches.frecency_file_to_score[abs_path] then
-          P.refresh_files_cache(opts.fd_cmd)
+          P.refresh_files_cache(opts.find_cmd)
         end
       end)
     end,
@@ -918,13 +920,13 @@ M.setup = function(opts)
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { link = "CursorLine", })
 end
 
---- @param fd_cmd? string
-M.refresh_files_cache = function(fd_cmd)
+--- @param find_cmd? string
+M.refresh_files_cache = function(find_cmd)
   if not P.setup_called then
     H.notify_error "[ff.nvim]: `setup` must be called before `refresh_files_cache`"
   end
-  fd_cmd = H.default(fd_cmd, P.setup_opts.fd_cmd)
-  P.refresh_files_cache(fd_cmd)
+  find_cmd = H.default(find_cmd, P.setup_opts.find_cmd)
+  P.refresh_files_cache(find_cmd)
 end
 
 M.benchmark_mean_start = function()
@@ -1116,7 +1118,7 @@ M.find = function(opts)
   vim.schedule(
     function()
       if P.setup_opts.refresh_files_cache == "find" then
-        P.refresh_files_cache(P.setup_opts.fd_cmd)
+        P.refresh_files_cache(P.setup_opts.find_cmd)
       end
       M.refresh_open_buffers_cache()
       M.refresh_frecency_cache()

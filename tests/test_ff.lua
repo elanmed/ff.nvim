@@ -314,13 +314,12 @@ end
 
 T["P"] = MiniTest.new_set {
   hooks = {
-    post_case = function()
-      P.caches.fd_files = {}
+    pre_case = function()
+      P.caches.find_files = {}
       P.caches.frecency_files = {}
       P.caches.frecency_file_to_score = {}
       P.caches.icon_cache = {}
       P.caches.open_buffer_to_modified = {}
-      P.caches.weighted_files_for_empty_query = {}
       P.caches.weighted_files_per_query = {}
     end,
   },

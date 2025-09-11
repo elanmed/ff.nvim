@@ -44,7 +44,7 @@ ff.setup {
   refresh_files_cache = "setup",
   benchmark_step = false,
   benchmark_mean = false,
-  fd_cmd = "fd --absolute-path --hidden --type f --exclude .git",
+  find_cmd = "fd --absolute-path --hidden --type f --exclude .git",
 }
 
 local editor_height = vim.o.lines - 1
@@ -123,7 +123,7 @@ end)
 --- @field refresh_files_cache? "setup"|"find"
 --- @field benchmark_step? boolean benchmark each keystroke
 --- @field benchmark_mean? boolean benchmark the mean of all keystrokes in a session
---- @field fd_cmd? string
+--- @field find_cmd? string defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
 
 --- @param opts? SetupOpts
 M.setup = function(opts) end
@@ -165,7 +165,7 @@ M.setup = function(opts) end
 --- @field n? FindKeymaps
 
 --- @class FindKeymaps
---- @field [string] "select"|"next"|"prev"|"close"|function
+--- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
 
 --- @param opts? FindOpts
 M.find = function(opts) end
@@ -173,8 +173,8 @@ M.find = function(opts) end
 
 ### `refresh_files_cache`
 ```lua
---- @param fd_cmd string
-M.refresh_files_cache = function(fd_cmd) end
+--- @param find_cmd string defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
+M.refresh_files_cache = function(find_cmd) end
 ```
 
 By default, `refresh_files_cache` is called once when `setup` is run. When performing actions on the file system, 
@@ -317,8 +317,7 @@ after calling`setup`
 
 ## TODO
 - [ ] Support alternatives to `mini.icons`
-- [ ] Support alternatives to `fd`
-- [ ] Support Windows
+- [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
 
 ## Features excluded for simplicity
 - Multi-select
