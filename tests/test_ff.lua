@@ -5,6 +5,7 @@ local ff = require "ff"
 local H = ff._internal.H
 local F = ff._internal.F
 local P = ff._internal.P
+local M = ff
 
 T["H"] = MiniTest.new_set()
 
@@ -337,69 +338,69 @@ T["P"]["format_filename"] = MiniTest.new_set {
 }
 
 T["P"]["format_filename"]["formats with score, icon, and relative path"] = function()
-  local result = P.format_filename("path/to/dir/src/file.lua", 12.34, "📄")
-  MiniTest.expect.equality(result, "12.34 📄 |src/file.lua")
+  local res = P.format_filename("path/to/dir/src/file.lua", 12.34, "📄")
+  MiniTest.expect.equality(res, "12.34 📄 |src/file.lua")
 end
 T["P"]["format_filename"]["formats without icon when icon_char is nil"] = function()
-  local result = P.format_filename("path/to/dir/src/file.lua", 12.34, nil)
-  MiniTest.expect.equality(result, "12.34 |src/file.lua")
+  local res = P.format_filename("path/to/dir/src/file.lua", 12.34, nil)
+  MiniTest.expect.equality(res, "12.34 |src/file.lua")
 end
 T["P"]["format_filename"]["pads score to MAX_SCORE_LEN"] = function()
-  local result = P.format_filename("path/to/dir/file.lua", 1.2, nil)
-  MiniTest.expect.equality(result, " 1.20 |file.lua")
+  local res = P.format_filename("path/to/dir/file.lua", 1.2, nil)
+  MiniTest.expect.equality(res, " 1.20 |file.lua")
 end
 T["P"]["format_filename"]["uses fit_decimals for score formatting"] = function()
-  local result = P.format_filename("path/to/dir/file.lua", 123.456789, nil)
-  MiniTest.expect.equality(result, "123.4 |file.lua")
+  local res = P.format_filename("path/to/dir/file.lua", 123.456789, nil)
+  MiniTest.expect.equality(res, "123.4 |file.lua")
 end
 T["P"]["format_filename"]["handles absolute path when not in cwd"] = function()
   H.cwd = "path/to/another_dir"
-  local result = P.format_filename("path/to/dir/file.lua", 12.34, nil)
-  MiniTest.expect.equality(result, "12.34 |path/to/dir/file.lua")
+  local res = P.format_filename("path/to/dir/file.lua", 12.34, nil)
+  MiniTest.expect.equality(res, "12.34 |path/to/dir/file.lua")
 end
 
 T["P"]["scale_fzy_to_frecency"] = MiniTest.new_set()
 T["P"]["scale_fzy_to_frecency"]["returns MAX_FRECENCY_SCORE for math.huge"] = function()
-  local result = P.scale_fzy_to_frecency(math.huge)
-  MiniTest.expect.equality(result, P.MAX_FRECENCY_SCORE)
+  local res = P.scale_fzy_to_frecency(math.huge)
+  MiniTest.expect.equality(res, P.MAX_FRECENCY_SCORE)
 end
 T["P"]["scale_fzy_to_frecency"]["returns 0 for -math.huge"] = function()
-  local result = P.scale_fzy_to_frecency(-math.huge)
-  MiniTest.expect.equality(result, 0)
+  local res = P.scale_fzy_to_frecency(-math.huge)
+  MiniTest.expect.equality(res, 0)
 end
 T["P"]["scale_fzy_to_frecency"]["scales positive scores proportionally"] = function()
-  local result = P.scale_fzy_to_frecency(20)
-  MiniTest.expect.equality(result, 99)
+  local res = P.scale_fzy_to_frecency(20)
+  MiniTest.expect.equality(res, 99)
 end
 T["P"]["scale_fzy_to_frecency"]["scales half max score to half max frecency"] = function()
-  local result = P.scale_fzy_to_frecency(10)
-  MiniTest.expect.equality(result, 49.5)
+  local res = P.scale_fzy_to_frecency(10)
+  MiniTest.expect.equality(res, 49.5)
 end
 T["P"]["scale_fzy_to_frecency"]["scales zero score to zero"] = function()
-  local result = P.scale_fzy_to_frecency(0)
-  MiniTest.expect.equality(result, 0)
+  local res = P.scale_fzy_to_frecency(0)
+  MiniTest.expect.equality(res, 0)
 end
 T["P"]["scale_fzy_to_frecency"]["scales negative scores proportionally"] = function()
-  local result = P.scale_fzy_to_frecency(-10)
-  MiniTest.expect.equality(result, -49.5)
+  local res = P.scale_fzy_to_frecency(-10)
+  MiniTest.expect.equality(res, -49.5)
 end
 T["P"]["scale_fzy_to_frecency"]["handles scores above MAX_FZY_SCORE"] = function()
-  local result = P.scale_fzy_to_frecency(40)
-  MiniTest.expect.equality(result, 198)
+  local res = P.scale_fzy_to_frecency(40)
+  MiniTest.expect.equality(res, 198)
 end
 T["P"]["scale_fzy_to_frecency"]["handles fractional scores"] = function()
-  local result = P.scale_fzy_to_frecency(5.5)
-  MiniTest.expect.equality(result, 27.225)
+  local res = P.scale_fzy_to_frecency(5.5)
+  MiniTest.expect.equality(res, 27.225)
 end
 
 T["P"]["get_icon_info"] = MiniTest.new_set()
 T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
-  local result = P.get_icon_info {
+  local res = P.get_icon_info {
     icons_enabled = false,
     abs_path = "path/to/file.lua",
   }
-  MiniTest.expect.equality(result.icon_char, nil)
-  MiniTest.expect.equality(result.icon_hl, nil)
+  MiniTest.expect.equality(res.icon_char, nil)
+  MiniTest.expect.equality(res.icon_hl, nil)
 end
 T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = function()
   P.caches.icon_cache["lua"] = {
@@ -407,55 +408,278 @@ T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = 
     icon_hl = "LuaIcon",
   }
 
-  local result = P.get_icon_info {
+  local res = P.get_icon_info {
     icons_enabled = true,
     abs_path = "path/to/file.lua",
   }
 
-  MiniTest.expect.equality(result.icon_char, "🌙")
-  MiniTest.expect.equality(result.icon_hl, "LuaIcon")
+  MiniTest.expect.equality(res.icon_char, "🌙")
+  MiniTest.expect.equality(res.icon_hl, "LuaIcon")
 end
 T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function()
-  local result_one = P.get_icon_info {
+  local res_one = P.get_icon_info {
     icons_enabled = true,
     abs_path = "path/to/file.js",
   }
 
-  MiniTest.expect.equality(result_one.icon_char, "󰌞")
-  MiniTest.expect.equality(result_one.icon_hl, "MiniIconsYellow")
+  MiniTest.expect.equality(res_one.icon_char, "󰌞")
+  MiniTest.expect.equality(res_one.icon_hl, "MiniIconsYellow")
 
   MiniTest.expect.equality(P.caches.icon_cache["js"].icon_char, "󰌞")
   MiniTest.expect.equality(P.caches.icon_cache["js"].icon_hl, "MiniIconsYellow")
 
-  local result_two = P.get_icon_info {
+  local res_two = P.get_icon_info {
     icons_enabled = true,
     abs_path = "path/to/file.js",
   }
-  MiniTest.expect.equality(result_two.icon_char, "󰌞")
-  MiniTest.expect.equality(result_two.icon_hl, "MiniIconsYellow")
+  MiniTest.expect.equality(res_two.icon_char, "󰌞")
+  MiniTest.expect.equality(res_two.icon_hl, "MiniIconsYellow")
 end
 
-T["P"]["get_weighted_files"] = MiniTest.new_set()
-T["P"]["get_weighted_files"]["when the query is cached, it should use the cache"] = function() end
-T["P"]["get_weighted_files"]["when the query is not cached, it should update the cache"] = function() end
-T["P"]["get_weighted_files"]["should loop through frecent files, then fd files"] = function() end
-T["P"]["get_weighted_files"]["should sort the files based on the weighted_score"] = function() end
+local query = "in"
+
+--- @type WeightedFile
+local weighted_file_lua = {
+  abs_path = "path/to/dir/init.lua",
+  rel_path = "init.lua",
+  buf_and_frecency_score = 10,
+  formatted_filename = "17.00  |init.lua",
+  fuzzy_score = 20,
+  weighted_score = 17,
+  hl_idxs = {},
+  icon_char = "",
+  icon_hl = "MiniIconsGreen",
+}
+
+--- @type WeightedFile
+local weighted_file_js = {
+  abs_path = "path/to/dir/icon.js",
+  rel_path = "icon.js",
+  buf_and_frecency_score = 30,
+  formatted_filename = "37.00 󰌞 |icon.js",
+  fuzzy_score = 40,
+  weighted_score = 37,
+  hl_idxs = {},
+  icon_char = "󰌞",
+  icon_hl = "MiniIconsYellow",
+}
+
+--- @type WeightedFile
+local weighted_file_ts = {
+  abs_path = "path/to/dir/mod.ts",
+  rel_path = "mod.ts",
+  buf_and_frecency_score = 50,
+  formatted_filename = "57.00 󰛦 |mod.ts",
+  fuzzy_score = 60,
+  weighted_score = 57,
+  hl_idxs = {},
+  icon_char = "󰛦",
+  icon_hl = "MiniIconsAzure",
+}
+
+local vim_uv_cwd = vim.uv.cwd
+T["P"]["get_weighted_files"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      vim.uv.cwd = function() return "path/to/dir" end
+    end,
+    post_case = function()
+      vim.uv.cwd = vim_uv_cwd
+    end,
+  },
+}
+T["P"]["get_weighted_files"]["when the query is cached, it should use the cache"] = function()
+  P.caches.weighted_files_per_query[query] = weighted_file_js
+
+  local res = M.get_weighted_files { query = query, batch_size = false, }
+  MiniTest.expect.equality(weighted_file_js, res)
+end
+T["P"]["get_weighted_files"]["when the query is not cached, it should update the cache"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, weighted_file_js.abs_path, weighted_file_ts.abs_path, }
+
+  M.get_weighted_files { query = query, batch_size = false, }
+  MiniTest.expect.equality(#P.caches.weighted_files_per_query[query], 2)
+  MiniTest.expect.equality(P.caches.weighted_files_per_query[query][1].abs_path, weighted_file_lua.abs_path)
+  MiniTest.expect.equality(P.caches.weighted_files_per_query[query][2].abs_path, weighted_file_js.abs_path)
+end
+T["P"]["get_weighted_files"]["should deduplicate the frecent files and fd files"] = function()
+  P.caches.frecency_files = { weighted_file_lua.abs_path, }
+  P.caches.find_files = { weighted_file_lua.abs_path, weighted_file_js.abs_path, weighted_file_ts.abs_path, }
+  P.caches.frecency_file_to_score = {
+    [weighted_file_lua.abs_path] = 5,
+  }
+
+  local res = M.get_weighted_files { query = query, batch_size = false, }
+  MiniTest.expect.equality(#res, 2)
+  MiniTest.expect.equality(res[1].abs_path, weighted_file_lua.abs_path)
+  MiniTest.expect.equality(res[2].abs_path, weighted_file_js.abs_path)
+end
+T["P"]["get_weighted_files"]["should sort the files based on the weighted_score"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, weighted_file_js.abs_path, weighted_file_ts.abs_path, }
+
+  local res = M.get_weighted_files { query = query, batch_size = false, }
+  MiniTest.expect.equality(#res, 2)
+  MiniTest.expect.equality(res[1].weighted_score >= res[2].weighted_score, true)
+end
 
 T["P"]["get_weighted_files"]["get_weighted_file"] = MiniTest.new_set()
 T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"] = MiniTest.new_set()
-T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is a frecency score, it should use it as the weighted_score"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is no frecency score, it should set the weighted_score to 0"] = function() end
+T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is a frecency score, it should use it as the weighted_score"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.frecency_files = { weighted_file_lua.abs_path, }
+  P.caches.frecency_file_to_score = { [weighted_file_lua.abs_path] = 15.5, }
 
-T["P"]["get_weighted_files"]["get_weighted_file"]["with no fuzzy match, it should not process the file"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the current_buf_boost"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the modified_buf_boost"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the open_buf_boost"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the frecency score"] = function() end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function() end
+  local res = M.get_weighted_files { query = "", batch_size = false, }
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].weighted_score, 15.5)
+  MiniTest.expect.equality(res[1].fuzzy_score, 0)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 0)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is no frecency score, it should set the weighted_score to 0"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.frecency_files = {}
+  P.caches.frecency_file_to_score = {}
+
+  local res = M.get_weighted_files { query = "", batch_size = false, }
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].weighted_score, 0)
+  MiniTest.expect.equality(res[1].fuzzy_score, 0)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 0)
+end
+
+T["P"]["get_weighted_files"]["get_weighted_file"]["with no fuzzy match, it should not process the file"] = function()
+  P.caches.find_files = { weighted_file_ts.abs_path, }
+  local res = M.get_weighted_files { query = query, batch_size = false, }
+  MiniTest.expect.equality(#res, 0)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+
+  local res = M.get_weighted_files {
+    query = "init.lua",
+    weights = { basename_boost = 100, },
+    batch_size = false,
+  }
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 100)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+
+  local res = M.get_weighted_files {
+    query = "init",
+    weights = { basename_boost = 400, },
+    batch_size = false,
+  }
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 400)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
+
+  local res = M.get_weighted_files {
+    query = query,
+    curr_bufname = weighted_file_lua.abs_path,
+    weights = { current_buf_boost = -90, },
+    batch_size = false,
+  }
+
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, -90)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
+
+  local res = M.get_weighted_files {
+    query = query,
+    alt_bufname = weighted_file_lua.abs_path,
+    weights = { alternate_buf_boost = 300, },
+    batch_size = false,
+  }
+
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 300)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = true, }
+
+  local res = M.get_weighted_files {
+    query = query,
+    weights = { modified_buf_boost = 200, },
+    batch_size = false,
+  }
+
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 200)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
+
+  local res = M.get_weighted_files {
+    query = query,
+    weights = { open_buf_boost = 100, },
+    batch_size = false,
+  }
+
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 100)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the frecency score"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.frecency_files = { weighted_file_lua.abs_path, }
+  P.caches.frecency_file_to_score = { [weighted_file_lua.abs_path] = 100, }
+
+  local res = M.get_weighted_files {
+    query = query,
+    batch_size = false,
+  }
+
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 100)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function()
+  P.caches.find_files = { weighted_file_lua.abs_path, }
+  P.caches.frecency_files = { weighted_file_lua.abs_path, }
+  P.caches.frecency_file_to_score = { [weighted_file_lua.abs_path] = 20, }
+
+  local res = M.get_weighted_files {
+    query = query,
+    fuzzy_score_multiple = 0.8,
+    file_score_multiple = 0.2,
+    batch_size = false,
+  }
+
+  local expected_buf_and_frecency_score = 20
+  MiniTest.expect.equality(#res, 1)
+  local expected_weighted = 0.8 * res[1].fuzzy_score + 0.2 * expected_buf_and_frecency_score
+  MiniTest.expect.equality(res[1].weighted_score, expected_weighted)
+end
 
 T["P"]["highlight_weighted_files"] = MiniTest.new_set()
+T["P"]["highlight_weighted_files"]["should apply highlights to buffer"] = function()
+  local results_buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, { "12.34 📄 |init.lua", })
+
+  local weighted_files = { {
+    formatted_filename = "12.34 📄 |init.lua",
+    icon_hl = "TestIconHL",
+    hl_idxs = { 1, 5, },
+  }, }
+
+  P.highlight_weighted_files {
+    weighted_files = weighted_files,
+    max_results_rendered = 1,
+    results_buf = results_buf,
+    batch_size = false,
+  }
+
+  local extmarks = vim.api.nvim_buf_get_extmarks(results_buf, P.ns_id, 0, -1, {})
+  MiniTest.expect.equality(#extmarks > 0, true)
+  vim.api.nvim_buf_delete(results_buf, { force = true, })
+end
 
 return T
