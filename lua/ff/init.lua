@@ -547,7 +547,7 @@ end
 --- @field alternate_bufname string
 --- @field weights Weights
 --- @field batch_size number | false
---- @field hi_enabled boolean
+--- @field hl_enabled boolean
 --- @field icons_enabled boolean
 --- @field max_results_considered number
 --- @field max_results_rendered number
@@ -574,7 +574,7 @@ M.get_weighted_files = function(opts)
   opts.weights.basename_boost = H.default(opts.weights.basename_boost, 40)
   opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
   opts.batch_size = H.default(opts.batch_size, false) -- different from M.find
-  opts.hi_enabled = H.default(opts.hi_enabled, true)
+  opts.hl_enabled = H.default(opts.hl_enabled, true)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
   opts.max_results_rendered = H.default(opts.max_results_rendered, 50) -- different from M.find
@@ -650,7 +650,7 @@ M.get_weighted_files = function(opts)
 
     local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
     local hl_idxs = {}
-    if opts.hi_enabled then
+    if opts.hl_enabled then
       hl_idxs = fzy.positions(opts.query, rel_path)
     end
 
@@ -780,7 +780,7 @@ end
 --- @field render_results fun(weighted_files:WeightedFile[]):nil
 --- @field weights Weights
 --- @field batch_size number | false
---- @field hi_enabled boolean
+--- @field hl_enabled boolean
 --- @field icons_enabled boolean
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
@@ -801,7 +801,7 @@ P.get_find_files = function(opts)
       alternate_bufname = opts.alternate_bufname,
       weights = opts.weights,
       batch_size = opts.batch_size,
-      hi_enabled = opts.hi_enabled,
+      hl_enabled = opts.hl_enabled,
       icons_enabled = opts.icons_enabled,
       max_results_considered = opts.max_results_considered,
       max_results_rendered = opts.max_results_rendered,
@@ -821,7 +821,7 @@ P.get_find_files = function(opts)
     opts.render_results(weighted_files)
     L.benchmark_step("end", "Render results")
 
-    if not opts.hi_enabled then
+    if not opts.hl_enabled then
       L.benchmark_step("end", "Per keystroke")
       L.benchmark_step_closing()
       return
@@ -963,7 +963,7 @@ end
 --- @field keymaps? FindKeymapsPerMode
 --- @field weights? Weights
 --- @field batch_size? number | false
---- @field hi_enabled? boolean
+--- @field hl_enabled? boolean
 --- @field icons_enabled? boolean
 --- @field max_results_considered? number
 --- @field max_results_rendered? number
@@ -1024,7 +1024,7 @@ M.find = function(opts)
   opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
 
   opts.batch_size = H.default(opts.batch_size, 250)
-  opts.hi_enabled = H.default(opts.hi_enabled, true)
+  opts.hl_enabled = H.default(opts.hl_enabled, true)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
@@ -1117,7 +1117,7 @@ M.find = function(opts)
       curr_tick = P.tick,
       weights = opts.weights,
       batch_size = opts.batch_size,
-      hi_enabled = opts.hi_enabled,
+      hl_enabled = opts.hl_enabled,
       icons_enabled = opts.icons_enabled,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,

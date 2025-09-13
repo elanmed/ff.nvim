@@ -81,7 +81,7 @@ vim.keymap.set("n", "<leader>f", function()
     },
     batch_size = 250,
     icons_enabled = true,
-    hi_enabled = true,
+    hl_enabled = true,
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
     max_results_considered = 1000,
@@ -136,7 +136,7 @@ M.setup = function(opts) end
 --- @field keymaps? FindKeymapsPerMode
 --- @field weights? FindWeights
 --- @field batch_size? number | false `false` to disable coroutines
---- @field hi_enabled? boolean highlighting the fuzzy matched characters
+--- @field hl_enabled? boolean highlighting the fuzzy matched characters
 --- @field icons_enabled? boolean
 --- @field fuzzy_score_multiple? number how much to weight the fuzzy match score vs the frecency + other weights
 --- @field file_score_multiple? number how much to weight the frecency + other weights
@@ -228,7 +228,7 @@ vim.keymap.set("n", "<leader>ff", function()
       },
       batch_size = false, -- `false` disables calling `coroutine.yield()`
       icons_enabled = true,
-      hi_enabled = true,
+      hl_enabled = true,
       fuzzy_score_multiple = 0.7,
       file_score_multiple = 0.3,
       max_results_considered = 1000,
@@ -267,7 +267,7 @@ end)
 --- @field alternate_bufname string absolute path of the alternate buffer
 --- @field weights Weights
 --- @field batch_size number | false
---- @field hi_enabled? boolean `false` will set `hl_idxs` to `{}`
+--- @field hl_enabled? boolean `false` will set `hl_idxs` to `{}`
 --- @field icons_enabled boolean
 --- @field max_results_considered? number a max of `max_results_considered` files with a fuzzy match are sorted
 --- @field max_results_rendered? number a max of `max_results_rendered` sorted files are rendered in the results buffer
