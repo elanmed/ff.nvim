@@ -315,7 +315,9 @@ after calling`setup`
 ## Deps
 - [`telescope-fzf-native.nvim`](https://github.com/nvim-telescope/telescope-fzf-native.nvim)
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
-- [`fd`](https://github.com/sharkdp/fd) - or a custom command passed to `find_cmd`
+    - Or `false` passed as `opts.icons_enabled`
+- [`fd`](https://github.com/sharkdp/fd) 
+    - Or a custom cli command passed as `opts.find_cmd`
 
 ## TODO
 - [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
