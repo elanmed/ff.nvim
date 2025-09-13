@@ -492,7 +492,6 @@ end
 --- @field abs_path string
 --- @param opts GetIconInfoOpts
 P.get_icon_info = function(opts)
-  local mini_icons = require "mini.icons"
   if not opts.icons_enabled then
     return {
       icon_char = nil,
@@ -508,15 +507,38 @@ P.get_icon_info = function(opts)
     }
   end
 
-  local _, icon_char_res, icon_hl_res = pcall(mini_icons.get, "file", opts.abs_path)
-  local icon_info = {
-    icon_char = icon_char_res or "?",
-    icon_hl = icon_hl_res or nil,
-  }
-  if ext then
-    P.caches.icon_cache[ext] = { icon_char = icon_info.icon_char, icon_hl = icon_info.icon_hl, }
+  local icon_library = (function()
+    local devicons_ok, devicons = pcall(require, "nvim-web-devicons")
+    if devicons_ok then return devicons end
+
+    local mini_icons_ok, mini_icons = pcall(require, "mini.icons")
+    if mini_icons_ok then
+      return {
+        get_icon = function(abs_path)
+          return mini_icons.get("file", abs_path)
+        end,
+      }
+    end
+
+    return nil
+  end)()
+
+  if icon_library == nil then
+    return {
+      icon_char = "?",
+      icon_hl = nil,
+    }
   end
-  return icon_info
+
+  local icon_char, icon_hl = icon_library.get_icon(opts.abs_path)
+  if ext then
+    P.caches.icon_cache[ext] = { icon_char = icon_char, icon_hl = icon_hl, }
+  end
+
+  return {
+    icon_char = icon_char,
+    icon_hl = icon_hl,
+  }
 end
 
 --- @class GetWeightedFilesOpts

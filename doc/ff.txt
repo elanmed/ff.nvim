@@ -1,4 +1,4 @@
-*ff.txt*                                        Last change: 2025 September 11
+*ff.txt*                                        Last change: 2025 September 12
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -372,8 +372,10 @@ DEPS                                                                 *ff-deps*
 
 
 - fzy-lua-native <https://github.com/romgrk/fzy-lua-native>
-- mini.icons <https://github.com/echasnovski/mini.icons>
-- `fd` <https://github.com/sharkdp/fd>
+- `mini.icons` <https://github.com/echasnovski/mini.icons> or
+  `nvim-web-devicons` <https://github.com/nvim-tree/nvim-web-devicons>
+- `fd` <https://github.com/sharkdp/fd> - or a custom command passed to
+  `find_cmd`
 
 ------------------------------------------------------------------------------
 TODO                                                                 *ff-todo*

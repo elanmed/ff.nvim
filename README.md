@@ -312,8 +312,8 @@ after calling`setup`
 
 ## Deps
 - [fzy-lua-native](https://github.com/romgrk/fzy-lua-native)
-- [mini.icons](https://github.com/echasnovski/mini.icons)
-- [`fd`](https://github.com/sharkdp/fd)
+- [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
+- [`fd`](https://github.com/sharkdp/fd) - or a custom command passed to `find_cmd`
 
 ## TODO
 - [ ] Support alternatives to `mini.icons`
