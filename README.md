@@ -21,6 +21,7 @@ A small, fast fuzzy finder with intelligent weights.
 `ff.nvim` prioritizes performance in a few ways:
 
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
+- New searches interrupt ongoing processing for previous searches
 - A max of `opts.max_results_considered` files with a fuzzy match are processed
     - Frecent files are checked for a fuzzy match first, then files from `fd`
     - For empty inputs, a max of `opts.max_results_rendered` files are processed
@@ -29,7 +30,7 @@ A small, fast fuzzy finder with intelligent weights.
     - Frecency scores are calculated once and cached when `find` is called
     - Info on open buffers are pulled once and cached when `find` is called
     - Icons are cached by extension to avoid calling `mini.icons` when possible
-    - Results are cached for each user input
+    - Results are cached for each user input (instant backspace search)
 - A max of `opts.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
