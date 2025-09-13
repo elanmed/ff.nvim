@@ -359,6 +359,7 @@ P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 -- just below math.huge is approx the length of the string
 -- just above -math.huge is approx 0
 P.MAX_FZY_SCORE = 20 -- approx the longest reasonable query
+P.MAX_MINI_FUZZY_SCORE = 10100 -- assuming a cutoff of 100
 P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
@@ -380,10 +381,19 @@ P.format_filename = function(abs_path, score, icon_char)
 end
 
 --- @param fuzzy_score number
-P.scale_fzy_to_frecency = function(fuzzy_score)
+--- @param query string
+P.scale_fzy_to_frecency = function(fuzzy_score, query)
   if fuzzy_score == math.huge then return P.MAX_FRECENCY_SCORE end
   if fuzzy_score == -math.huge then return 0 end
-  return (fuzzy_score) / (P.MAX_FZY_SCORE) * P.MAX_FRECENCY_SCORE
+  local max_fzy_score = #query
+  return fuzzy_score / max_fzy_score * P.MAX_FRECENCY_SCORE
+end
+
+--- @param fuzzy_score number
+P.scale_mini_to_frecency = function(fuzzy_score)
+  if fuzzy_score == -1 then return 0 end
+  local inverted_score = P.MAX_MINI_FUZZY_SCORE - fuzzy_score
+  return inverted_score / (P.MAX_MINI_FUZZY_SCORE) * P.MAX_FRECENCY_SCORE
 end
 
 P.caches = {
@@ -514,9 +524,7 @@ P.get_icon_info = function(opts)
     local mini_icons_ok, mini_icons = pcall(require, "mini.icons")
     if mini_icons_ok then
       return {
-        get_icon = function(abs_path)
-          return mini_icons.get("file", abs_path)
-        end,
+        get_icon = function(abs_path) return mini_icons.get("file", abs_path) end,
       }
     end
 
@@ -538,6 +546,59 @@ P.get_icon_info = function(opts)
   return {
     icon_char = icon_char,
     icon_hl = icon_hl,
+  }
+end
+
+--- @param hi_enabled boolean
+P.get_fuzzy_lib = function(hi_enabled)
+  local fzy_ok, fzy = pcall(require, "fzy-lua-native")
+  if fzy_ok then
+    return {
+      has_match = fzy.has_match,
+      --- @param needle string
+      --- @param haystack string
+      score = function(needle, haystack)
+        local fuzzy_score = fzy.score(needle, haystack)
+        return P.scale_fzy_to_frecency(fuzzy_score, needle)
+      end,
+      positions = fzy.positions,
+    }
+  end
+
+  local mini_fuzzy_ok, mini_fuzzy = pcall(require, "mini.fuzzy")
+  if mini_fuzzy_ok then
+    local cache = {}
+
+    return {
+      --- @param needle string
+      --- @param haystack string
+      has_match = function(needle, haystack)
+        local fuzzy_match = mini_fuzzy.match(needle, haystack)
+        cache[needle .. "|" .. haystack] = fuzzy_match
+        return fuzzy_match.score ~= -1
+      end,
+      --- @param needle string
+      --- @param haystack string
+      score = function(needle, haystack)
+        local fuzzy_match = cache[needle .. "|" .. haystack]
+        if not hi_enabled then cache = {} end
+        return P.scale_mini_to_frecency(fuzzy_match.score)
+      end,
+      --- @param needle string
+      --- @param haystack string
+      positions = function(needle, haystack)
+        local fuzzy_match = cache[needle .. "|" .. haystack]
+        cache = {}
+        return fuzzy_match.positions
+      end,
+    }
+  end
+
+  H.notify_error "[ff.nvim]: fzy-lua-native or mini.fuzzy is a required dependency"
+  return {
+    has_match = function() return false end,
+    score = function() return 0 end,
+    positions = function() return {} end,
   }
 end
 
@@ -585,7 +646,7 @@ M.get_weighted_files = function(opts)
     return P.caches.weighted_files_per_query[opts.query]
   end
 
-  local fzy = require "fzy-lua-native"
+  local fuzzy = P.get_fuzzy_lib(opts.hi_enabled)
 
   --- @type WeightedFile[]
   local weighted_files_for_query = {}
@@ -613,7 +674,7 @@ M.get_weighted_files = function(opts)
       }
     end
 
-    if not fzy.has_match(opts.query, rel_path) then
+    if not fuzzy.has_match(opts.query, rel_path) then
       return nil
     end
 
@@ -642,23 +703,22 @@ M.get_weighted_files = function(opts)
       buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_path]
     end
 
-    local fuzzy_score = fzy.score(opts.query, rel_path)
-    local scaled_fzy_score = P.scale_fzy_to_frecency(fuzzy_score)
+    local fuzzy_score = fuzzy.score(opts.query, rel_path)
     local weighted_score =
-        opts.fuzzy_score_multiple * scaled_fzy_score +
+        opts.fuzzy_score_multiple * fuzzy_score +
         opts.file_score_multiple * buf_and_frecency_score
 
     local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
     local hl_idxs = {}
     if opts.hi_enabled then
-      hl_idxs = fzy.positions(opts.query, rel_path)
+      hl_idxs = fuzzy.positions(opts.query, rel_path)
     end
 
     return {
       abs_path = abs_path,
       rel_path = rel_path,
       weighted_score = weighted_score,
-      fuzzy_score = scaled_fzy_score,
+      fuzzy_score = fuzzy_score,
       buf_and_frecency_score = buf_and_frecency_score,
       hl_idxs = hl_idxs,
       icon_hl = icon_info.icon_hl,
