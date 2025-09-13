@@ -522,7 +522,7 @@ end
 --- @class GetWeightedFilesOpts
 --- @field query string
 --- @field curr_bufname string
---- @field alt_bufname string
+--- @field alternate_bufname string
 --- @field weights Weights
 --- @field batch_size number | false
 --- @field hi_enabled boolean
@@ -542,8 +542,8 @@ M.get_weighted_files = function(opts)
   opts.curr_bufname = H.default(opts.curr_bufname, "")
   opts.curr_bufname = vim.fs.normalize(opts.curr_bufname)
 
-  opts.alt_bufname = H.default(opts.alt_bufname, "")
-  opts.alt_bufname = vim.fs.normalize(opts.alt_bufname)
+  opts.alternate_bufname = H.default(opts.alternate_bufname, "")
+  opts.alternate_bufname = vim.fs.normalize(opts.alternate_bufname)
 
   opts.weights = H.default(opts.weights, {})
   opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
@@ -606,7 +606,7 @@ M.get_weighted_files = function(opts)
 
       if abs_path == opts.curr_bufname then
         buf_score = opts.weights.current_buf_boost
-      elseif abs_path == opts.alt_bufname then
+      elseif abs_path == opts.alternate_bufname then
         buf_score = opts.weights.alternate_buf_boost
       elseif modified then
         buf_score = opts.weights.modified_buf_boost
@@ -753,7 +753,7 @@ end
 --- @field query string
 --- @field results_buf number
 --- @field curr_bufname string
---- @field alt_bufname string
+--- @field alternate_bufname string
 --- @field curr_tick number
 --- @field render_results fun(weighted_files:WeightedFile[]):nil
 --- @field weights Weights
@@ -776,7 +776,7 @@ P.get_find_files = function(opts)
     local weighted_files = M.get_weighted_files {
       query = opts.query,
       curr_bufname = opts.curr_bufname,
-      alt_bufname = opts.alt_bufname,
+      alternate_bufname = opts.alternate_bufname,
       weights = opts.weights,
       batch_size = opts.batch_size,
       hi_enabled = opts.hi_enabled,
@@ -1048,7 +1048,7 @@ M.find = function(opts)
   local curr_bufname_ok, curr_bufname_res = pcall(vim.api.nvim_buf_get_name, 0)
   local alt_bufname_ok, alt_bufname_res = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
   local curr_bufname = curr_bufname_ok and curr_bufname_res or nil
-  local alt_bufname = alt_bufname_ok and alt_bufname_res or nil
+  local alternate_bufname = alt_bufname_ok and alt_bufname_res or nil
 
   local preview_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = preview_buf, })
@@ -1091,7 +1091,7 @@ M.find = function(opts)
       query = query,
       results_buf = results_buf,
       curr_bufname = curr_bufname,
-      alt_bufname = alt_bufname,
+      alternate_bufname = alternate_bufname,
       curr_tick = P.tick,
       weights = opts.weights,
       batch_size = opts.batch_size,

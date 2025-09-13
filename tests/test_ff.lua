@@ -594,7 +594,7 @@ T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the alternate_bu
 
   local res = M.get_weighted_files {
     query = query,
-    alt_bufname = weighted_file_lua.abs_path,
+    alternate_bufname = weighted_file_lua.abs_path,
     weights = { alternate_buf_boost = 300, },
     batch_size = false,
   }

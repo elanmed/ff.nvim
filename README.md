@@ -205,7 +205,7 @@ To use another picker as a frontend for `ff.nvim`, the following functions may b
 vim.keymap.set("n", "<leader>ff", function()
   -- setup still needs to be called
   local curr_bufname = vim.api.nvim_buf_get_name(0)
-  local alt_bufname = vim.api.nvim_buf_get_name(vim.fn.bufnr "#")
+  local alternate_bufname = vim.api.nvim_buf_get_name(vim.fn.bufnr "#")
 
   local ff = require "ff"
   ff.benchmark_mean_start()
@@ -216,7 +216,7 @@ vim.keymap.set("n", "<leader>ff", function()
     local weighted_files = ff.get_weighted_files {
       query = query, -- defaults to "" if passed `nil`
       curr_bufname = curr_bufname, -- defaults to "" if not passed
-      alt_bufname = alt_bufname, -- defaults to "" if not passed
+      alternate_bufname = alternate_bufname, -- defaults to "" if not passed
       -- defaults to:
       weights = {
         open_buf_boost = 10,
@@ -263,7 +263,7 @@ end)
 --- @class GetWeightedFilesOpts
 --- @field query string
 --- @field curr_bufname string absolute path of the current buffer
---- @field alt_bufname string absolute path of the alternate buffer
+--- @field alternate_bufname string absolute path of the alternate buffer
 --- @field weights Weights
 --- @field batch_size number | false
 --- @field hi_enabled? boolean `false` will set `hl_idxs` to `{}`
