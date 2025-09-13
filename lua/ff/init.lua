@@ -1253,6 +1253,7 @@ M.find = function(opts)
     buffer = input_buf,
     callback = function()
       P.tick = P.tick + 1
+      if P.preview_active then keymap_fns["preview-toggle"]() end
       get_find_files_with_query(vim.api.nvim_get_current_line())
     end,
   })
