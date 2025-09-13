@@ -197,7 +197,7 @@ vim.api.nvim_create_autocmd("User", {
 
 ---
 
-## `ff.nvim` as a backend for another pick
+## Using another picker as a frontend for `ff.nvim`
 
 To use another picker as a frontend for `ff.nvim`, the following functions may be useful. When calling `find` directly, there's no need to call any of these.
 

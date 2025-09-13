@@ -10,7 +10,7 @@ API ................................................................. |ff-api|
 `setup` ........................................................... |ff-setup|
 `find` ............................................................. |ff-find|
 `refresh_files_cache` ............................... |ff-refresh_files_cache|
-`ff.nvim` as a backend for another pick  |ff-ff.nvim`-as-a-backend-for-another-pick|
+Using another picker as a frontend for `ff.nvim`  |ff-using-another-picker-as-a-frontend-for-`ff.nvim|
 `get_weighted_files` ................................. |ff-get_weighted_files|
 `refresh_frecency_cache` ......................... |ff-refresh_frecency_cache|
 `refresh_open_buffers_cache` ................. |ff-refresh_open_buffers_cache|
@@ -240,7 +240,7 @@ like:
 <
 
 ------------------------------------------------------------------------------
-`FF.NVIM` AS A BACKEND FOR ANOTHER PICK*ff-ff.nvim`-as-a-backend-for-another-pick*
+USING ANOTHER PICKER AS A FRONTEND FOR `FF.NVIM`*ff-using-another-picker-as-a-frontend-for-`ff.nvim*
 
 
 To use another picker as a frontend for `ff.nvim`, the following functions may
