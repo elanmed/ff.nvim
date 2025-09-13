@@ -4,7 +4,8 @@ A small, fast fuzzy finder with intelligent weights.
 
 - **Small**: ~1200 LOC, 1 source file, 1 test file
 - **Fast**: Average ~20ms per keystroke on a codebase of 60k files
-- **Fuzzy**: Uses `fzy-lua-native` to fuzzy match against the current input
+- **Fuzzy**: Uses `telescope-fzf-native.nvim` to fuzzy match against the current input
+    - Allows matching with the `fzf` search [syntax](https://github.com/junegunn/fzf#search-syntax)
 - **Intelligent weights**: Sorts the results by considering:
     - Open buffers
     - Modified buffers
@@ -312,12 +313,11 @@ M.benchmark_mean_end = function() end
 after calling`setup`
 
 ## Deps
-- [fzy-lua-native](https://github.com/romgrk/fzy-lua-native)
+- [`telescope-fzf-native.nvim`](https://github.com/nvim-telescope/telescope-fzf-native.nvim)
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
 - [`fd`](https://github.com/sharkdp/fd) - or a custom command passed to `find_cmd`
 
 ## TODO
-- [ ] Support alternatives to `mini.icons`
 - [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
 
 ## Features excluded for simplicity

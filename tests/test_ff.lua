@@ -359,40 +359,6 @@ T["P"]["format_filename"]["handles absolute path when not in cwd"] = function()
   MiniTest.expect.equality(res, "12.34 |path/to/dir/file.lua")
 end
 
-T["P"]["scale_fzy_to_frecency"] = MiniTest.new_set()
-T["P"]["scale_fzy_to_frecency"]["returns MAX_FRECENCY_SCORE for math.huge"] = function()
-  local res = P.scale_fzy_to_frecency(math.huge)
-  MiniTest.expect.equality(res, P.MAX_FRECENCY_SCORE)
-end
-T["P"]["scale_fzy_to_frecency"]["returns 0 for -math.huge"] = function()
-  local res = P.scale_fzy_to_frecency(-math.huge)
-  MiniTest.expect.equality(res, 0)
-end
-T["P"]["scale_fzy_to_frecency"]["scales positive scores proportionally"] = function()
-  local res = P.scale_fzy_to_frecency(20)
-  MiniTest.expect.equality(res, 99)
-end
-T["P"]["scale_fzy_to_frecency"]["scales half max score to half max frecency"] = function()
-  local res = P.scale_fzy_to_frecency(10)
-  MiniTest.expect.equality(res, 49.5)
-end
-T["P"]["scale_fzy_to_frecency"]["scales zero score to zero"] = function()
-  local res = P.scale_fzy_to_frecency(0)
-  MiniTest.expect.equality(res, 0)
-end
-T["P"]["scale_fzy_to_frecency"]["scales negative scores proportionally"] = function()
-  local res = P.scale_fzy_to_frecency(-10)
-  MiniTest.expect.equality(res, -49.5)
-end
-T["P"]["scale_fzy_to_frecency"]["handles scores above MAX_FZY_SCORE"] = function()
-  local res = P.scale_fzy_to_frecency(40)
-  MiniTest.expect.equality(res, 198)
-end
-T["P"]["scale_fzy_to_frecency"]["handles fractional scores"] = function()
-  local res = P.scale_fzy_to_frecency(5.5)
-  MiniTest.expect.equality(res, 27.225)
-end
-
 T["P"]["get_icon_info"] = MiniTest.new_set()
 T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
   local res = P.get_icon_info {

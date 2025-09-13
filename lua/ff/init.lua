@@ -355,10 +355,6 @@ P.tick = 0
 P.preview_active = false
 P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 
--- [-math.huge, math.huge]
--- just below math.huge is approx the length of the string
--- just above -math.huge is approx 0
-P.MAX_FZY_SCORE = 20 -- approx the longest reasonable query
 P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
@@ -380,10 +376,10 @@ P.format_filename = function(abs_path, score, icon_char)
 end
 
 --- @param fuzzy_score number
-P.scale_fzy_to_frecency = function(fuzzy_score)
-  if fuzzy_score == math.huge then return P.MAX_FRECENCY_SCORE end
-  if fuzzy_score == -math.huge then return 0 end
-  return (fuzzy_score) / (P.MAX_FZY_SCORE) * P.MAX_FRECENCY_SCORE
+--- @param query string
+P.scale_fzf_to_frecency = function(fuzzy_score, query)
+  local max_fzf_score = 8 + 24 * #query
+  return fuzzy_score / max_fzf_score * P.MAX_FRECENCY_SCORE
 end
 
 P.caches = {
@@ -585,13 +581,14 @@ M.get_weighted_files = function(opts)
     return P.caches.weighted_files_per_query[opts.query]
   end
 
-  local fzy = require "fzy-lua-native"
+  local fzf = require "fzf_lib"
+  local slab = fzf.allocate_slab()
 
   --- @type WeightedFile[]
   local weighted_files_for_query = {}
 
   --- @param abs_path string
-  local function get_weighted_file(abs_path)
+  local function get_weighted_file(abs_path, slab_arg)
     local rel_path = H.rel_path(abs_path)
     if #opts.query == 0 then
       local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
@@ -613,7 +610,12 @@ M.get_weighted_files = function(opts)
       }
     end
 
-    if not fzy.has_match(opts.query, rel_path) then
+    local smart_case_mode = 0
+    local pattern_obj = fzf.parse_pattern(opts.query, smart_case_mode)
+    local fzf_score = fzf.get_score(rel_path, pattern_obj, slab_arg)
+
+    if fzf_score == 0 then
+      fzf.free_pattern(pattern_obj)
       return nil
     end
 
@@ -642,23 +644,23 @@ M.get_weighted_files = function(opts)
       buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_path]
     end
 
-    local fuzzy_score = fzy.score(opts.query, rel_path)
-    local scaled_fzy_score = P.scale_fzy_to_frecency(fuzzy_score)
+    local scaled_fzf_score = P.scale_fzf_to_frecency(fzf_score, opts.query)
     local weighted_score =
-        opts.fuzzy_score_multiple * scaled_fzy_score +
+        opts.fuzzy_score_multiple * scaled_fzf_score +
         opts.file_score_multiple * buf_and_frecency_score
 
     local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
     local hl_idxs = {}
     if opts.hl_enabled then
-      hl_idxs = fzy.positions(opts.query, rel_path)
+      hl_idxs = fzf.get_pos(rel_path, pattern_obj, slab_arg)
     end
 
+    fzf.free_pattern(pattern_obj)
     return {
       abs_path = abs_path,
       rel_path = rel_path,
       weighted_score = weighted_score,
-      fuzzy_score = scaled_fzy_score,
+      fuzzy_score = scaled_fzf_score,
       buf_and_frecency_score = buf_and_frecency_score,
       hl_idxs = hl_idxs,
       icon_hl = icon_info.icon_hl,
@@ -678,7 +680,7 @@ M.get_weighted_files = function(opts)
   for idx, abs_path in pairs(P.caches.frecency_files) do
     if #weighted_files_for_query >= max_results then break end
 
-    local weighted_file = get_weighted_file(abs_path)
+    local weighted_file = get_weighted_file(abs_path, slab)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -696,7 +698,7 @@ M.get_weighted_files = function(opts)
       goto continue
     end
 
-    local weighted_file = get_weighted_file(abs_path)
+    local weighted_file = get_weighted_file(abs_path, slab)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -708,6 +710,8 @@ M.get_weighted_files = function(opts)
     ::continue::
   end
   L.benchmark_step("end", "Populate weighted files with find")
+
+  fzf.free_slab(slab)
 
   L.benchmark_step("start", "Sort weighted files")
   table.sort(weighted_files_for_query, function(a, b)
@@ -790,8 +794,6 @@ end
 --- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
   vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
-
-  opts.query = opts.query:gsub("%s+", "") -- fzy doesn't ignore spaces
   L.benchmark_step("start", "Per keystroke")
 
   local process_files = coroutine.create(function()
@@ -1126,7 +1128,7 @@ M.find = function(opts)
       render_results = function(weighted_files)
         local formatted_filenames = {}
         for idx, weighted_file in ipairs(weighted_files) do
-          if idx >= opts.max_results_considered then break end
+          if idx >= opts.max_results_rendered then break end
           table.insert(formatted_filenames, weighted_file.formatted_filename)
         end
         vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, formatted_filenames)
