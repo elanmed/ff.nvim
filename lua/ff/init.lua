@@ -405,12 +405,11 @@ P.caches = {
 
 --- @param find_cmd string
 P.refresh_files_cache = function(find_cmd)
-  P.caches.find_files = {}
-
   L.benchmark_step_heading "Refresh files cache"
   L.benchmark_step("start", "Refresh find cache")
   local find_cmd_tbl = vim.split(find_cmd, " ")
   vim.system(find_cmd_tbl, { text = true, }, function(obj)
+    P.caches.find_files = {}
     local lines = vim.split(obj.stdout, "\n")
     for _, abs_path in ipairs(lines) do
       if #abs_path == 0 then goto continue end
@@ -545,7 +544,7 @@ end
 --- @field batch_size number | false
 --- @field hl_enabled boolean
 --- @field icons_enabled boolean
---- @field max_results_considered number
+--- @field get_max_results_considered fun(query: string):number
 --- @field max_results_rendered number
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
@@ -572,7 +571,7 @@ M.get_weighted_files = function(opts)
   opts.batch_size = H.default(opts.batch_size, false) -- different from M.find
   opts.hl_enabled = H.default(opts.hl_enabled, true)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
-  opts.max_results_considered = H.default(opts.max_results_considered, 1000)
+  opts.get_max_results_considered = H.default(opts.get_max_results_considered, P.default_get_max_results_considered)
   opts.max_results_rendered = H.default(opts.max_results_rendered, 50) -- different from M.find
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
@@ -673,8 +672,10 @@ M.get_weighted_files = function(opts)
     if opts.query == "" then
       return opts.max_results_rendered
     end
-    return opts.max_results_considered
+    return opts.get_max_results_considered(opts.query)
   end)()
+  L.log_content("max_results: " .. tostring(max_results))
+  L.log_content("query len: " .. tostring(#opts.query))
 
   L.benchmark_step("start", "Populate weighted files with frecency")
   for idx, abs_path in pairs(P.caches.frecency_files) do
@@ -788,7 +789,7 @@ end
 --- @field icons_enabled boolean
 --- @field fuzzy_score_multiple number
 --- @field file_score_multiple number
---- @field max_results_considered number
+--- @field get_max_results_considered fun(query:string):number
 --- @field max_results_rendered number
 
 --- @param opts GetFindFilesOpts
@@ -804,7 +805,7 @@ P.get_find_files = function(opts)
       batch_size = opts.batch_size,
       hl_enabled = opts.hl_enabled,
       icons_enabled = opts.icons_enabled,
-      max_results_considered = opts.max_results_considered,
+      get_max_results_considered = opts.get_max_results_considered,
       max_results_rendered = opts.max_results_rendered,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
@@ -871,6 +872,22 @@ P.save_minimal_opts = function(win)
   end
 
   return saved_minimal_opts
+end
+
+P.default_get_max_results_considered = function(query)
+  -- f(t) = f(0) * e^(-k*t)
+  -- f(t) = 1000 * e^(-k*t)
+
+  -- solving for k
+  -- f(15) = 100
+  -- 100 = 1000 * e^(-k*15)
+  -- 0.1 = e^(-25k)
+  -- ln(0.1) = -25k
+  -- k = -ln(0.1) / 15
+  -- k = ln(10) / 15
+
+  local k = math.log(10) / 15
+  return math.floor(1000 * math.exp(-k * #query))
 end
 
 --- @param win number
@@ -967,7 +984,7 @@ end
 --- @field batch_size? number | false
 --- @field hl_enabled? boolean
 --- @field icons_enabled? boolean
---- @field max_results_considered? number
+--- @field get_max_results_considered? fun():number
 --- @field max_results_rendered? number
 --- @field fuzzy_score_multiple? number
 --- @field file_score_multiple? number
@@ -1028,7 +1045,7 @@ M.find = function(opts)
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.hl_enabled = H.default(opts.hl_enabled, true)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
-  opts.max_results_considered = H.default(opts.max_results_considered, 1000)
+  opts.get_max_results_considered = H.default(opts.get_max_results_considered, P.default_get_max_results_considered)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
   opts.on_picker_open = H.default(opts.on_picker_open, function() end)
@@ -1123,7 +1140,7 @@ M.find = function(opts)
       icons_enabled = opts.icons_enabled,
       fuzzy_score_multiple = opts.fuzzy_score_multiple,
       file_score_multiple = opts.file_score_multiple,
-      max_results_considered = opts.max_results_considered,
+      get_max_results_considered = opts.get_max_results_considered,
       max_results_rendered = opts.max_results_rendered,
       render_results = function(weighted_files)
         local formatted_filenames = {}
@@ -1246,7 +1263,6 @@ M.find = function(opts)
       end, { buffer = input_buf, })
     end
   end
-
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
     group = vim.api.nvim_create_augroup("FFPicker", { clear = true, }),
