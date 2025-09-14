@@ -674,8 +674,6 @@ M.get_weighted_files = function(opts)
     end
     return opts.get_max_results_considered(opts.query)
   end)()
-  L.log_content("max_results: " .. tostring(max_results))
-  L.log_content("query len: " .. tostring(#opts.query))
 
   L.benchmark_step("start", "Populate weighted files with frecency")
   for idx, abs_path in pairs(P.caches.frecency_files) do
