@@ -793,7 +793,6 @@ end
 
 --- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
-  vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
   L.benchmark_step("start", "Per keystroke")
 
   local process_files = coroutine.create(function()
@@ -829,6 +828,7 @@ P.get_find_files = function(opts)
       return
     end
 
+    vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
     P.highlight_weighted_files {
       batch_size = opts.batch_size,
       max_results_rendered = opts.max_results_rendered,
