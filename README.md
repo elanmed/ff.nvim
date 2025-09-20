@@ -23,9 +23,8 @@ A small, fast fuzzy finder with intelligent weights.
 
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
 - New searches interrupt ongoing processing for previous searches
-- A max of `opts.get_max_results_considered` files with a fuzzy match are processed
+- A max of `opts.max_results_considered` files with a fuzzy match are processed
     - Frecent files are checked for a fuzzy match first, then files from `fd`
-    - The default `opts.get_max_results_considered` uses an exponential decay formula that returns fewer files as the length of the query grows
     - For empty inputs, a max of `opts.max_results_rendered` files are processed
 - Extensive caching:
     - `fd` is executed once and cached when `setup` is called
@@ -92,7 +91,7 @@ vim.keymap.set("n", "<leader>f", function()
     hl_enabled = true,
     fuzzy_score_multiple = 0.7,
     file_score_multiple = 0.3,
-    get_max_results_considered = default_get_max_results_considered,
+    max_results_considered = 1000,
     max_results_rendered = results_height * 2,
     input_win_config = {
       style = "minimal",
@@ -148,7 +147,7 @@ M.setup = function(opts) end
 --- @field icons_enabled? boolean
 --- @field fuzzy_score_multiple? number how much to weight the fuzzy match score vs the frecency + other weights
 --- @field file_score_multiple? number how much to weight the frecency + other weights
---- @field get_max_results_considered? number a max of `get_max_results_considered` files with a fuzzy match are sorted
+--- @field max_results_considered? number a max of `max_results_considered` files with a fuzzy match are sorted
 --- @field max_results_rendered? number a max of `max_results_rendered` sorted files are rendered in the results buffer
 --- @field input_win_config? vim.api.keyset.win_config
 --- @field results_win_config? vim.api.keyset.win_config
@@ -239,7 +238,7 @@ vim.keymap.set("n", "<leader>ff", function()
       hl_enabled = true,
       fuzzy_score_multiple = 0.7,
       file_score_multiple = 0.3,
-      get_max_results_considered = default_get_max_results_considered,
+      max_results_considered = 1000,
       max_results_rendered = 50,
     }
     local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
@@ -277,7 +276,7 @@ end)
 --- @field batch_size number | false
 --- @field hl_enabled? boolean `false` will set `hl_idxs` to `{}`
 --- @field icons_enabled boolean
---- @field get_max_results_considered? fun(query:string):number a max of `get_max_results_considered` files with a fuzzy match are sorted
+--- @field max_results_considered? number a max of `max_results_considered` files with a fuzzy match are sorted
 --- @field max_results_rendered? number a max of `max_results_rendered` sorted files are rendered in the results buffer
 --- @field fuzzy_score_multiple? number how much to weight the fuzzy match score vs the frecency + other weights
 --- @field file_score_multiple? number how much to weight the frecency + other weights

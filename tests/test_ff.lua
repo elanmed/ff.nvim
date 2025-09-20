@@ -648,28 +648,4 @@ T["P"]["highlight_weighted_files"]["should apply highlights to buffer"] = functi
   vim.api.nvim_buf_delete(results_buf, { force = true, })
 end
 
-T["P"]["default_get_max_results_considered"] = MiniTest.new_set()
-T["P"]["default_get_max_results_considered"]["returns 1000 for query length 0"] = function()
-  MiniTest.expect.equality(P.default_get_max_results_considered "", 1000)
-end
-T["P"]["default_get_max_results_considered"]["returns 100 for query length 25"] = function()
-  -- precision issue with math.floor
-  MiniTest.expect.equality(P.default_get_max_results_considered(string.rep("a", 15)), 99)
-end
-T["P"]["default_get_max_results_considered"]["returns decreasing values for increasing query lengths"] = function()
-  local result_one = P.default_get_max_results_considered "a"
-  local result_two = P.default_get_max_results_considered "as"
-  local result_three = P.default_get_max_results_considered "asd"
-
-  MiniTest.expect.equality(result_one > result_two, true)
-  MiniTest.expect.equality(result_two > result_three, true)
-end
-T["P"]["default_get_max_results_considered"]["handles very long queries"] = function()
-  local long_query = string.rep("a", 40)
-  local result = P.default_get_max_results_considered(long_query)
-
-  MiniTest.expect.equality(result >= 1, true)
-  MiniTest.expect.equality(result < 100, true)
-end
-
 return T
