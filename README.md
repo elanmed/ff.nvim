@@ -15,9 +15,6 @@ A small, fast fuzzy finder with intelligent weights.
     - The basename of a result (with and without an extension)
     - The fuzzy score of a result
 
-## Status
-- Works fine, API is not yet stable
-
 ## Performance
 `ff.nvim` prioritizes performance in a few ways:
 
