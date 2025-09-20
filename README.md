@@ -54,12 +54,6 @@ local results_height = math.floor(available_height / 2)
 local input_row = editor_height
 local results_row = input_row - input_height - border_height
 
--- exponential function that returns 1000 with a query length of 0, 100 with a len of 15
-local default_get_max_results_considered = function(query)
-  local k = math.log(10) / 25
-  return math.floor(1000 * math.exp(-k * #query))
-end
-
 vim.keymap.set("n", "<leader>f", function()
   ff.find {
     -- no keymaps are set by default
