@@ -98,13 +98,6 @@ end
 H.vimscript_true = 1
 H.vimscript_false = 0
 
---- @param msg string
---- @param ... any
-H.notify_error = function(msg, ...)
-  local formatted = msg:format(...)
-  vim.notify(formatted, vim.log.levels.ERROR)
-end
-
 --- @param abs_path string
 H.readable = function(abs_path)
   local stat_result = vim.uv.fs_stat(abs_path)
@@ -145,13 +138,13 @@ F.write = function(path, data)
   local path_dir = vim.fs.dirname(path)
   local mkdir_res = vim.fn.mkdir(path_dir, "p")
   if mkdir_res == H.vimscript_false then
-    H.notify_error "[ff.nvim]: vim.fn.mkdir returned vimscript_false"
+    vim.notify("[ff.nvim]: vim.fn.mkdir returned vimscript_false", vim.log.levels.ERROR)
     return
   end
 
   local file = io.open(path, "w")
   if file == nil then
-    H.notify_error "[ff.nvim]: io.open failed to open the file created with vim.fn.mkdir"
+    vim.notify("[ff.nvim]: io.open failed to open the file created with vim.fn.mkdir", vim.log.levels.ERROR)
     return
   end
 
@@ -923,13 +916,15 @@ M.setup = function(opts)
       local is_buf_normal = vim.api.nvim_win_get_config(current_win).relative == ""
       if not is_buf_normal then return end
       local abs_path = vim.fs.normalize(vim.api.nvim_buf_get_name(ev.buf))
+      local rel_path = vim.fs.relpath(H.cwd, abs_path)
       if abs_path == "" then return end
       if last_updated_abs_file == abs_path then return end
 
       timer_id = vim.fn.timer_start(1000, function()
         last_updated_abs_file = abs_path
 
-        F.update_file_score(vim.fs.normalize(abs_path), { update_type = "increase", })
+        vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
+        F.update_file_score(abs_path, { update_type = "increase", })
         if not P.caches.frecency_file_to_score[abs_path] then
           P.refresh_files_cache(opts.find_cmd)
         end
@@ -943,7 +938,7 @@ end
 --- @param find_cmd? string
 M.refresh_files_cache = function(find_cmd)
   if not P.setup_called then
-    H.notify_error "[ff.nvim]: `setup` must be called before `refresh_files_cache`"
+    vim.notify("[ff.nvim]: `setup` must be called before `refresh_files_cache`", vim.log.levels.ERROR)
   end
   find_cmd = H.default(find_cmd, P.setup_opts.find_cmd)
   P.refresh_files_cache(find_cmd)
@@ -999,7 +994,7 @@ end
 --- @param opts? FindOpts
 M.find = function(opts)
   if not P.setup_called then
-    H.notify_error "[ff.nvim]: `setup` must be called before `find`"
+    vim.notify("[ff.nvim]: `setup` must be called before `find`", vim.log.levels.ERROR)
     return
   end
   M.benchmark_mean_start()
