@@ -879,6 +879,7 @@ end
 --- @field benchmark_mean? boolean
 --- @field find_cmd? string
 --- @field icons_enabled? boolean
+--- @field notify_frecency_update? boolean
 
 P.setup_opts = {}
 P.setup_called = false
@@ -897,6 +898,7 @@ M.setup = function(opts)
 
   opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
   opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
+  opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
   P.setup_opts = opts
 
   if opts.refresh_files_cache == "setup" then
@@ -923,7 +925,9 @@ M.setup = function(opts)
       timer_id = vim.fn.timer_start(1000, function()
         last_updated_abs_file = abs_path
 
-        vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
+        if opts.notify_frecency_update then
+          vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
+        end
         F.update_file_score(abs_path, { update_type = "increase", })
         if not P.caches.frecency_file_to_score[abs_path] then
           P.refresh_files_cache(opts.find_cmd)

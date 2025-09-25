@@ -75,6 +75,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       benchmark_step = false,
       benchmark_mean = false,
       find_cmd = "fd --absolute-path --type f",
+      notify_frecency_update = false
     }
     
     local editor_height = vim.o.lines - 1
@@ -159,6 +160,7 @@ API                                                                   *ff-api*
     --- @field benchmark_step? boolean benchmark each keystroke
     --- @field benchmark_mean? boolean benchmark the mean of all keystrokes in a session
     --- @field find_cmd? string defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
+    --- @field notify_frecency_update? boolean call vim.notify when a file's frecency score is updated
     
     --- @param opts? SetupOpts
     M.setup = function(opts) end
