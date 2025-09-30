@@ -235,7 +235,10 @@ local L = {}
 --- @param content string
 L.log = function(content)
   local file = io.open("ff.log", "a")
-  if file == nil then return end
+  if file == nil then
+    vim.notify("[ff.nvim]: opening `ff.log` failed", vim.log.levels.ERROR)
+    return
+  end
   file:write(content .. "\n")
   file:close()
 end
@@ -297,10 +300,12 @@ L.benchmarks_for_mean = {}
 
 --- @param type "start"|"end"
 --- @param label string
---- @param opts? {record_mean: boolean}
+--- @param opts? {record_mean: boolean, print_benchmark: boolean}
 L.benchmark_step = function(type, label, opts)
   opts = H.default(opts, {})
   opts.record_mean = H.default(opts.record_mean, true)
+  opts.print_benchmark = H.default(opts.print_benchmark, true)
+
   if type == "start" then
     L.ongoing_benchmarks[label] = os.clock()
   else
@@ -317,24 +322,10 @@ L.benchmark_step = function(type, label, opts)
       table.insert(L.benchmarks_for_mean[label], elapsed_ms)
     end
 
-    if L.SHOULD_LOG_STEP then
+    if L.SHOULD_LOG_STEP and opts.print_benchmark then
       local content = ("% sms : %s"):format(formatted_ms, label)
       L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
     end
-  end
-end
-
-L.benchmark_mean = function()
-  if not L.SHOULD_LOG_MEAN then return end
-
-  for label, benchmarks in pairs(L.benchmarks_for_mean) do
-    local sum = 0
-    for _, bench in ipairs(benchmarks) do
-      sum = sum + bench
-    end
-    local mean = sum / #benchmarks
-    local formatted_mean = H.pad_str(H.exact_decimals(mean, 3), 8)
-    L.log_content(("%s ms : %s"):format(formatted_mean, label))
   end
 end
 
@@ -497,48 +488,54 @@ P.caches = {
 }
 
 P.refresh_files_cache = function()
-  L.benchmark_step_heading "Refresh files cache"
-  L.benchmark_step("start", "Refresh find cache")
+  L.benchmark_step_heading "refresh_files_cache"
+  L.benchmark_step("start", "refresh_files_cache (entire function)")
   local gopts = P.defaulted_gopts()
   local find_cmd_tbl = vim.split(gopts.find_cmd, " ")
   vim.system(find_cmd_tbl, { text = true, }, function(obj)
     P.caches.find_files = {}
     local lines = vim.split(obj.stdout, "\n")
     for _, abs_path in ipairs(lines) do
+      L.benchmark_step("start", "refresh_files_cache (loop iteration)")
       if #abs_path == 0 then goto continue end
       table.insert(P.caches.find_files, vim.fs.normalize(abs_path))
 
       ::continue::
+      L.benchmark_step("end", "refresh_files_cache (loop iteration)", { print_benchmark = false, })
     end
-    L.benchmark_step("end", "Refresh find cache", { record_mean = false, })
+    L.benchmark_step("end", "refresh_files_cache (entire function)", { record_mean = false, })
     L.benchmark_step_closing()
   end)
 end
 
 M.refresh_frecency_cache = function()
-  L.benchmark_step_heading "Refresh frecency cache"
+  L.benchmark_step_heading "refresh_frecency_cache"
   P.caches.frecency_files = {}
   P.caches.frecency_file_to_score = {}
 
-  L.benchmark_step("start", "Frecency dated_files fs read")
+  L.benchmark_step("start", "dated_files file read")
   local dated_files_path = F.get_dated_files_path()
   local dated_files = F.read(dated_files_path)
   if dated_files[H.cwd] == nil then
     dated_files[H.cwd] = {}
   end
-  L.benchmark_step("end", "Frecency dated_files fs read", { record_mean = false, })
+  L.benchmark_step("end", "dated_files file read", { record_mean = false, })
 
   local now = os.time()
-  L.benchmark_step("start", "Calculate frecency_file_to_score")
+  L.benchmark_step("start", "Calculate frecency_file_to_score (entire loop)")
   for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
+    local score
+    L.benchmark_step("start", "Calculate frecency_file_to_score (loop iteration)")
+
     if not H.readable(abs_path) then goto continue end
-    local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
+    score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_path] = score
     table.insert(P.caches.frecency_files, abs_path)
 
     ::continue::
+    L.benchmark_step("end", "Calculate frecency_file_to_score (loop iteration)", { print_benchmark = false, })
   end
-  L.benchmark_step("end", "Calculate frecency_file_to_score", { record_mean = false, })
+  L.benchmark_step("end", "Calculate frecency_file_to_score (entire loop)", { record_mean = false, })
   L.benchmark_step_closing()
 end
 
@@ -546,21 +543,26 @@ M.refresh_open_buffers_cache = function()
   P.caches.weighted_files_per_query = {}
   P.caches.open_buffer_to_modified = {}
 
-  L.benchmark_step_heading "Refresh open buffers cache"
-  L.benchmark_step("start", "open_buffer_to_modified loop")
+  L.benchmark_step_heading "refresh_open_buffers_cache"
+  L.benchmark_step("start", "Calculate open_buffer_to_modified (entire loop)")
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
+    local buf_name = nil
+    local modified = nil
+    L.benchmark_step("start", "Calculate open_buffer_to_modified (loop iteration)")
+
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
     if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then goto continue end
-    local buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
+    buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
     if buf_name == "" then goto continue end
     if not vim.startswith(buf_name, H.cwd) then goto continue end
 
-    local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
+    modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
     P.caches.open_buffer_to_modified[buf_name] = modified
 
     ::continue::
+    L.benchmark_step("end", "Calculate open_buffer_to_modified (loop iteration)", { print_benchmark = false, })
   end
-  L.benchmark_step("end", "open_buffer_to_modified loop", { record_mean = false, })
+  L.benchmark_step("end", "Calculate open_buffer_to_modified (entire loop)", { record_mean = false, })
   L.benchmark_step_closing()
 end
 
@@ -652,7 +654,9 @@ M.get_weighted_files = function(opts)
   local function get_weighted_file(abs_path, slab_arg)
     local rel_path = H.rel_path(abs_path)
     if #opts.query == 0 then
+      L.benchmark_step("start", "get_weighted_file: get_icon_info (empty query)")
       local icon_info = P.get_icon_info(abs_path)
+      L.benchmark_step("end", "get_weighted_file: get_icon_info (empty query)", { print_benchmark = false, })
 
       local frecency_score = 0
       if P.caches.frecency_file_to_score[abs_path] ~= nil then
@@ -671,9 +675,11 @@ M.get_weighted_files = function(opts)
       }
     end
 
+    L.benchmark_step("start", "get_weighted_file: fzf.parse_pattern and fzf.get_score")
     local smart_case_mode = 0
     local pattern_obj = fzf.parse_pattern(opts.query, smart_case_mode)
     local fzf_score = fzf.get_score(rel_path, pattern_obj, slab_arg)
+    L.benchmark_step("end", "get_weighted_file: fzf.parse_pattern and fzf.get_score", { print_benchmark = false, })
 
     if fzf_score == 0 then
       fzf.free_pattern(pattern_obj)
@@ -710,7 +716,9 @@ M.get_weighted_files = function(opts)
         gopts.fuzzy_score_multiple * scaled_fzf_score +
         gopts.file_score_multiple * buf_and_frecency_score
 
+    L.benchmark_step("start", "get_weighted_file: get_icon_info (populated query)")
     local icon_info = P.get_icon_info(abs_path)
+    L.benchmark_step("end", "get_weighted_file: get_icon_info (populated query)", { print_benchmark = false, })
     local hl_idxs = {}
     if gopts.hl_enabled then
       local pos = fzf.get_pos(rel_path, pattern_obj, slab_arg)
@@ -738,29 +746,33 @@ M.get_weighted_files = function(opts)
     return gopts.max_results_considered
   end)()
 
-  L.benchmark_step("start", "Populate weighted files with frecency")
+  L.benchmark_step("start", "Populate weighted files with frecency (entire loop)")
   for idx, abs_path in pairs(P.caches.frecency_files) do
     if #weighted_files_for_query >= max_results then break end
 
+    L.benchmark_step("start", "Populate weighted files with frecency (loop iteration)")
     local weighted_file = get_weighted_file(abs_path, slab)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
+    L.benchmark_step("end", "Populate weighted files with frecency (loop iteration)", { print_benchmark = false, })
 
     if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
     end
   end
-  L.benchmark_step("end", "Populate weighted files with frecency")
+  L.benchmark_step("end", "Populate weighted files with frecency (entire loop)")
 
-  L.benchmark_step("start", "Populate weighted files with find")
+  L.benchmark_step("start", "Populate weighted files with fd (entire loop)")
   for idx, abs_path in ipairs(P.caches.find_files) do
     if #weighted_files_for_query >= max_results then break end
     if P.caches.frecency_file_to_score[abs_path] ~= nil then
       goto continue
     end
 
+    L.benchmark_step("start", "Populate weighted files with fd (loop iteration)")
     local weighted_file = get_weighted_file(abs_path, slab)
+    L.benchmark_step("end", "Populate weighted files with fd (loop iteration)", { print_benchmark = false, })
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -771,7 +783,7 @@ M.get_weighted_files = function(opts)
 
     ::continue::
   end
-  L.benchmark_step("end", "Populate weighted files with find")
+  L.benchmark_step("end", "Populate weighted files with fd (entire loop)")
 
   fzf.free_slab(slab)
 
@@ -807,6 +819,7 @@ P.highlight_weighted_files = function(opts)
       local icon_hl_col_1_indexed = icon_char_idx
       local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
 
+      L.benchmark_step("start", "highlight_weighted_files icon vim.hl.range")
       vim.hl.range(
         opts.results_buf,
         P.ns_id,
@@ -814,12 +827,15 @@ P.highlight_weighted_files = function(opts)
         { row_0_indexed, icon_hl_col_0_indexed, },
         { row_0_indexed, icon_hl_col_0_indexed + 1, }
       )
+      L.benchmark_step("end", "highlight_weighted_files icon vim.hl.range", { print_benchmark = false, })
     end
 
     local file_offset = weighted_file.formatted_filename:find "|"
+    L.benchmark_step("start", "highlight_weighted_files hl_idxs loop")
     for _, hl_idx in ipairs(weighted_file.hl_idxs) do
       local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
 
+      L.benchmark_step("start", "highlight_weighted_files hl_idxs loop iteration")
       vim.hl.range(
         opts.results_buf,
         P.ns_id,
@@ -827,7 +843,9 @@ P.highlight_weighted_files = function(opts)
         { row_0_indexed, file_char_hl_col_0_indexed, },
         { row_0_indexed, file_char_hl_col_0_indexed + 1, }
       )
+      L.benchmark_step("end", "highlight_weighted_files hl_idxs loop iteration", { print_benchmark = false, })
     end
+    L.benchmark_step("end", "highlight_weighted_files hl_idxs loop", { print_benchmark = false, })
 
     if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
@@ -846,7 +864,7 @@ end
 
 --- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
-  L.benchmark_step("start", "Per keystroke")
+  L.benchmark_step("start", "Total per keystroke")
 
   local gopts = P.defaulted_gopts()
   local process_files = coroutine.create(function()
@@ -869,7 +887,7 @@ P.get_find_files = function(opts)
     L.benchmark_step("end", "Render results")
 
     if not gopts.hl_enabled then
-      L.benchmark_step("end", "Per keystroke")
+      L.benchmark_step("end", "Total per keystroke")
       L.benchmark_step_closing()
       return
     end
@@ -877,7 +895,7 @@ P.get_find_files = function(opts)
     vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
     P.highlight_weighted_files { weighted_files = weighted_files, results_buf = opts.results_buf, }
 
-    L.benchmark_step("end", "Per keystroke")
+    L.benchmark_step("end", "Total per keystroke")
     L.benchmark_step_closing()
   end)
 
@@ -977,14 +995,25 @@ M.refresh_files_cache = function()
   P.refresh_files_cache()
 end
 
-M.benchmark_mean_start = function()
+M.reset_benchmarks = function()
   L.ongoing_benchmarks = {}
   L.benchmarks_for_mean = {}
 end
 
-M.benchmark_mean_end = function()
+M.print_mean_benchmarks = function()
   L.benchmark_mean_heading "Mean benchmarks"
-  L.benchmark_mean()
+
+  if not L.SHOULD_LOG_MEAN then return end
+  for label, benchmarks in pairs(L.benchmarks_for_mean) do
+    local sum = 0
+    for _, bench in ipairs(benchmarks) do
+      sum = sum + bench
+    end
+    local mean = sum / #benchmarks
+    local formatted_mean = H.pad_str(H.exact_decimals(mean, 3), 8)
+    L.log_content(("%s ms : %s"):format(formatted_mean, label))
+  end
+
   L.benchmark_mean_closing()
 end
 
@@ -993,9 +1022,7 @@ M.find = function()
     vim.notify("[ff.nvim]: `setup` must be called before `find`", vim.log.levels.ERROR)
     return
   end
-  M.benchmark_mean_start()
-  L.ongoing_benchmarks = {}
-  L.benchmarks_for_mean = {}
+  M.reset_benchmarks()
   P.preview_active = false
 
   local gopts = P.defaulted_gopts()
@@ -1080,7 +1107,7 @@ M.find = function()
     vim.api.nvim_buf_clear_namespace(results_buf, P.ns_id, 0, -1)
     vim.api.nvim_win_close(input_win, true)
     vim.api.nvim_win_close(results_win, true)
-    M.benchmark_mean_end()
+    M.print_mean_benchmarks()
     vim.cmd "stopinsert"
   end
 

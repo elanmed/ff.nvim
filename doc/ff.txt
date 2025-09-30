@@ -13,8 +13,8 @@ Using another picker as a frontend for `ff.nvim`  |ff-using-another-picker-as-a-
 `get_weighted_files` ................................. |ff-get_weighted_files|
 `refresh_frecency_cache` ......................... |ff-refresh_frecency_cache|
 `refresh_open_buffers_cache` ................. |ff-refresh_open_buffers_cache|
-`benchmark_mean_start` ............................. |ff-benchmark_mean_start|
-`benchmark_mean_end` ................................. |ff-benchmark_mean_end|
+`reset_benchmarks` ..................................... |ff-reset_benchmarks|
+`print_mean_benchmarks` ........................... |ff-print_mean_benchmarks|
 Highlight Groups ....................................... |ff-highlight-groups|
 Plug remaps ................................................. |ff-plug-remaps|
 `<Plug>FFResultSelect` ............................. |ff-<plug>ffresultselect|
@@ -221,11 +221,10 @@ these.
     ff.setup()
     
     vim.keymap.set("n", "<leader>ff", function()
-      -- setup still needs to be called
       local curr_bufname = vim.api.nvim_buf_get_name(0)
       local alternate_bufname = vim.api.nvim_buf_get_name(vim.fn.bufnr "#")
     
-      ff.benchmark_mean_start()
+      ff.reset_benchmarks()
       ff.refresh_frecency_cache()
       ff.refresh_open_buffers_cache()
     
@@ -243,8 +242,7 @@ these.
         vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
       end)
     
-      -- this should be in an `on_close` function
-      ff.benchmark_mean_end()
+      ff.print_mean_benchmarks()
     end)
 <
 
@@ -288,19 +286,17 @@ these.
 <
 
                                                                               
-`BENCHMARK_MEAN_START`                               *ff-benchmark_mean_start*
+`RESET_BENCHMARKS`                                       *ff-reset_benchmarks*
 
 >lua
-    require "ff".benchmark_mean_start()
-    -- clears previous benchmarks
+    require "ff".reset_benchmarks()
 <
 
                                                                               
-`BENCHMARK_MEAN_END`                                   *ff-benchmark_mean_end*
+`PRINT_MEAN_BENCHMARKS`                             *ff-print_mean_benchmarks*
 
 >lua
-    require "ff".benchmark_mean_end()
-    -- prints current benchmarks
+    require "ff".print_mean_benchmarks()
 <
 
 ------------------------------------------------------------------------------

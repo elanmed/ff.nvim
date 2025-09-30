@@ -170,11 +170,10 @@ local ff = require "ff"
 ff.setup()
 
 vim.keymap.set("n", "<leader>ff", function()
-  -- setup still needs to be called
   local curr_bufname = vim.api.nvim_buf_get_name(0)
   local alternate_bufname = vim.api.nvim_buf_get_name(vim.fn.bufnr "#")
 
-  ff.benchmark_mean_start()
+  ff.reset_benchmarks()
   ff.refresh_frecency_cache()
   ff.refresh_open_buffers_cache()
 
@@ -192,8 +191,7 @@ vim.keymap.set("n", "<leader>ff", function()
     vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
   end)
 
-  -- this should be in an `on_close` function
-  ff.benchmark_mean_end()
+  ff.print_mean_benchmarks()
 end)
 
 ```
@@ -231,16 +229,14 @@ require "ff".refresh_frecency_cache()
 require "ff".refresh_open_buffers_cache()
 ```
 
-### `benchmark_mean_start`
+### `reset_benchmarks`
 ```lua
-require "ff".benchmark_mean_start()
--- clears previous benchmarks
+require "ff".reset_benchmarks()
 ```
 
-### `benchmark_mean_end`
+### `print_mean_benchmarks`
 ```lua
-require "ff".benchmark_mean_end()
--- prints current benchmarks
+require "ff".print_mean_benchmarks()
 ```
 
 ## Highlight Groups
