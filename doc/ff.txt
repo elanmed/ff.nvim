@@ -58,17 +58,17 @@ PERFORMANCE                                                   *ff-performance*
   processed - Frecent files are checked for a fuzzy match first, then files
   from `fd` - For empty inputs, a max of `vim.g.ff.max_results_rendered` files
   are processed
-- Extensive caching: - `fd` is executed once and cached when `setup` is called
-  - Frecency scores are calculated once and cached when `find` is called -
-  Info on open buffers are pulled once and cached when `find` is called -
-  Icons are cached by extension to avoid calling `mini.icons` when possible -
-  Results are cached for each user input (instant backspace search)
+- Extensive caching: - `fd` is executed once and cached when `setup()` is
+  called - Frecency scores are calculated once and cached when `find()` is
+  called - Info on open buffers are pulled once and cached when `find()` is
+  called - Icons are cached by extension to avoid calling `mini.icons` when
+  possible - Results are cached for each user input (instant backspace search)
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results
   window, preventing unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 With these optimizations in place, I average around 20ms per keystroke on a
-codebase of 60k files. Enable the `benchmark_step` and `benchmark_mean`
-options to try yourself
+codebase of 60k files. Enable the `vim.g.ff.benchmark_step` and
+`vim.g.ff.benchmark_mean` options to try yourself
 
 
 ------------------------------------------------------------------------------
@@ -76,8 +76,8 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
 
 
 >lua
+    -- defaults:
     vim.g.ff = {
-      -- defaults to:
       -- "setup"|"find"
       refresh_files_cache = "setup",
       -- benchmark each keystroke
@@ -142,7 +142,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
     
     local ff = require "ff"
     ff.setup()
-    vim.keymap.set("n", "<leader>f", ff.find, { desc = "Fuzzy find with ff", })
+    vim.keymap.set("n", "<leader>ff", ff.find, { desc = "Fuzzy find with ff", })
     
     vim.api.nvim_create_autocmd({ "FileType", }, {
       pattern = "ff-picker",
@@ -167,23 +167,23 @@ API                                                                   *ff-api*
 `SETUP`                                                             *ff-setup*
 
 >lua
-    M.setup = function() end
+    require "ff".setup()
 <
 
                                                                               
 `FIND`                                                               *ff-find*
 
 >lua
-    M.find = function() end
+    require "ff".find()
 <
 
                                                                               
 `REFRESH_FILES_CACHE`                                 *ff-refresh_files_cache*
 
 >lua
-    M.refresh_files_cache = function() end
+    require "ff".refresh_files_cache()
 <
-By default, `refresh_files_cache` is called once when `setup` is run. When
+By default, `refresh_files_cache()` is called once when `setup()` is run. When
 performing actions on the file system, it can be helpful to refresh the cache
 so the picker shows the latest files. This can be done with an autocommand
 like:
@@ -229,8 +229,8 @@ be useful. When calling `find` directly, there's no need to call any of these.
       vim.ui.input({ prompt = "ff> ", }, function(query)
         local weighted_files = ff.get_weighted_files {
           query = query or "",
-          curr_bufname = curr_bufname or "",
-          alternate_bufname = alternate_bufname or "",
+          curr_bufname = curr_bufname,
+          alternate_bufname = alternate_bufname,
         }
         local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
     
@@ -267,28 +267,28 @@ be useful. When calling `find` directly, there's no need to call any of these.
     
     --- @param opts GetWeightedFilesOpts
     --- @return WeightedFile[]
-    M.get_weighted_files = function(opts) end
+    require "ff".get_weighted_files(opts)
 <
 
                                                                               
 `REFRESH_FRECENCY_CACHE`                           *ff-refresh_frecency_cache*
 
 >lua
-    M.refresh_frecency_cache = function() end
+    require "ff".refresh_frecency_cache()
 <
 
                                                                               
 `REFRESH_OPEN_BUFFERS_CACHE`                   *ff-refresh_open_buffers_cache*
 
 >lua
-    M.refresh_open_buffers_cache = function() end
+    require "ff".refresh_open_buffers_cache()
 <
 
                                                                               
 `BENCHMARK_MEAN_START`                               *ff-benchmark_mean_start*
 
 >lua
-    M.benchmark_mean_start = function() end
+    require "ff".benchmark_mean_start()
     -- clears previous benchmarks
 <
 
@@ -296,7 +296,7 @@ be useful. When calling `find` directly, there's no need to call any of these.
 `BENCHMARK_MEAN_END`                                   *ff-benchmark_mean_end*
 
 >lua
-    M.benchmark_mean_end = function() end
+    require "ff".benchmark_mean_end()
     -- prints current benchmarks
 <
 
@@ -308,9 +308,9 @@ HIGHLIGHT GROUPS                                         *ff-highlight-groups*
   - Defaults to `Search`
 - `FFPickerCursorLine`: The current line in the results window - Defaults to
   `CursorLine`
-  [!NOTE] The default highlight groups are set as a part of the `setup`
+  [!NOTE] The default highlight groups are set as a part of the `setup()`
   function. In order to successfully override a highlight group, make sure to
-  set it after calling`setup`
+  set it after calling `setup()`
 
 
 ------------------------------------------------------------------------------
@@ -377,7 +377,6 @@ FEATURES EXCLUDED FOR SIMPLICITY         *ff-features-excluded-for-simplicity*
 
 
 - Multi-select
-- Shared options between `setup` and `find`
 
 ------------------------------------------------------------------------------
 SIMILAR PLUGINS                                           *ff-similar-plugins*

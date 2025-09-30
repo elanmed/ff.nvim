@@ -24,21 +24,21 @@ A small, fast fuzzy finder with intelligent weights.
     - Frecent files are checked for a fuzzy match first, then files from `fd`
     - For empty inputs, a max of `vim.g.ff.max_results_rendered` files are processed
 - Extensive caching:
-    - `fd` is executed once and cached when `setup` is called
-    - Frecency scores are calculated once and cached when `find` is called
-    - Info on open buffers are pulled once and cached when `find` is called
+    - `fd` is executed once and cached when `setup()` is called
+    - Frecency scores are calculated once and cached when `find()` is called
+    - Info on open buffers are pulled once and cached when `find()` is called
     - Icons are cached by extension to avoid calling `mini.icons` when possible
     - Results are cached for each user input (instant backspace search)
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files. 
-Enable the `benchmark_step` and `benchmark_mean` options to try yourself
+Enable the `vim.g.ff.benchmark_step` and `vim.g.ff.benchmark_mean` options to try yourself
 
 ## Configuration example
 ```lua
+-- defaults:
 vim.g.ff = {
-  -- defaults to:
   -- "setup"|"find"
   refresh_files_cache = "setup",
   -- benchmark each keystroke
@@ -103,7 +103,7 @@ vim.g.ff = {
 
 local ff = require "ff"
 ff.setup()
-vim.keymap.set("n", "<leader>f", ff.find, { desc = "Fuzzy find with ff", })
+vim.keymap.set("n", "<leader>ff", ff.find, { desc = "Fuzzy find with ff", })
 
 vim.api.nvim_create_autocmd({ "FileType", }, {
   pattern = "ff-picker",
@@ -123,20 +123,20 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 
 ### `setup`
 ```lua 
-M.setup = function() end
+require "ff".setup()
 ```
 
 ### `find`
 ```lua 
-M.find = function() end
+require "ff".find()
 ```
 
 ### `refresh_files_cache`
 ```lua
-M.refresh_files_cache = function() end
+require "ff".refresh_files_cache()
 ```
 
-By default, `refresh_files_cache` is called once when `setup` is run. When performing actions on the file system, 
+By default, `refresh_files_cache()` is called once when `setup()` is run. When performing actions on the file system, 
 it can be helpful to refresh the cache so the picker shows the latest files. This can be done with an autocommand like:
 
 ```lua
@@ -179,8 +179,8 @@ vim.keymap.set("n", "<leader>ff", function()
   vim.ui.input({ prompt = "ff> ", }, function(query)
     local weighted_files = ff.get_weighted_files {
       query = query or "",
-      curr_bufname = curr_bufname or "",
-      alternate_bufname = alternate_bufname or "",
+      curr_bufname = curr_bufname,
+      alternate_bufname = alternate_bufname,
     }
     local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
 
@@ -216,28 +216,28 @@ end)
 
 --- @param opts GetWeightedFilesOpts
 --- @return WeightedFile[]
-M.get_weighted_files = function(opts) end
+require "ff".get_weighted_files(opts)
 ```
 
 ### `refresh_frecency_cache`
 ```lua
-M.refresh_frecency_cache = function() end
+require "ff".refresh_frecency_cache()
 ```
 
 ### `refresh_open_buffers_cache`
 ```lua
-M.refresh_open_buffers_cache = function() end
+require "ff".refresh_open_buffers_cache()
 ```
 
 ### `benchmark_mean_start`
 ```lua
-M.benchmark_mean_start = function() end
+require "ff".benchmark_mean_start()
 -- clears previous benchmarks
 ```
 
 ### `benchmark_mean_end`
 ```lua
-M.benchmark_mean_end = function() end
+require "ff".benchmark_mean_end()
 -- prints current benchmarks
 ```
 
@@ -248,8 +248,8 @@ M.benchmark_mean_end = function() end
   - Defaults to `CursorLine`
 
 > [!NOTE]
-> The default highlight groups are set as a part of the `setup` function. In order to successfully override a highlight group, make sure to set it
-after calling`setup`
+> The default highlight groups are set as a part of the `setup()` function. In order to successfully override a highlight group, make sure to set it
+after calling `setup()`
 
 ## Plug remaps
 
@@ -286,7 +286,6 @@ after calling`setup`
 
 ## Features excluded for simplicity
 - Multi-select
-- Shared options between `setup` and `find`
 
 ## Similar plugins
 - [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)
