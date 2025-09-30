@@ -351,6 +351,120 @@ P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
+--- @class FFOpts
+--- @field keymaps? FindKeymapsPerMode
+--- @field weights? Weights
+--- @field batch_size? number | false
+--- @field hl_enabled? boolean
+--- @field icons_enabled? boolean
+--- @field max_results_considered? number
+--- @field max_results_rendered? number
+--- @field fuzzy_score_multiple? number
+--- @field file_score_multiple? number
+--- @field input_win_config? vim.api.keyset.win_config
+--- @field results_win_config? vim.api.keyset.win_config
+--- @field results_win_opts? vim.wo
+--- @field preview_win_opts? vim.wo
+--- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
+--- @field refresh_files_cache? "setup"|"find"
+--- @field benchmark_step? boolean
+--- @field benchmark_mean? boolean
+--- @field find_cmd? string
+--- @field notify_frecency_update? boolean
+
+--- @class OnPickerOpenOpts
+--- @field results_win number
+--- @field results_buf number
+--- @field input_win number
+--- @field input_buf number
+
+--- @class Weights
+--- @field open_buf_boost? number
+--- @field modified_buf_boost? number
+--- @field alternate_buf_boost? number
+--- @field current_buf_boost? number
+--- @field basename_boost? number
+
+--- @class FindKeymapsPerMode
+--- @field i? FindKeymaps
+--- @field n? FindKeymaps
+
+--- @class FindKeymaps
+--- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
+
+--- @return FFOpts
+P.defaulted_gopts = function()
+  local opts = (function()
+    if vim.g.ff == nil then
+      return {}
+    end
+    return vim.deepcopy(vim.g.ff)
+  end)()
+
+  opts.keymaps = H.default(opts.keymaps, {})
+  opts.keymaps.i = H.default(opts.keymaps.i, {})
+  opts.keymaps.n = H.default(opts.keymaps.n, {})
+
+  opts.weights = H.default(opts.weights, {})
+  opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
+  opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
+  opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
+  opts.weights.basename_boost = H.default(opts.weights.basename_boost, 40)
+  opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
+
+  opts.batch_size = H.default(opts.batch_size, 250)
+  opts.hl_enabled = H.default(opts.hl_enabled, true)
+  opts.icons_enabled = H.default(opts.icons_enabled, true)
+  opts.max_results_considered = H.default(opts.max_results_considered, 1000)
+  opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
+  opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
+  opts.on_picker_open = H.default(opts.on_picker_open, function() end)
+
+  opts.results_win_opts = H.default(opts.results_win_opts, {})
+  opts.preview_win_opts = H.default(opts.preview_win_opts, {})
+
+  local editor_height = vim.o.lines
+  local input_height = 1
+  local border_height = 2
+  local available_height = editor_height - input_height - (border_height * 4)
+  local results_height = math.floor(available_height / 2)
+  local input_row = editor_height
+  local results_row = input_row - input_height - border_height
+
+  opts.max_results_rendered = H.default(opts.max_results_rendered, results_height * 2)
+  opts.input_win_config = H.default(opts.input_win_config, {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = 1,
+    row = input_row,
+    col = 0,
+    border = "rounded",
+    title = "Input",
+  })
+  opts.results_win_config = H.default(opts.results_win_config, {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = results_height,
+    row = results_row,
+    col = 0,
+    border = "rounded",
+    title = "Results",
+    focusable = false,
+  })
+
+  opts.benchmark_step = H.default(opts.benchmark_step, false)
+  opts.benchmark_mean = H.default(opts.benchmark_mean, false)
+  opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
+  opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
+  opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
+
+  return opts
+end
+
 --- @param abs_path string
 --- @param score number
 --- @param icon_char string|nil
@@ -395,12 +509,11 @@ P.caches = {
   weighted_files_per_query = {},
 }
 
-
---- @param find_cmd string
-P.refresh_files_cache = function(find_cmd)
+P.refresh_files_cache = function()
   L.benchmark_step_heading "Refresh files cache"
   L.benchmark_step("start", "Refresh find cache")
-  local find_cmd_tbl = vim.split(find_cmd, " ")
+  local gopts = P.defaulted_gopts()
+  local find_cmd_tbl = vim.split(gopts.find_cmd, " ")
   vim.system(find_cmd_tbl, { text = true, }, function(obj)
     P.caches.find_files = {}
     local lines = vim.split(obj.stdout, "\n")
@@ -475,19 +588,17 @@ end
 --- @field icon_hl string
 --- @field formatted_filename string
 
---- @class GetIconInfoOpts
---- @field icons_enabled boolean
---- @field abs_path string
---- @param opts GetIconInfoOpts
-P.get_icon_info = function(opts)
-  if not opts.icons_enabled then
+--- @param abs_path string
+P.get_icon_info = function(abs_path)
+  local gopts = P.defaulted_gopts()
+  if not gopts.icons_enabled then
     return {
       icon_char = nil,
       icon_hl = nil,
     }
   end
 
-  local ext = H.get_ext(opts.abs_path)
+  local ext = H.get_ext(abs_path)
   if ext and P.caches.icon_cache[ext] then
     return {
       icon_char = P.caches.icon_cache[ext].icon_char,
@@ -502,8 +613,8 @@ P.get_icon_info = function(opts)
     local mini_icons_ok, mini_icons = pcall(require, "mini.icons")
     if mini_icons_ok then
       return {
-        get_icon = function(abs_path)
-          return mini_icons.get("file", abs_path)
+        get_icon = function(path)
+          return mini_icons.get("file", path)
         end,
       }
     end
@@ -518,7 +629,7 @@ P.get_icon_info = function(opts)
     }
   end
 
-  local icon_char, icon_hl = icon_library.get_icon(opts.abs_path)
+  local icon_char, icon_hl = icon_library.get_icon(abs_path)
   if ext then
     P.caches.icon_cache[ext] = { icon_char = icon_char, icon_hl = icon_hl, }
   end
@@ -533,41 +644,12 @@ end
 --- @field query string
 --- @field curr_bufname string
 --- @field alternate_bufname string
---- @field weights Weights
---- @field batch_size number | false
---- @field hl_enabled boolean
---- @field icons_enabled boolean
---- @field max_results_considered number
---- @field max_results_rendered number
---- @field fuzzy_score_multiple number
---- @field file_score_multiple number
 --- @param opts GetWeightedFilesOpts
 M.get_weighted_files = function(opts)
   L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
   H.cwd = vim.uv.cwd()
 
-  opts = H.default(opts, {})
-  opts.query = H.default(opts.query, "")
-
-  opts.curr_bufname = H.default(opts.curr_bufname, "")
-  opts.curr_bufname = vim.fs.normalize(opts.curr_bufname)
-
-  opts.alternate_bufname = H.default(opts.alternate_bufname, "")
-  opts.alternate_bufname = vim.fs.normalize(opts.alternate_bufname)
-
-  opts.weights = H.default(opts.weights, {})
-  opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
-  opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
-  opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
-  opts.weights.basename_boost = H.default(opts.weights.basename_boost, 40)
-  opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
-  opts.batch_size = H.default(opts.batch_size, false) -- different from M.find
-  opts.hl_enabled = H.default(opts.hl_enabled, true)
-  opts.icons_enabled = H.default(opts.icons_enabled, true)
-  opts.max_results_considered = H.default(opts.max_results_considered, 1000)
-  opts.max_results_rendered = H.default(opts.max_results_rendered, 50) -- different from M.find
-  opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
-  opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
+  local gopts = P.defaulted_gopts()
 
   if P.caches.weighted_files_per_query[opts.query] then
     return P.caches.weighted_files_per_query[opts.query]
@@ -583,7 +665,7 @@ M.get_weighted_files = function(opts)
   local function get_weighted_file(abs_path, slab_arg)
     local rel_path = H.rel_path(abs_path)
     if #opts.query == 0 then
-      local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
+      local icon_info = P.get_icon_info(abs_path)
 
       local frecency_score = 0
       if P.caches.frecency_file_to_score[abs_path] ~= nil then
@@ -616,18 +698,18 @@ M.get_weighted_files = function(opts)
     local basename_without_ext = H.basename(abs_path, { with_ext = false, })
 
     if opts.query == basename_with_ext or opts.query == basename_without_ext then
-      buf_score = opts.weights.basename_boost
+      buf_score = gopts.weights.basename_boost
     elseif P.caches.open_buffer_to_modified[abs_path] ~= nil then
       local modified = P.caches.open_buffer_to_modified[abs_path]
 
       if abs_path == opts.curr_bufname then
-        buf_score = opts.weights.current_buf_boost
+        buf_score = gopts.weights.current_buf_boost
       elseif abs_path == opts.alternate_bufname then
-        buf_score = opts.weights.alternate_buf_boost
+        buf_score = gopts.weights.alternate_buf_boost
       elseif modified then
-        buf_score = opts.weights.modified_buf_boost
+        buf_score = gopts.weights.modified_buf_boost
       else
-        buf_score = opts.weights.open_buf_boost
+        buf_score = gopts.weights.open_buf_boost
       end
     end
 
@@ -638,13 +720,14 @@ M.get_weighted_files = function(opts)
 
     local scaled_fzf_score = P.scale_fzf_to_frecency(fzf_score, opts.query)
     local weighted_score =
-        opts.fuzzy_score_multiple * scaled_fzf_score +
-        opts.file_score_multiple * buf_and_frecency_score
+        gopts.fuzzy_score_multiple * scaled_fzf_score +
+        gopts.file_score_multiple * buf_and_frecency_score
 
-    local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = opts.icons_enabled, }
+    local icon_info = P.get_icon_info(abs_path)
     local hl_idxs = {}
-    if opts.hl_enabled then
-      hl_idxs = fzf.get_pos(rel_path, pattern_obj, slab_arg)
+    if gopts.hl_enabled then
+      local pos = fzf.get_pos(rel_path, pattern_obj, slab_arg)
+      if pos then hl_idxs = pos end
     end
 
     fzf.free_pattern(pattern_obj)
@@ -663,9 +746,9 @@ M.get_weighted_files = function(opts)
 
   local max_results = (function()
     if opts.query == "" then
-      return opts.max_results_rendered
+      return gopts.max_results_rendered
     end
-    return opts.max_results_considered
+    return gopts.max_results_considered
   end)()
 
   L.benchmark_step("start", "Populate weighted files with frecency")
@@ -677,7 +760,7 @@ M.get_weighted_files = function(opts)
       table.insert(weighted_files_for_query, weighted_file)
     end
 
-    if opts.batch_size and idx % opts.batch_size == 0 then
+    if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
     end
   end
@@ -695,7 +778,7 @@ M.get_weighted_files = function(opts)
       table.insert(weighted_files_for_query, weighted_file)
     end
 
-    if opts.batch_size and idx % opts.batch_size == 0 then
+    if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
     end
 
@@ -718,11 +801,10 @@ end
 
 --- @class HighlightWeightedFilesOpts
 --- @field weighted_files WeightedFile[]
---- @field max_results_rendered number
 --- @field results_buf number
---- @field batch_size number | false
 --- @param opts HighlightWeightedFilesOpts
 P.highlight_weighted_files = function(opts)
+  local gopts = P.defaulted_gopts()
   local formatted_score_last_idx = #H.pad_str(
     H.fit_decimals(P.MAX_FRECENCY_SCORE, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
@@ -731,7 +813,7 @@ P.highlight_weighted_files = function(opts)
 
   L.benchmark_step("start", "Highlight results")
   for idx, weighted_file in ipairs(opts.weighted_files) do
-    if idx > opts.max_results_rendered then break end
+    if idx > gopts.max_results_rendered then break end
     local row_0_indexed = idx - 1
 
     if weighted_file.icon_hl then
@@ -760,7 +842,7 @@ P.highlight_weighted_files = function(opts)
       )
     end
 
-    if opts.batch_size and idx % opts.batch_size == 0 then
+    if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
     end
   end
@@ -774,32 +856,17 @@ end
 --- @field alternate_bufname string
 --- @field curr_tick number
 --- @field render_results fun(weighted_files:WeightedFile[]):nil
---- @field weights Weights
---- @field batch_size number | false
---- @field hl_enabled boolean
---- @field icons_enabled boolean
---- @field fuzzy_score_multiple number
---- @field file_score_multiple number
---- @field max_results_considered number
---- @field max_results_rendered number
 
 --- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
   L.benchmark_step("start", "Per keystroke")
 
+  local gopts = P.defaulted_gopts()
   local process_files = coroutine.create(function()
     local weighted_files = M.get_weighted_files {
       query = opts.query,
       curr_bufname = opts.curr_bufname,
       alternate_bufname = opts.alternate_bufname,
-      weights = opts.weights,
-      batch_size = opts.batch_size,
-      hl_enabled = opts.hl_enabled,
-      icons_enabled = opts.icons_enabled,
-      max_results_considered = opts.max_results_considered,
-      max_results_rendered = opts.max_results_rendered,
-      fuzzy_score_multiple = opts.fuzzy_score_multiple,
-      file_score_multiple = opts.file_score_multiple,
     }
 
     if P.tick ~= opts.curr_tick then
@@ -814,19 +881,14 @@ P.get_find_files = function(opts)
     opts.render_results(weighted_files)
     L.benchmark_step("end", "Render results")
 
-    if not opts.hl_enabled then
+    if not gopts.hl_enabled then
       L.benchmark_step("end", "Per keystroke")
       L.benchmark_step_closing()
       return
     end
 
     vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
-    P.highlight_weighted_files {
-      batch_size = opts.batch_size,
-      max_results_rendered = opts.max_results_rendered,
-      results_buf = opts.results_buf,
-      weighted_files = weighted_files,
-    }
+    P.highlight_weighted_files { weighted_files = weighted_files, results_buf = opts.results_buf, }
 
     L.benchmark_step("end", "Per keystroke")
     L.benchmark_step_closing()
@@ -873,36 +935,18 @@ P.set_opts = function(win, opts)
   end
 end
 
---- @class SetupOpts
---- @field refresh_files_cache? "setup"|"find"
---- @field benchmark_step? boolean
---- @field benchmark_mean? boolean
---- @field find_cmd? string
---- @field icons_enabled? boolean
---- @field notify_frecency_update? boolean
-
-P.setup_opts = {}
 P.setup_called = false
 
---- @param opts? SetupOpts
-M.setup = function(opts)
+M.setup = function()
   if P.setup_called then return end
   P.setup_called = true
 
-  opts = H.default(opts, {})
-  opts.benchmark_step = H.default(opts.benchmark_step, false)
-  L.SHOULD_LOG_STEP = opts.benchmark_step
+  local gopts = P.defaulted_gopts()
+  L.SHOULD_LOG_STEP = gopts.benchmark_step
+  L.SHOULD_LOG_MEAN = gopts.benchmark_mean
 
-  opts.benchmark_mean = H.default(opts.benchmark_mean, false)
-  L.SHOULD_LOG_MEAN = opts.benchmark_mean
-
-  opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
-  opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
-  opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
-  P.setup_opts = opts
-
-  if opts.refresh_files_cache == "setup" then
-    P.refresh_files_cache(opts.find_cmd)
+  if gopts.refresh_files_cache == "setup" then
+    P.refresh_files_cache()
   end
 
   local timer_id = nil
@@ -925,12 +969,12 @@ M.setup = function(opts)
       timer_id = vim.fn.timer_start(1000, function()
         last_updated_abs_file = abs_path
 
-        if opts.notify_frecency_update then
+        if gopts.notify_frecency_update then
           vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
         end
         F.update_file_score(abs_path, { update_type = "increase", })
         if not P.caches.frecency_file_to_score[abs_path] then
-          P.refresh_files_cache(opts.find_cmd)
+          P.refresh_files_cache()
         end
       end)
     end,
@@ -939,13 +983,11 @@ M.setup = function(opts)
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { link = "CursorLine", })
 end
 
---- @param find_cmd? string
-M.refresh_files_cache = function(find_cmd)
+M.refresh_files_cache = function()
   if not P.setup_called then
     vim.notify("[ff.nvim]: `setup` must be called before `refresh_files_cache`", vim.log.levels.ERROR)
   end
-  find_cmd = H.default(find_cmd, P.setup_opts.find_cmd)
-  P.refresh_files_cache(find_cmd)
+  P.refresh_files_cache()
 end
 
 M.benchmark_mean_start = function()
@@ -959,44 +1001,7 @@ M.benchmark_mean_end = function()
   L.benchmark_mean_closing()
 end
 
---- @class FindOpts
---- @field keymaps? FindKeymapsPerMode
---- @field weights? Weights
---- @field batch_size? number | false
---- @field hl_enabled? boolean
---- @field icons_enabled? boolean
---- @field max_results_considered? number
---- @field max_results_rendered? number
---- @field fuzzy_score_multiple? number
---- @field file_score_multiple? number
---- @field input_win_config? vim.api.keyset.win_config
---- @field results_win_config? vim.api.keyset.win_config
---- @field results_win_opts? vim.wo
---- @field preview_win_opts? vim.wo
---- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
-
---- @class OnPickerOpenOpts
---- @field results_win number
---- @field results_buf number
---- @field input_win number
---- @field input_buf number
-
---- @class Weights
---- @field open_buf_boost? number
---- @field modified_buf_boost? number
---- @field alternate_buf_boost? number
---- @field current_buf_boost? number
---- @field basename_boost? number
-
---- @class FindKeymapsPerMode
---- @field i? FindKeymaps
---- @field n? FindKeymaps
-
---- @class FindKeymaps
---- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
-
---- @param opts? FindOpts
-M.find = function(opts)
+M.find = function()
   if not P.setup_called then
     vim.notify("[ff.nvim]: `setup` must be called before `find`", vim.log.levels.ERROR)
     return
@@ -1006,99 +1011,45 @@ M.find = function(opts)
   L.benchmarks_for_mean = {}
   P.preview_active = false
 
+  local gopts = P.defaulted_gopts()
+
   local cursorline_opts = {
     cursorline = true,
     winhighlight = "CursorLine:FFPickerCursorLine",
   }
 
-  opts = H.default(opts, {})
-  opts.keymaps = H.default(opts.keymaps, {})
-  opts.keymaps.i = H.default(opts.keymaps.i, {})
-  opts.keymaps.n = H.default(opts.keymaps.n, {})
-
-  opts.weights = H.default(opts.weights, {})
-  opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
-  opts.weights.modified_buf_boost = H.default(opts.weights.modified_buf_boost, 20)
-  opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
-  opts.weights.basename_boost = H.default(opts.weights.basename_boost, 40)
-  opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
-
-  opts.batch_size = H.default(opts.batch_size, 250)
-  opts.hl_enabled = H.default(opts.hl_enabled, true)
-  opts.icons_enabled = H.default(opts.icons_enabled, true)
-  opts.max_results_considered = H.default(opts.max_results_considered, 1000)
-  opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
-  opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
-  opts.on_picker_open = H.default(opts.on_picker_open, function() end)
-
-  opts.results_win_opts = H.default(opts.results_win_opts, {})
-  opts.preview_win_opts = H.default(opts.preview_win_opts, {})
-
-  local editor_height = vim.o.lines - 1
-  local input_height = 1
-  local border_height = 2
-  local available_height = editor_height - input_height - (border_height * 3)
-  local results_height = math.floor(available_height / 2)
-  local input_row = editor_height
-  local results_row = input_row - input_height - border_height
-
-  opts.max_results_rendered = H.default(opts.max_results_rendered, results_height * 2)
-  opts.input_win_config = H.default(opts.input_win_config, {
-    style = "minimal",
-    anchor = "SW",
-    relative = "editor",
-    width = vim.o.columns,
-    height = 1,
-    row = input_row,
-    col = 0,
-    border = "rounded",
-    title = "Input",
-  })
-  opts.results_win_config = H.default(opts.results_win_config, {
-    style = "minimal",
-    anchor = "SW",
-    relative = "editor",
-    width = vim.o.columns,
-    height = results_height,
-    row = results_row,
-    col = 0,
-    border = "rounded",
-    title = "Results",
-    focusable = false,
-  })
-
   local curr_bufname_ok, curr_bufname_res = pcall(vim.api.nvim_buf_get_name, 0)
   local alt_bufname_ok, alt_bufname_res = pcall(vim.api.nvim_buf_get_name, vim.fn.bufnr "#")
-  local curr_bufname = curr_bufname_ok and curr_bufname_res or nil
-  local alternate_bufname = alt_bufname_ok and alt_bufname_res or nil
+  local curr_bufname = curr_bufname_ok and curr_bufname_res or ""
+  local alternate_bufname = alt_bufname_ok and alt_bufname_res or ""
 
   local preview_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = preview_buf, })
 
   local results_buf = vim.api.nvim_create_buf(false, true)
-  local results_win = vim.api.nvim_open_win(results_buf, false, opts.results_win_config)
+  local results_win = vim.api.nvim_open_win(results_buf, false, gopts.results_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf, })
   local minimal_opts = P.save_minimal_opts(results_win)
 
   local function set_results_win_opts()
     P.set_opts(results_win, minimal_opts)
     P.set_opts(results_win, cursorline_opts)
-    P.set_opts(results_win, opts.results_win_opts)
+    P.set_opts(results_win, gopts.results_win_opts)
   end
 
   local function set_preview_win_opts()
     P.set_opts(results_win, minimal_opts)
-    P.set_opts(results_win, opts.preview_win_opts)
+    P.set_opts(results_win, gopts.preview_win_opts)
   end
 
   set_results_win_opts()
 
   local input_buf = vim.api.nvim_create_buf(false, true)
-  local input_win = vim.api.nvim_open_win(input_buf, false, opts.input_win_config)
+  local input_win = vim.api.nvim_open_win(input_buf, false, gopts.input_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf, })
   vim.api.nvim_set_current_win(input_win)
 
-  opts.on_picker_open {
+  gopts.on_picker_open {
     input_buf = input_buf,
     input_win = input_win,
     results_buf = results_buf,
@@ -1115,18 +1066,10 @@ M.find = function(opts)
       curr_bufname = curr_bufname,
       alternate_bufname = alternate_bufname,
       curr_tick = P.tick,
-      weights = opts.weights,
-      batch_size = opts.batch_size,
-      hl_enabled = opts.hl_enabled,
-      icons_enabled = opts.icons_enabled,
-      fuzzy_score_multiple = opts.fuzzy_score_multiple,
-      file_score_multiple = opts.file_score_multiple,
-      max_results_considered = opts.max_results_considered,
-      max_results_rendered = opts.max_results_rendered,
       render_results = function(weighted_files)
         local formatted_filenames = {}
         for idx, weighted_file in ipairs(weighted_files) do
-          if idx >= opts.max_results_rendered then break end
+          if idx >= gopts.max_results_rendered then break end
           table.insert(formatted_filenames, weighted_file.formatted_filename)
         end
         vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, formatted_filenames)
@@ -1136,8 +1079,8 @@ M.find = function(opts)
 
   vim.schedule(
     function()
-      if P.setup_opts.refresh_files_cache == "find" then
-        P.refresh_files_cache(P.setup_opts.find_cmd)
+      if gopts.refresh_files_cache == "find" then
+        P.refresh_files_cache()
       end
       M.refresh_open_buffers_cache()
       M.refresh_frecency_cache()
@@ -1233,7 +1176,7 @@ M.find = function(opts)
     end,
   }
 
-  for mode, keymaps in pairs(opts.keymaps) do
+  for mode, keymaps in pairs(gopts.keymaps) do
     for key, map in pairs(keymaps) do
       vim.keymap.set(mode, key, function()
         if type(map) == "string" then
@@ -1256,13 +1199,13 @@ M.find = function(opts)
   })
 end
 
-if _G.FF_TEST then
-  M._internal = {
-    H = H,
-    F = F,
-    L = L,
-    P = P,
-  }
-end
+-- if _G.FF_TEST then
+M._internal = {
+  H = H,
+  F = F,
+  L = L,
+  P = P,
+}
+-- end
 
 return M

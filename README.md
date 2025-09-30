@@ -37,145 +37,103 @@ Enable the `benchmark_step` and `benchmark_mean` options to try yourself
 
 ## Configuration example
 ```lua
-local ff = require "ff"
-ff.setup {
+vim.g.ff = {
   -- defaults to:
+  -- "setup"|"find"
   refresh_files_cache = "setup",
+  -- benchmark each keystroke
   benchmark_step = false,
+  -- benchmark the mean of all keystrokes in a session
   benchmark_mean = false,
+  -- defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
   find_cmd = "fd --absolute-path --type f",
+  -- call vim.notify when a file's frecency score is updated
   notify_frecency_update = false
+  weights = {
+    open_buf_boost = 10,
+    modified_buf_boost = 20,
+    alternate_buf_boost = 30,
+    basename_boost = 40,
+    current_buf_boost = -1000,
+  },
+  -- number | false `false` to disable coroutines
+  batch_size = 250,
+  icons_enabled = true,
+  -- highlighting the fuzzy matched characters and icons
+  hl_enabled = true,
+  -- how much to weight the fuzzy match score vs the frecency + other weights
+  fuzzy_score_multiple = 0.7,
+  -- how much to weight the frecency + other weights
+  file_score_multiple = 0.3,
+  -- a max of `max_results_considered` files with a fuzzy match are sorted
+  max_results_considered = 1000,
+  -- a max of `max_results_rendered` sorted files are rendered in the results buffer
+  max_results_rendered = results_height * 2,
+  -- vim.api.keyset.win_config
+  input_win_config = {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = 1,
+    row = input_row,
+    col = 0,
+    border = "rounded",
+    title = "Input",
+  },
+  -- vim.api.keyset.win_config
+  results_win_config = {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = results_height,
+    row = results_row,
+    col = 0,
+    border = "rounded",
+    title = "Results",
+    focusable = false,
+  },
+  -- vim.wo
+  results_win_opts = {},
+  -- vim.wo
+  preview_win_opts = {},
+  on_picker_open = function(on_picker_open_opts) end
+  -- no keymaps are set by default
+  keymaps = {
+    i = {
+      ["<cr>"] = "select",
+      ["<c-n>"] = "next",
+      ["<c-p>"] = "prev",
+      ["<c-c>"] = "close",
+      ["<esc>"] = "close",
+      ["<tab>"] = "preview-toggle",
+      ["<C-d>"] = "preview-scroll-down",
+      ["<C-u>"] = "preview-scroll-up",
+    },
+  },
 }
 
-local editor_height = vim.o.lines - 1
-local input_height = 1
-local border_height = 2
-local available_height = editor_height - input_height - (border_height * 3)
-local results_height = math.floor(available_height / 2)
-local input_row = editor_height
-local results_row = input_row - input_height - border_height
-
-vim.keymap.set("n", "<leader>f", function()
-  ff.find {
-    -- no keymaps are set by default
-    keymaps = {
-      i = {
-        ["<cr>"] = "select",
-        ["<c-n>"] = "next",
-        ["<c-p>"] = "prev",
-        ["<c-c>"] = "close",
-        ["<esc>"] = "close",
-        ["<tab>"] = "preview-toggle",
-        ["<C-d>"] = "preview-scroll-down",
-        ["<C-u>"] = "preview-scroll-up",
-      },
-    },
-    -- defaults to:
-    weights = {
-      open_buf_boost = 10,
-      modified_buf_boost = 20,
-      alternate_buf_boost = 30,
-      basename_boost = 40,
-      current_buf_boost = -1000,
-    },
-    batch_size = 250,
-    icons_enabled = true,
-    hl_enabled = true,
-    fuzzy_score_multiple = 0.7,
-    file_score_multiple = 0.3,
-    max_results_considered = 1000,
-    max_results_rendered = results_height * 2,
-    input_win_config = {
-      style = "minimal",
-      anchor = "SW",
-      relative = "editor",
-      width = vim.o.columns,
-      height = 1,
-      row = input_row,
-      col = 0,
-      border = "rounded",
-      title = "Input",
-    },
-    results_win_config = {
-      style = "minimal",
-      anchor = "SW",
-      relative = "editor",
-      width = vim.o.columns,
-      height = results_height,
-      row = results_row,
-      col = 0,
-      border = "rounded",
-      title = "Results",
-      focusable = false,
-    },
-    results_win_opts = {},
-    preview_win_opts = {},
-    on_picker_open = function(on_picker_open_opts) end
-  }
-end)
+local ff = require "ff"
+ff.setup()
+vim.keymap.set("n", "<leader>f", ff.find, { desc = "Fuzzy find with ff", })
 ```
 
 ## API
 
 ### `setup`
 ```lua 
---- @class SetupOpts
---- @field refresh_files_cache? "setup"|"find"
---- @field benchmark_step? boolean benchmark each keystroke
---- @field benchmark_mean? boolean benchmark the mean of all keystrokes in a session
---- @field find_cmd? string defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
---- @field notify_frecency_update? boolean call vim.notify when a file's frecency score is updated
-
---- @param opts? SetupOpts
-M.setup = function(opts) end
+M.setup = function() end
 ```
 
 ### `find`
 ```lua 
---- @class FindOpts
---- @field keymaps? FindKeymapsPerMode
---- @field weights? FindWeights
---- @field batch_size? number | false `false` to disable coroutines
---- @field hl_enabled? boolean highlighting the fuzzy matched characters
---- @field icons_enabled? boolean
---- @field fuzzy_score_multiple? number how much to weight the fuzzy match score vs the frecency + other weights
---- @field file_score_multiple? number how much to weight the frecency + other weights
---- @field max_results_considered? number a max of `max_results_considered` files with a fuzzy match are sorted
---- @field max_results_rendered? number a max of `max_results_rendered` sorted files are rendered in the results buffer
---- @field input_win_config? vim.api.keyset.win_config
---- @field results_win_config? vim.api.keyset.win_config
---- @field results_win_opts? vim.wo
---- @field preview_win_opts? vim.wo
---- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
-
---- @class OnPickerOpenOpts
---- @field results_win number
---- @field results_buf number
---- @field input_win number
---- @field input_buf number
-
---- @class FindWeights
---- @field open_buf_boost? number
---- @field modified_buf_boost? number
---- @field alternate_buf_boost? number
---- @field current_buf_boost? number
---- @field basename_boost? number
-
---- @class FindKeymapsPerMode
---- @field i? FindKeymaps
---- @field n? FindKeymaps
-
---- @class FindKeymaps
---- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
-
---- @param opts? FindOpts
-M.find = function(opts) end
+M.find = function() end
 ```
 
 ### `refresh_files_cache`
 ```lua
---- @param find_cmd string defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
-M.refresh_files_cache = function(find_cmd) end
+M.refresh_files_cache = function() end
 ```
 
 By default, `refresh_files_cache` is called once when `setup` is run. When performing actions on the file system, 
@@ -203,6 +161,11 @@ vim.api.nvim_create_autocmd("User", {
 To use another picker as a frontend for `ff.nvim`, the following functions may be useful. When calling `find` directly, there's no need to call any of these.
 
 ```lua
+vim.g.ff = {
+  batch_size = false,
+  max_results_rendered = 50,
+}
+
 vim.keymap.set("n", "<leader>ff", function()
   -- setup still needs to be called
   local curr_bufname = vim.api.nvim_buf_get_name(0)
@@ -215,24 +178,9 @@ vim.keymap.set("n", "<leader>ff", function()
 
   vim.ui.input({ prompt = "ff> ", }, function(query)
     local weighted_files = ff.get_weighted_files {
-      query = query, -- defaults to "" if passed `nil`
-      curr_bufname = curr_bufname, -- defaults to "" if not passed
-      alternate_bufname = alternate_bufname, -- defaults to "" if not passed
-      -- defaults to:
-      weights = {
-        open_buf_boost = 10,
-        modified_buf_boost = 20,
-        alternate_buf_boost = 30,
-        basename_boost = 40,
-        current_buf_boost = -1000,
-      },
-      batch_size = false, -- `false` disables calling `coroutine.yield()`
-      icons_enabled = true,
-      hl_enabled = true,
-      fuzzy_score_multiple = 0.7,
-      file_score_multiple = 0.3,
-      max_results_considered = 1000,
-      max_results_rendered = 50,
+      query = query or "",
+      curr_bufname = curr_bufname or "",
+      alternate_bufname = alternate_bufname or "",
     }
     local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
 
@@ -265,14 +213,6 @@ end)
 --- @field query string
 --- @field curr_bufname string absolute path of the current buffer
 --- @field alternate_bufname string absolute path of the alternate buffer
---- @field weights Weights
---- @field batch_size number | false
---- @field hl_enabled? boolean `false` will set `hl_idxs` to `{}`
---- @field icons_enabled boolean
---- @field max_results_considered? number a max of `max_results_considered` files with a fuzzy match are sorted
---- @field max_results_rendered? number a max of `max_results_rendered` sorted files are rendered in the results buffer
---- @field fuzzy_score_multiple? number how much to weight the fuzzy match score vs the frecency + other weights
---- @field file_score_multiple? number how much to weight the frecency + other weights
 
 --- @param opts GetWeightedFilesOpts
 --- @return WeightedFile[]
