@@ -158,7 +158,7 @@ vim.api.nvim_create_autocmd("User", {
 
 ## Using another picker as a frontend for `ff.nvim`
 
-To use another picker as a frontend for `ff.nvim`, the following functions may be useful. When calling `find` directly, there's no need to call any of these.
+To use another picker as a frontend for `ff.nvim`, the following functions may be useful. When calling `find()` directly, there's no need to call any of these.
 
 ```lua
 vim.g.ff = {
@@ -166,12 +166,14 @@ vim.g.ff = {
   max_results_rendered = 50,
 }
 
+local ff = require "ff"
+ff.setup()
+
 vim.keymap.set("n", "<leader>ff", function()
   -- setup still needs to be called
   local curr_bufname = vim.api.nvim_buf_get_name(0)
   local alternate_bufname = vim.api.nvim_buf_get_name(vim.fn.bufnr "#")
 
-  local ff = require "ff"
   ff.benchmark_mean_start()
   ff.refresh_frecency_cache()
   ff.refresh_open_buffers_cache()
