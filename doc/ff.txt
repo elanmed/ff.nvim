@@ -1,4 +1,4 @@
-*ff.txt*                                        Last change: 2025 September 24
+*ff.txt*                                        Last change: 2025 September 29
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -16,6 +16,14 @@ Using another picker as a frontend for `ff.nvim`  |ff-using-another-picker-as-a-
 `benchmark_mean_start` ............................. |ff-benchmark_mean_start|
 `benchmark_mean_end` ................................. |ff-benchmark_mean_end|
 Highlight Groups ....................................... |ff-highlight-groups|
+Plug remaps ................................................. |ff-plug-remaps|
+`<Plug>FFResultSelect` ............................. |ff-<plug>ffresultselect|
+`<Plug>FFResultNext` ................................. |ff-<plug>ffresultnext|
+`<Plug>FFResultPrev` ................................. |ff-<plug>ffresultprev|
+`<Plug>FFClose` ........................................... |ff-<plug>ffclose|
+`<Plug>FFPreviewToggle` ........................... |ff-<plug>ffpreviewtoggle|
+`<Plug>FFPreviewScrollDown` ................... |ff-<plug>ffpreviewscrolldown|
+`<Plug>FFPreviewScrollUp` ....................... |ff-<plug>ffpreviewscrollup|
 Deps ............................................................... |ff-deps|
 TODO ............................................................... |ff-todo|
 Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
@@ -130,24 +138,24 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       -- vim.wo
       preview_win_opts = {},
       on_picker_open = function(on_picker_open_opts) end
-      -- no keymaps are set by default
-      keymaps = {
-        i = {
-          ["<cr>"] = "select",
-          ["<c-n>"] = "next",
-          ["<c-p>"] = "prev",
-          ["<c-c>"] = "close",
-          ["<esc>"] = "close",
-          ["<tab>"] = "preview-toggle",
-          ["<C-d>"] = "preview-scroll-down",
-          ["<C-u>"] = "preview-scroll-up",
-        },
-      },
     }
     
     local ff = require "ff"
     ff.setup()
     vim.keymap.set("n", "<leader>f", ff.find, { desc = "Fuzzy find with ff", })
+    
+    vim.api.nvim_create_autocmd({ "FileType", }, {
+      pattern = "ff-picker",
+      callback = function()
+        vim.keymap.set("i", "<cr>", "<Plug>FFResultSelect", { buffer = true, })
+        vim.keymap.set("i", "<c-n>", "<Plug>FFResultNext", { buffer = true, })
+        vim.keymap.set("i", "<c-p>", "<Plug>FFResultPrev", { buffer = true, })
+        vim.keymap.set("i", "<esc>", "<Plug>FFClose", { buffer = true, })
+        vim.keymap.set("i", "<tab>", "<Plug>FFPreviewToggle", { buffer = true, })
+        vim.keymap.set("i", "<c-d>", "<Plug>FFPreviewScrollDown", { buffer = true, })
+        vim.keymap.set("i", "<c-u>", "<Plug>FFPreviewScrollUp", { buffer = true, })
+      end,
+    })
 <
 
 ------------------------------------------------------------------------------
@@ -304,6 +312,46 @@ HIGHLIGHT GROUPS                                         *ff-highlight-groups*
   function. In order to successfully override a highlight group, make sure to
   set it after calling`setup`
 
+
+------------------------------------------------------------------------------
+PLUG REMAPS                                                   *ff-plug-remaps*
+
+
+
+                                                                              
+`<PLUG>FFRESULTSELECT`                               *ff-<plug>ffresultselect*
+
+- Select a result, close the picker, and edit the selected file
+
+                                                                              
+`<PLUG>FFRESULTNEXT`                                   *ff-<plug>ffresultnext*
+
+- Move the cursor to the next result
+
+                                                                              
+`<PLUG>FFRESULTPREV`                                   *ff-<plug>ffresultprev*
+
+- Move the cursor to the prev result
+
+                                                                              
+`<PLUG>FFCLOSE`                                             *ff-<plug>ffclose*
+
+- Close the picker
+
+                                                                              
+`<PLUG>FFPREVIEWTOGGLE`                             *ff-<plug>ffpreviewtoggle*
+
+- Toggle the preview for the file under the cursor
+
+                                                                              
+`<PLUG>FFPREVIEWSCROLLDOWN`                     *ff-<plug>ffpreviewscrolldown*
+
+- Scroll the preview down half a page
+
+                                                                              
+`<PLUG>FFPREVIEWSCROLLUP`                         *ff-<plug>ffpreviewscrollup*
+
+- Scroll the preview up half a page
 
 ------------------------------------------------------------------------------
 DEPS                                                                 *ff-deps*

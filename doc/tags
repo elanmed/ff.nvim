@@ -1,3 +1,10 @@
+ff-<plug>ffclose	ff.txt	/*ff-<plug>ffclose*
+ff-<plug>ffpreviewscrolldown	ff.txt	/*ff-<plug>ffpreviewscrolldown*
+ff-<plug>ffpreviewscrollup	ff.txt	/*ff-<plug>ffpreviewscrollup*
+ff-<plug>ffpreviewtoggle	ff.txt	/*ff-<plug>ffpreviewtoggle*
+ff-<plug>ffresultnext	ff.txt	/*ff-<plug>ffresultnext*
+ff-<plug>ffresultprev	ff.txt	/*ff-<plug>ffresultprev*
+ff-<plug>ffresultselect	ff.txt	/*ff-<plug>ffresultselect*
 ff-api	ff.txt	/*ff-api*
 ff-benchmark_mean_end	ff.txt	/*ff-benchmark_mean_end*
 ff-benchmark_mean_start	ff.txt	/*ff-benchmark_mean_start*
@@ -9,6 +16,7 @@ ff-find	ff.txt	/*ff-find*
 ff-get_weighted_files	ff.txt	/*ff-get_weighted_files*
 ff-highlight-groups	ff.txt	/*ff-highlight-groups*
 ff-performance	ff.txt	/*ff-performance*
+ff-plug-remaps	ff.txt	/*ff-plug-remaps*
 ff-refresh_files_cache	ff.txt	/*ff-refresh_files_cache*
 ff-refresh_frecency_cache	ff.txt	/*ff-refresh_frecency_cache*
 ff-refresh_open_buffers_cache	ff.txt	/*ff-refresh_open_buffers_cache*

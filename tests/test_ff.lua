@@ -1,6 +1,6 @@
+_G.FF_TEST = true
 require "mini.test".setup()
 local T = MiniTest.new_set()
-_G.FF_TEST = true
 
 local ff = require "ff"
 local H = ff._internal.H

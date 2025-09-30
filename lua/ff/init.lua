@@ -352,7 +352,6 @@ P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @class FFOpts
---- @field keymaps? FindKeymapsPerMode
 --- @field weights? Weights
 --- @field batch_size? number | false
 --- @field hl_enabled? boolean
@@ -385,13 +384,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field current_buf_boost? number
 --- @field basename_boost? number
 
---- @class FindKeymapsPerMode
---- @field i? FindKeymaps
---- @field n? FindKeymaps
-
---- @class FindKeymaps
---- @field [string] "select"|"next"|"prev"|"close"|"preview-toggle"|"preview-scroll-up"|"preview-scroll-down"|function
-
 --- @return FFOpts
 P.defaulted_gopts = function()
   local opts = (function()
@@ -400,10 +392,6 @@ P.defaulted_gopts = function()
     end
     return vim.deepcopy(vim.g.ff)
   end)()
-
-  opts.keymaps = H.default(opts.keymaps, {})
-  opts.keymaps.i = H.default(opts.keymaps.i, {})
-  opts.keymaps.n = H.default(opts.keymaps.n, {})
 
   opts.weights = H.default(opts.weights, {})
   opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
@@ -425,11 +413,10 @@ P.defaulted_gopts = function()
 
   local editor_height = vim.o.lines
   local input_height = 1
-  local border_height = 2
-  local available_height = editor_height - input_height - (border_height * 4)
-  local results_height = math.floor(available_height / 2)
+  local border_height = 1
+  local results_height = math.floor(editor_height / 2)
   local input_row = editor_height
-  local results_row = input_row - input_height - border_height
+  local results_row = input_row - input_height - (border_height * 2) - 1
 
   opts.max_results_rendered = H.default(opts.max_results_rendered, results_height * 2)
   opts.input_win_config = H.default(opts.input_win_config, {
@@ -1098,7 +1085,7 @@ M.find = function()
   end
 
   local keymap_fns = {
-    select = function()
+    ResultSelect = function()
       if P.preview_active then return end
 
       vim.api.nvim_set_current_win(results_win)
@@ -1107,7 +1094,7 @@ M.find = function()
       close()
       vim.cmd("edit " .. vim.split(result, "|")[2])
     end,
-    next = function()
+    ResultNext = function()
       if P.preview_active then return end
 
       vim.api.nvim_win_call(results_win, function()
@@ -1119,7 +1106,7 @@ M.find = function()
         vim.cmd "redraw"
       end)
     end,
-    prev = function()
+    ResultPrev = function()
       if P.preview_active then return end
 
       vim.api.nvim_win_call(results_win, function()
@@ -1131,8 +1118,8 @@ M.find = function()
         vim.cmd "redraw"
       end)
     end,
-    close = close,
-    ["preview-toggle"] = function()
+    Close = close,
+    PreviewToggle = function()
       if P.preview_active then
         P.preview_active = not P.preview_active
         vim.api.nvim_win_set_buf(results_win, results_buf)
@@ -1162,13 +1149,13 @@ M.find = function()
 
       pcall(vim.treesitter.start, preview_buf, lang)
     end,
-    ["preview-scroll-down"] = function()
+    PreviewScrollDown = function()
       if not P.preview_active then return end
       vim.api.nvim_win_call(results_win, function()
         vim.cmd 'execute "normal! \\<C-d>"'
       end)
     end,
-    ["preview-scroll-up"] = function()
+    PreviewScrollUp = function()
       if not P.preview_active then return end
       vim.api.nvim_win_call(results_win, function()
         vim.cmd 'execute "normal! \\<C-u>"'
@@ -1176,17 +1163,13 @@ M.find = function()
     end,
   }
 
-  for mode, keymaps in pairs(gopts.keymaps) do
-    for key, map in pairs(keymaps) do
-      vim.keymap.set(mode, key, function()
-        if type(map) == "string" then
-          keymap_fns[map]()
-        else
-          map()
-        end
-      end, { buffer = input_buf, })
-    end
+  for action, fn in pairs(keymap_fns) do
+    vim.keymap.set({ "i", "n", }, "<Plug>FF" .. action, fn, {
+      buffer = input_buf,
+      desc = "FF: " .. action,
+    })
   end
+  vim.api.nvim_set_option_value("filetype", "ff-picker", { buf = input_buf, })
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
     group = vim.api.nvim_create_augroup("FFPicker", { clear = true, }),
@@ -1199,13 +1182,13 @@ M.find = function()
   })
 end
 
--- if _G.FF_TEST then
-M._internal = {
-  H = H,
-  F = F,
-  L = L,
-  P = P,
-}
--- end
+if _G.FF_TEST then
+  M._internal = {
+    H = H,
+    F = F,
+    L = L,
+    P = P,
+  }
+end
 
 return M

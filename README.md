@@ -99,24 +99,24 @@ vim.g.ff = {
   -- vim.wo
   preview_win_opts = {},
   on_picker_open = function(on_picker_open_opts) end
-  -- no keymaps are set by default
-  keymaps = {
-    i = {
-      ["<cr>"] = "select",
-      ["<c-n>"] = "next",
-      ["<c-p>"] = "prev",
-      ["<c-c>"] = "close",
-      ["<esc>"] = "close",
-      ["<tab>"] = "preview-toggle",
-      ["<C-d>"] = "preview-scroll-down",
-      ["<C-u>"] = "preview-scroll-up",
-    },
-  },
 }
 
 local ff = require "ff"
 ff.setup()
 vim.keymap.set("n", "<leader>f", ff.find, { desc = "Fuzzy find with ff", })
+
+vim.api.nvim_create_autocmd({ "FileType", }, {
+  pattern = "ff-picker",
+  callback = function()
+    vim.keymap.set("i", "<cr>", "<Plug>FFResultSelect", { buffer = true, })
+    vim.keymap.set("i", "<c-n>", "<Plug>FFResultNext", { buffer = true, })
+    vim.keymap.set("i", "<c-p>", "<Plug>FFResultPrev", { buffer = true, })
+    vim.keymap.set("i", "<esc>", "<Plug>FFClose", { buffer = true, })
+    vim.keymap.set("i", "<tab>", "<Plug>FFPreviewToggle", { buffer = true, })
+    vim.keymap.set("i", "<c-d>", "<Plug>FFPreviewScrollDown", { buffer = true, })
+    vim.keymap.set("i", "<c-u>", "<Plug>FFPreviewScrollUp", { buffer = true, })
+  end,
+})
 ```
 
 ## API
@@ -250,6 +250,29 @@ M.benchmark_mean_end = function() end
 > [!NOTE]
 > The default highlight groups are set as a part of the `setup` function. In order to successfully override a highlight group, make sure to set it
 after calling`setup`
+
+## Plug remaps
+
+#### `<Plug>FFResultSelect`
+- Select a result, close the picker, and edit the selected file
+
+#### `<Plug>FFResultNext`
+- Move the cursor to the next result
+
+#### `<Plug>FFResultPrev`
+- Move the cursor to the prev result
+
+#### `<Plug>FFClose`
+- Close the picker
+
+#### `<Plug>FFPreviewToggle`
+- Toggle the preview for the file under the cursor
+
+#### `<Plug>FFPreviewScrollDown`
+- Scroll the preview down half a page
+
+#### `<Plug>FFPreviewScrollUp`
+- Scroll the preview up half a page
 
 ## Deps
 - [`telescope-fzf-native.nvim`](https://github.com/nvim-telescope/telescope-fzf-native.nvim)
