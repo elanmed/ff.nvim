@@ -190,7 +190,7 @@ F.update_file_score = function(abs_path, opts)
   opts._db_dir = H.default(opts._db_dir, F.default_db_dir)
   local dated_files_path = F.get_dated_files_path(opts._db_dir)
   local dated_files = F.read(dated_files_path)
-  if not dated_files[H.cwd] then
+  if dated_files[H.cwd] == nil then
     dated_files[H.cwd] = {}
   end
 
@@ -235,7 +235,7 @@ local L = {}
 --- @param content string
 L.log = function(content)
   local file = io.open("ff.log", "a")
-  if not file then return end
+  if file == nil then return end
   file:write(content .. "\n")
   file:close()
 end
@@ -311,7 +311,7 @@ L.benchmark_step = function(type, label, opts)
     local formatted_ms = H.pad_str(H.exact_decimals(elapsed_ms, 3), 8)
 
     if L.SHOULD_LOG_MEAN and opts.record_mean then
-      if not L.benchmarks_for_mean[label] then
+      if L.benchmarks_for_mean[label] == nil then
         L.benchmarks_for_mean[label] = {}
       end
       table.insert(L.benchmarks_for_mean[label], elapsed_ms)
@@ -523,7 +523,7 @@ M.refresh_frecency_cache = function()
   L.benchmark_step("start", "Frecency dated_files fs read")
   local dated_files_path = F.get_dated_files_path()
   local dated_files = F.read(dated_files_path)
-  if not dated_files[H.cwd] then
+  if dated_files[H.cwd] == nil then
     dated_files[H.cwd] = {}
   end
   L.benchmark_step("end", "Frecency dated_files fs read", { record_mean = false, })
@@ -960,7 +960,7 @@ M.setup = function()
           vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
         end
         F.update_file_score(abs_path, { update_type = "increase", })
-        if not P.caches.frecency_file_to_score[abs_path] then
+        if P.caches.frecency_file_to_score[abs_path] == nil then
           P.refresh_files_cache()
         end
       end)
@@ -1176,7 +1176,7 @@ M.find = function()
     buffer = input_buf,
     callback = function()
       P.tick = P.tick + 1
-      if P.preview_active then keymap_fns["preview-toggle"]() end
+      if P.preview_active then keymap_fns["PreviewToggle"]() end
       get_find_files_with_query(vim.api.nvim_get_current_line())
     end,
   })
