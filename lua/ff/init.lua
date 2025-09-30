@@ -262,6 +262,17 @@ L.log_line = function(type)
   end
 end
 
+L.should_log_step = function()
+  local opts = H.default(vim.g.ff, {})
+  return H.default(opts.benchmark_step, false)
+end
+
+L.should_log_mean = function()
+  local opts = H.default(vim.g.ff, {})
+  return H.default(opts.benchmark_mean, false)
+end
+
+
 --- @param get_flag function
 L.create_benchmark_heading = function(get_flag)
   --- @param content string
@@ -273,8 +284,8 @@ L.create_benchmark_heading = function(get_flag)
   end
 end
 
-L.benchmark_step_heading = L.create_benchmark_heading(function() return L.SHOULD_LOG_STEP end)
-L.benchmark_mean_heading = L.create_benchmark_heading(function() return L.SHOULD_LOG_MEAN end)
+L.benchmark_step_heading = L.create_benchmark_heading(L.should_log_step)
+L.benchmark_mean_heading = L.create_benchmark_heading(L.should_log_mean)
 
 --- @param get_flag function
 L.create_benchmark_closing = function(get_flag)
@@ -284,11 +295,11 @@ L.create_benchmark_closing = function(get_flag)
   end
 end
 
-L.benchmark_step_closing = L.create_benchmark_closing(function() return L.SHOULD_LOG_STEP end)
-L.benchmark_mean_closing = L.create_benchmark_closing(function() return L.SHOULD_LOG_MEAN end)
+L.benchmark_step_closing = L.create_benchmark_closing(L.should_log_step)
+L.benchmark_mean_closing = L.create_benchmark_closing(L.should_log_mean)
 
 L.benchmark_step_interrupted = function()
-  if not L.SHOULD_LOG_STEP then return end
+  if not L.should_log_step() then return end
   L.log_content "INTERRUPTED"
 end
 
@@ -315,14 +326,14 @@ L.benchmark_step = function(type, label, opts)
     local elapsed_ms = (end_time - start_time) * 1000
     local formatted_ms = H.pad_str(H.exact_decimals(elapsed_ms, 3), 8)
 
-    if L.SHOULD_LOG_MEAN and opts.record_mean then
+    if L.should_log_mean() and opts.record_mean then
       if L.benchmarks_for_mean[label] == nil then
         L.benchmarks_for_mean[label] = {}
       end
       table.insert(L.benchmarks_for_mean[label], elapsed_ms)
     end
 
-    if L.SHOULD_LOG_STEP and opts.print_benchmark then
+    if L.should_log_step() and opts.print_benchmark then
       local content = ("% sms : %s"):format(formatted_ms, label)
       L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
     end
@@ -377,12 +388,8 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @return FFOpts
 P.defaulted_gopts = function()
-  local opts = (function()
-    if vim.g.ff == nil then
-      return {}
-    end
-    return vim.deepcopy(vim.g.ff)
-  end)()
+  local opts = H.default(vim.g.ff, {})
+  opts = vim.deepcopy(opts)
 
   opts.weights = H.default(opts.weights, {})
   opts.weights.open_buf_boost = H.default(opts.weights.open_buf_boost, 10)
@@ -947,8 +954,6 @@ M.setup = function()
   P.setup_called = true
 
   local gopts = P.defaulted_gopts()
-  L.SHOULD_LOG_STEP = gopts.benchmark_step
-  L.SHOULD_LOG_MEAN = gopts.benchmark_mean
 
   if gopts.refresh_files_cache == "setup" then
     P.refresh_files_cache()
@@ -1003,7 +1008,7 @@ end
 M.print_mean_benchmarks = function()
   L.benchmark_mean_heading "Mean benchmarks"
 
-  if not L.SHOULD_LOG_MEAN then return end
+  if not L.should_log_mean() then return end
   for label, benchmarks in pairs(L.benchmarks_for_mean) do
     local sum = 0
     for _, bench in ipairs(benchmarks) do
