@@ -20,16 +20,16 @@ A small, fast fuzzy finder with intelligent weights.
 
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
 - New searches interrupt ongoing processing for previous searches
-- A max of `opts.max_results_considered` files with a fuzzy match are processed
+- A max of `vim.g.ff.max_results_considered` files with a fuzzy match are processed
     - Frecent files are checked for a fuzzy match first, then files from `fd`
-    - For empty inputs, a max of `opts.max_results_rendered` files are processed
+    - For empty inputs, a max of `vim.g.ff.max_results_rendered` files are processed
 - Extensive caching:
     - `fd` is executed once and cached when `setup` is called
     - Frecency scores are calculated once and cached when `find` is called
     - Info on open buffers are pulled once and cached when `find` is called
     - Icons are cached by extension to avoid calling `mini.icons` when possible
     - Results are cached for each user input (instant backspace search)
-- A max of `opts.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
+- A max of `vim.g.ff.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files. 
@@ -277,9 +277,9 @@ after calling`setup`
 ## Deps
 - [`telescope-fzf-native.nvim`](https://github.com/nvim-telescope/telescope-fzf-native.nvim)
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
-    - Or `false` passed as `opts.icons_enabled`
+    - Or `false` passed as `vim.g.ff.icons_enabled`
 - [`fd`](https://github.com/sharkdp/fd) 
-    - Or a custom cli command passed as `opts.find_cmd`
+    - Or a custom cli command passed as `vim.g.ff.find_cmd`
 
 ## TODO
 - [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
