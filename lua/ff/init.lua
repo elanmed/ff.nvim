@@ -311,11 +311,11 @@ L.benchmarks_for_mean = {}
 
 --- @param type "start"|"end"
 --- @param label string
---- @param opts? {record_mean: boolean, print_benchmark: boolean}
+--- @param opts? {record_mean: boolean, print_step: boolean}
 L.benchmark_step = function(type, label, opts)
   opts = H.default(opts, {})
   opts.record_mean = H.default(opts.record_mean, true)
-  opts.print_benchmark = H.default(opts.print_benchmark, true)
+  opts.print_step = H.default(opts.print_step, true)
 
   if type == "start" then
     L.ongoing_benchmarks[label] = os.clock()
@@ -333,7 +333,7 @@ L.benchmark_step = function(type, label, opts)
       table.insert(L.benchmarks_for_mean[label], elapsed_ms)
     end
 
-    if L.should_log_step() and opts.print_benchmark then
+    if L.should_log_step() and opts.print_step then
       local content = ("% sms : %s"):format(formatted_ms, label)
       L.log("│" .. content .. (" "):rep(L.LOG_LEN - #content - 2) .. "│")
     end
@@ -388,6 +388,8 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @return FFOpts
 P.defaulted_gopts = function()
+  L.benchmark_step("start", "defaulted_gopts")
+
   local opts = H.default(vim.g.ff, {})
   opts = vim.deepcopy(opts)
 
@@ -447,6 +449,7 @@ P.defaulted_gopts = function()
   opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
   opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
 
+  L.benchmark_step("end", "defaulted_gopts", { print_step = false, })
   return opts
 end
 
@@ -508,7 +511,7 @@ P.refresh_files_cache = function()
       table.insert(P.caches.find_files, vim.fs.normalize(abs_path))
 
       ::continue::
-      L.benchmark_step("end", "refresh_files_cache (loop iteration)", { print_benchmark = false, })
+      L.benchmark_step("end", "refresh_files_cache (loop iteration)", { print_step = false, })
     end
     L.benchmark_step("end", "refresh_files_cache (entire function)", { record_mean = false, })
     L.benchmark_step_closing()
@@ -540,7 +543,7 @@ M.refresh_frecency_cache = function()
     table.insert(P.caches.frecency_files, abs_path)
 
     ::continue::
-    L.benchmark_step("end", "Calculate frecency_file_to_score (loop iteration)", { print_benchmark = false, })
+    L.benchmark_step("end", "Calculate frecency_file_to_score (loop iteration)", { print_step = false, })
   end
   L.benchmark_step("end", "Calculate frecency_file_to_score (entire loop)", { record_mean = false, })
   L.benchmark_step_closing()
@@ -567,7 +570,7 @@ M.refresh_open_buffers_cache = function()
     P.caches.open_buffer_to_modified[buf_name] = modified
 
     ::continue::
-    L.benchmark_step("end", "Calculate open_buffer_to_modified (loop iteration)", { print_benchmark = false, })
+    L.benchmark_step("end", "Calculate open_buffer_to_modified (loop iteration)", { print_step = false, })
   end
   L.benchmark_step("end", "Calculate open_buffer_to_modified (entire loop)", { record_mean = false, })
   L.benchmark_step_closing()
@@ -661,9 +664,7 @@ M.get_weighted_files = function(opts)
   local function get_weighted_file(abs_path, slab_arg)
     local rel_path = H.rel_path(abs_path)
     if #opts.query == 0 then
-      L.benchmark_step("start", "get_weighted_file: get_icon_info (empty query)")
       local icon_info = P.get_icon_info(abs_path)
-      L.benchmark_step("end", "get_weighted_file: get_icon_info (empty query)", { print_benchmark = false, })
 
       local frecency_score = 0
       if P.caches.frecency_file_to_score[abs_path] ~= nil then
@@ -686,7 +687,7 @@ M.get_weighted_files = function(opts)
     local smart_case_mode = 0
     local pattern_obj = fzf.parse_pattern(opts.query, smart_case_mode)
     local fzf_score = fzf.get_score(rel_path, pattern_obj, slab_arg)
-    L.benchmark_step("end", "get_weighted_file: fzf.parse_pattern and fzf.get_score", { print_benchmark = false, })
+    L.benchmark_step("end", "get_weighted_file: fzf.parse_pattern and fzf.get_score", { print_step = false, })
 
     if fzf_score == 0 then
       fzf.free_pattern(pattern_obj)
@@ -725,7 +726,7 @@ M.get_weighted_files = function(opts)
 
     L.benchmark_step("start", "get_weighted_file: get_icon_info (populated query)")
     local icon_info = P.get_icon_info(abs_path)
-    L.benchmark_step("end", "get_weighted_file: get_icon_info (populated query)", { print_benchmark = false, })
+    L.benchmark_step("end", "get_weighted_file: get_icon_info (populated query)", { print_step = false, })
     local hl_idxs = {}
     if gopts.hl_enabled then
       local pos = fzf.get_pos(rel_path, pattern_obj, slab_arg)
@@ -762,7 +763,7 @@ M.get_weighted_files = function(opts)
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
-    L.benchmark_step("end", "Populate weighted files with frecency (loop iteration)", { print_benchmark = false, })
+    L.benchmark_step("end", "Populate weighted files with frecency (loop iteration)", { print_step = false, })
 
     if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
@@ -779,7 +780,7 @@ M.get_weighted_files = function(opts)
 
     L.benchmark_step("start", "Populate weighted files with fd (loop iteration)")
     local weighted_file = get_weighted_file(abs_path, slab)
-    L.benchmark_step("end", "Populate weighted files with fd (loop iteration)", { print_benchmark = false, })
+    L.benchmark_step("end", "Populate weighted files with fd (loop iteration)", { print_step = false, })
     if weighted_file then
       table.insert(weighted_files_for_query, weighted_file)
     end
@@ -834,7 +835,7 @@ P.highlight_weighted_files = function(opts)
         { row_0_indexed, icon_hl_col_0_indexed, },
         { row_0_indexed, icon_hl_col_0_indexed + 1, }
       )
-      L.benchmark_step("end", "highlight_weighted_files icon vim.hl.range", { print_benchmark = false, })
+      L.benchmark_step("end", "highlight_weighted_files icon vim.hl.range", { print_step = false, })
     end
 
     local file_offset = weighted_file.formatted_filename:find "|"
@@ -850,9 +851,9 @@ P.highlight_weighted_files = function(opts)
         { row_0_indexed, file_char_hl_col_0_indexed, },
         { row_0_indexed, file_char_hl_col_0_indexed + 1, }
       )
-      L.benchmark_step("end", "highlight_weighted_files hl_idxs loop iteration", { print_benchmark = false, })
+      L.benchmark_step("end", "highlight_weighted_files hl_idxs loop iteration", { print_step = false, })
     end
-    L.benchmark_step("end", "highlight_weighted_files hl_idxs loop", { print_benchmark = false, })
+    L.benchmark_step("end", "highlight_weighted_files hl_idxs loop", { print_step = false, })
 
     if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
