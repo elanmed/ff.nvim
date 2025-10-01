@@ -371,6 +371,7 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field benchmark_mean? boolean
 --- @field find_cmd? string
 --- @field notify_frecency_update? boolean
+--- @field auto_setup? boolean
 
 --- @class OnPickerOpenOpts
 --- @field results_win number
@@ -447,6 +448,7 @@ P.defaulted_gopts = function()
   opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
   opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
   opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
+  opts.auto_setup = H.default(opts.auto_setup, true)
 
   L.benchmark_step("end", "defaulted_gopts", { print_step = false, })
   return opts
@@ -934,10 +936,11 @@ end
 P.setup_called = false
 
 M.setup = function()
+  local gopts = P.defaulted_gopts()
+  if not gopts.auto_setup then return end
+
   if P.setup_called then return end
   P.setup_called = true
-
-  local gopts = P.defaulted_gopts()
 
   if gopts.refresh_files_cache == "setup" then
     P.refresh_files_cache()

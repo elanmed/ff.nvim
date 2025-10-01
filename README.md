@@ -102,7 +102,6 @@ vim.g.ff = {
 }
 
 local ff = require "ff"
-ff.setup()
 vim.keymap.set("n", "<leader>ff", ff.find, { desc = "Fuzzy find with ff", })
 
 vim.api.nvim_create_autocmd({ "FileType", }, {
@@ -122,9 +121,13 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 ## API
 
 ### `setup`
+
 ```lua 
 require "ff".setup()
 ```
+
+By default, `setup()` is automatically on startup. This can be disabled by setting `vim.g.ff.auto_setup = false`. Note that if `auto_setup` is disabled,
+`setup()` still needs to be called manually.
 
 ### `find`
 ```lua 
@@ -248,8 +251,9 @@ require "ff".print_mean_benchmarks()
   - Defaults to `CursorLine`
 
 > [!NOTE]
-> The default highlight groups are set as a part of the `setup()` function. In order to successfully override a highlight group, make sure to set it
-after calling `setup()`
+> The default highlight groups are set as a part of the `setup()` function. In order to successfully change a highlight group, make sure to override it
+_after_ calling `setup()`. This can be done either by calling `vim.api.nvim_set_hl` in the `after/plugin/` directory or in the `vim.g.ff.on_picker_open` 
+function
 
 ## Plug remaps
 
