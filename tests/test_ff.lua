@@ -363,8 +363,7 @@ end
 
 T["P"]["get_icon_info"] = MiniTest.new_set()
 T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
-  vim.g.ff = { icons_enabled = false, }
-  local res = P.get_icon_info "path/to/file.lua"
+  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = false, }
   MiniTest.expect.equality(res.icon_char, nil)
   MiniTest.expect.equality(res.icon_hl, nil)
 end
@@ -374,15 +373,13 @@ T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = 
     icon_hl = "LuaIcon",
   }
 
-  vim.g.ff = { icons_enabled = true, }
-  local res = P.get_icon_info "path/to/file.lua"
+  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = true, }
 
   MiniTest.expect.equality(res.icon_char, "🌙")
   MiniTest.expect.equality(res.icon_hl, "LuaIcon")
 end
 T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function()
-  vim.g.ff = { icons_enabled = true, }
-  local res_one = P.get_icon_info "path/to/file.js"
+  local res_one = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
 
   MiniTest.expect.equality(res_one.icon_char, "󰌞")
   MiniTest.expect.equality(res_one.icon_hl, "MiniIconsYellow")
@@ -390,7 +387,7 @@ T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function
   MiniTest.expect.equality(P.caches.icon_cache["js"].icon_char, "󰌞")
   MiniTest.expect.equality(P.caches.icon_cache["js"].icon_hl, "MiniIconsYellow")
 
-  local res_two = P.get_icon_info "path/to/file.js"
+  local res_two = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
   MiniTest.expect.equality(res_two.icon_char, "󰌞")
   MiniTest.expect.equality(res_two.icon_hl, "MiniIconsYellow")
 end

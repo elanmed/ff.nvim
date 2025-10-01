@@ -587,17 +587,19 @@ end
 --- @field icon_hl string
 --- @field formatted_filename string
 
---- @param abs_path string
-P.get_icon_info = function(abs_path)
-  local gopts = P.defaulted_gopts()
-  if not gopts.icons_enabled then
+--- @class GetIconInfoOpts
+--- @field abs_path string
+--- @field icons_enabled boolean
+--- @param opts GetIconInfoOpts
+P.get_icon_info = function(opts)
+  if not opts.icons_enabled then
     return {
       icon_char = nil,
       icon_hl = nil,
     }
   end
 
-  local ext = H.get_ext(abs_path)
+  local ext = H.get_ext(opts.abs_path)
   if ext and P.caches.icon_cache[ext] then
     return {
       icon_char = P.caches.icon_cache[ext].icon_char,
@@ -628,7 +630,7 @@ P.get_icon_info = function(abs_path)
     }
   end
 
-  local icon_char, icon_hl = icon_library.get_icon(abs_path)
+  local icon_char, icon_hl = icon_library.get_icon(opts.abs_path)
   if ext then
     P.caches.icon_cache[ext] = { icon_char = icon_char, icon_hl = icon_hl, }
   end
@@ -664,7 +666,7 @@ M.get_weighted_files = function(opts)
   local function get_weighted_file(abs_path, slab_arg)
     local rel_path = H.rel_path(abs_path)
     if #opts.query == 0 then
-      local icon_info = P.get_icon_info(abs_path)
+      local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = gopts.icons_enabled, }
 
       local frecency_score = 0
       if P.caches.frecency_file_to_score[abs_path] ~= nil then
@@ -725,7 +727,7 @@ M.get_weighted_files = function(opts)
         gopts.file_score_multiple * buf_and_frecency_score
 
     L.benchmark_step("start", "get_weighted_file: get_icon_info (populated query)")
-    local icon_info = P.get_icon_info(abs_path)
+    local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = gopts.icons_enabled, }
     L.benchmark_step("end", "get_weighted_file: get_icon_info (populated query)", { print_step = false, })
     local hl_idxs = {}
     if gopts.hl_enabled then
