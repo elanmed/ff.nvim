@@ -1,4 +1,4 @@
-*ff.txt*                                        Last change: 2025 September 30
+*ff.txt*                                          Last change: 2025 October 01
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -78,6 +78,8 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
 >lua
     -- defaults:
     vim.g.ff = {
+      -- automatically call `setup()` on startup
+      auto_setup = true,
       -- "setup"|"find"
       refresh_files_cache = "setup",
       -- benchmark each keystroke
@@ -140,8 +142,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       on_picker_open = function(on_picker_open_opts) end
     }
     
-    local ff = require "ff"
-    vim.keymap.set("n", "<leader>ff", ff.find, { desc = "Fuzzy find with ff", })
+    vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff", })
     
     vim.api.nvim_create_autocmd({ "FileType", }, {
       pattern = "ff-picker",
@@ -201,7 +202,7 @@ like:
         "MiniFilesActionMove",
       },
       callback = function()
-        ff.refresh_files_cache()
+        require "ff".refresh_files_cache()
       end,
     })
 <
@@ -221,7 +222,6 @@ these.
     }
     
     local ff = require "ff"
-    ff.setup()
     
     vim.keymap.set("n", "<leader>ff", function()
       local curr_bufname = vim.api.nvim_buf_get_name(0)

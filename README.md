@@ -39,6 +39,8 @@ Enable the `vim.g.ff.benchmark_step` and `vim.g.ff.benchmark_mean` options to tr
 ```lua
 -- defaults:
 vim.g.ff = {
+  -- automatically call `setup()` on startup
+  auto_setup = true,
   -- "setup"|"find"
   refresh_files_cache = "setup",
   -- benchmark each keystroke
@@ -101,8 +103,7 @@ vim.g.ff = {
   on_picker_open = function(on_picker_open_opts) end
 }
 
-local ff = require "ff"
-vim.keymap.set("n", "<leader>ff", ff.find, { desc = "Fuzzy find with ff", })
+vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff", })
 
 vim.api.nvim_create_autocmd({ "FileType", }, {
   pattern = "ff-picker",
@@ -152,7 +153,7 @@ vim.api.nvim_create_autocmd("User", {
     "MiniFilesActionMove",
   },
   callback = function()
-    ff.refresh_files_cache()
+    require "ff".refresh_files_cache()
   end,
 })
 ```
@@ -170,7 +171,6 @@ vim.g.ff = {
 }
 
 local ff = require "ff"
-ff.setup()
 
 vim.keymap.set("n", "<leader>ff", function()
   local curr_bufname = vim.api.nvim_buf_get_name(0)
