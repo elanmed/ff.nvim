@@ -185,15 +185,17 @@ vim.keymap.set("n", "<leader>ff", function()
     }
     local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
 
-    vim.cmd "vnew"
-    vim.bo.buftype = "nofile"
-    vim.bo.bufhidden = "wipe"
+    local bufnr = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_open_win(bufnr, true, {
+      split = "right",
+    })
+    vim.api.nvim_set_option_value("buftype", "nofile", { buf = bufnr, })
+    vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr, })
     vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
   end)
 
   ff.print_mean_benchmarks()
 end)
-
 ```
 
 ### `get_weighted_files`
