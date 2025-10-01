@@ -10,12 +10,12 @@ function M.check()
     })
   end
 
-  local fzy_ok = pcall(require, "fzy-lua-native")
-  if fzy_ok then
-    vim.health.ok "fzy-lua-native is installed"
+  local fzf_ok = pcall(require, "fzf_lib")
+  if fzf_ok then
+    vim.health.ok "telescope-fzf-native is installed"
   else
-    vim.health.error("fzy-lua-native is not installed", {
-      "Install fzy-lua-native: https://github.com/romgrk/fzy-lua-native",
+    vim.health.error("telescope-fzf-native is not installed", {
+      "Install telescope-fzf-native: https://github.com/nvim-telescope/telescope-fzf-native.nvim",
     })
   end
 
