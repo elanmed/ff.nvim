@@ -610,7 +610,7 @@ P.get_icon_info = function(opts)
     if mini_icons_ok then
       return {
         get_icon = function(path)
-          return mini_icons.get("file", path)
+          return mini_icons.get("extension", path)
         end,
       }
     end
