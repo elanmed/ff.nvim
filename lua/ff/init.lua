@@ -826,7 +826,6 @@ P.highlight_weighted_files = function(opts)
     end
 
     local file_offset = weighted_file.formatted_filename:find "|"
-    L.benchmark_step("start", "highlight_weighted_files highlight hl_idxs (entire loop)")
     for _, hl_idx in ipairs(weighted_file.hl_idxs) do
       local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
 
@@ -838,7 +837,6 @@ P.highlight_weighted_files = function(opts)
         { row_0_indexed, file_char_hl_col_0_indexed + 1, }
       )
     end
-    L.benchmark_step("end", "highlight_weighted_files highlight hl_idxs (entire loop)")
 
     if gopts.batch_size and idx % gopts.batch_size == 0 then
       coroutine.yield()
