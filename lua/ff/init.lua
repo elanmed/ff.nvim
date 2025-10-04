@@ -535,11 +535,13 @@ M.refresh_frecency_cache = function()
   for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
     if not H.readable(abs_path) then goto continue end
     local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
+    P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
     P.caches.frecency_file_to_score[abs_path] = score
     table.insert(P.caches.frecency_files, abs_path)
 
     ::continue::
   end
+  P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
   L.benchmark_step("end", "Calculate frecency_file_to_score (entire loop)", { record_mean = false, })
   L.benchmark_step_closing()
 end
