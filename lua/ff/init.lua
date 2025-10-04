@@ -533,10 +533,8 @@ M.refresh_frecency_cache = function()
   local now = os.time()
   L.benchmark_step("start", "Calculate frecency_file_to_score (entire loop)")
   for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
-    local score
-
     if not H.readable(abs_path) then goto continue end
-    score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
+    local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
     P.caches.frecency_file_to_score[abs_path] = score
     table.insert(P.caches.frecency_files, abs_path)
 
@@ -553,16 +551,13 @@ M.refresh_open_buffers_cache = function()
   L.benchmark_step_heading "refresh_open_buffers_cache"
   L.benchmark_step("start", "Calculate open_buffer_to_modified (entire loop)")
   for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
-    local buf_name = nil
-    local modified = nil
-
     if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
     if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then goto continue end
-    buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
+    local buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
     if buf_name == "" then goto continue end
     if not vim.startswith(buf_name, H.cwd) then goto continue end
 
-    modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
+    local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
     P.caches.open_buffer_to_modified[buf_name] = modified
 
     ::continue::
