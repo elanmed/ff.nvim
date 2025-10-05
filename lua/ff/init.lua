@@ -388,8 +388,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @return FFOpts
 P.defaulted_gopts = function()
-  L.benchmark_step("start", "defaulted_gopts")
-
   local opts = H.default(vim.g.ff, {})
   opts = vim.deepcopy(opts)
 
@@ -449,8 +447,6 @@ P.defaulted_gopts = function()
   opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
   opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
   opts.auto_setup = H.default(opts.auto_setup, true)
-
-  L.benchmark_step("end", "defaulted_gopts", { print_step = false, })
   return opts
 end
 
