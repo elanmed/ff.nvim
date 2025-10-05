@@ -1112,7 +1112,7 @@ M.find = function()
       if P.preview_active then return end
 
       vim.api.nvim_win_call(results_win, function()
-        if vim.api.nvim_win_get_cursor(results_win)[1] == vim.api.nvim_buf_line_count(results_buf) then
+        if vim.fn.line "." == vim.fn.line "$" then
           vim.cmd "normal! gg"
         else
           vim.cmd "normal! j"
@@ -1124,7 +1124,7 @@ M.find = function()
       if P.preview_active then return end
 
       vim.api.nvim_win_call(results_win, function()
-        if vim.api.nvim_win_get_cursor(results_win)[1] == 1 then
+        if vim.fn.line "." == 1 then
           vim.cmd "normal! G"
         else
           vim.cmd "normal! k"
@@ -1142,10 +1142,7 @@ M.find = function()
       end
 
       P.preview_active = not P.preview_active
-      local result
-      vim.api.nvim_win_call(results_win, function()
-        result = vim.api.nvim_get_current_line()
-      end)
+      local result = vim.api.nvim_win_call(results_win, vim.api.nvim_get_current_line)
       if #result == 0 then return end
 
       vim.api.nvim_win_set_buf(results_win, preview_buf)
