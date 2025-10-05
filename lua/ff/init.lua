@@ -622,7 +622,7 @@ P.get_icon_info = function(opts)
     }
   end
 
-  local icon_char, icon_hl = icon_library.get_icon(ext)
+  local icon_char, icon_hl = icon_library.get_icon(opts.abs_path)
   if ext then
     P.caches.icon_cache[ext] = { icon_char = icon_char, icon_hl = icon_hl, }
   end
