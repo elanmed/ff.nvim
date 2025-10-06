@@ -450,6 +450,32 @@ P.defaulted_gopts = function()
   return opts
 end
 
+--- @class RunBatchOpts
+--- @field fn function
+--- @field on_complete? function
+--- @opts opts RunBatchOpts
+P.run_batch = function(opts)
+  local gopts = P.defaulted_gopts()
+  if gopts.batch_size == false then
+    opts.fn()
+    if opts.on_complete then opts.on_complete() end
+    return
+  end
+
+  local co = coroutine.create(opts.fn)
+
+  local function step()
+    coroutine.resume(co)
+    if coroutine.status(co) == "suspended" then
+      vim.schedule(step)
+    elseif opts.on_complete then
+      opts.on_complete()
+    end
+  end
+
+  step()
+end
+
 --- @param abs_path string
 --- @param score number
 --- @param icon_char string|nil
@@ -494,26 +520,37 @@ P.caches = {
   weighted_files_per_query = {},
 }
 
-P.refresh_files_cache = function()
+--- @param opts? {on_complete: function}
+P.refresh_files_cache = function(opts)
+  opts = opts or {}
   L.benchmark_step_heading "refresh_files_cache"
-  L.benchmark_step("start", "refresh_files_cache (entire function)")
+  P.caches.find_files = {}
   local gopts = P.defaulted_gopts()
-  local find_cmd_tbl = vim.split(gopts.find_cmd, " ")
-  vim.system(find_cmd_tbl, { text = true, }, function(obj)
-    P.caches.find_files = {}
-    local lines = vim.split(obj.stdout, "\n")
-    for _, abs_path in ipairs(lines) do
-      if #abs_path == 0 then goto continue end
-      table.insert(P.caches.find_files, vim.fs.normalize(abs_path))
+  L.benchmark_step("start", "find_cmd vim.fn.systemlist")
+  local lines = vim.fn.systemlist(gopts.find_cmd)
+  L.benchmark_step("end", "find_cmd vim.fn.systemlist")
+  P.run_batch {
+    fn = function()
+      L.benchmark_step("start", "refresh_files_cache (entire loop)")
+      for idx, abs_path in ipairs(lines) do
+        if #abs_path == 0 then goto continue end
+        table.insert(P.caches.find_files, vim.fs.normalize(abs_path))
 
-      ::continue::
-    end
-    L.benchmark_step("end", "refresh_files_cache (entire function)", { record_mean = false, })
-    L.benchmark_step_closing()
-  end)
+        if gopts.batch_size and idx % gopts.batch_size == 0 then
+          coroutine.yield()
+        end
+
+        ::continue::
+      end
+      L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
+      L.benchmark_step_closing()
+    end,
+    on_complete = opts.on_complete,
+  }
 end
 
-M.refresh_frecency_cache = function()
+--- @param opts {on_complete: function}
+M.refresh_frecency_cache = function(opts)
   L.benchmark_step_heading "refresh_frecency_cache"
   P.caches.frecency_files = {}
   P.caches.frecency_file_to_score = {}
@@ -526,20 +563,34 @@ M.refresh_frecency_cache = function()
   end
   L.benchmark_step("end", "dated_files file read", { record_mean = false, })
 
-  local now = os.time()
-  L.benchmark_step("start", "Calculate frecency_file_to_score (entire loop)")
-  for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
-    if not H.readable(abs_path) then goto continue end
-    local score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
-    P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
-    P.caches.frecency_file_to_score[abs_path] = score
-    table.insert(P.caches.frecency_files, abs_path)
+  local gopts = P.defaulted_gopts()
+  P.run_batch {
+    fn = function()
+      local now = os.time()
+      L.benchmark_step("start", "Calculate frecency_file_to_score (entire loop)")
+      local idx = 1
+      for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
+        local score
 
-    ::continue::
-  end
-  P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
-  L.benchmark_step("end", "Calculate frecency_file_to_score (entire loop)", { record_mean = false, })
-  L.benchmark_step_closing()
+        if not H.readable(abs_path) then goto continue end
+        score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
+        P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
+        P.caches.frecency_file_to_score[abs_path] = score
+        table.insert(P.caches.frecency_files, abs_path)
+
+        if gopts.batch_size and idx % gopts.batch_size == 0 then
+          coroutine.yield()
+        end
+
+        ::continue::
+        idx = idx + 1
+      end
+      P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
+      L.benchmark_step("end", "Calculate frecency_file_to_score (entire loop)", { record_mean = false, })
+      L.benchmark_step_closing()
+    end,
+    on_complete = opts.on_complete,
+  }
 end
 
 M.refresh_open_buffers_cache = function()
@@ -1077,12 +1128,20 @@ M.find = function()
   vim.schedule(
     function()
       if gopts.refresh_files_cache == "find" then
-        P.refresh_files_cache()
+        P.refresh_files_cache {
+          on_complete = function()
+            M.refresh_open_buffers_cache()
+            M.refresh_frecency_cache {
+              on_complete = function() get_find_files_with_query "" end,
+            }
+          end,
+        }
+      else
+        M.refresh_open_buffers_cache()
+        M.refresh_frecency_cache {
+          on_complete = function() get_find_files_with_query "" end,
+        }
       end
-      M.refresh_open_buffers_cache()
-      M.refresh_frecency_cache()
-
-      get_find_files_with_query ""
     end
   )
 
