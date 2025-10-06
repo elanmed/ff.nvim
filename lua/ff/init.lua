@@ -523,18 +523,12 @@ P.scale_fuzzy_to_frecency = function(opts)
   )
   local max_score = max_weights + P.MAX_FRECENCY_SCORE
 
-  if opts.fuzzy_score <= -1e9 then return 0 end
-  if opts.fuzzy_score >= 1e9 then return max_score end
-  -- scale to [-1, 1]
-  local norm = math.tanh(opts.fuzzy_score / (#opts.target * max_score))
-  -- scale to [0, max_score]
-  local scaled = (norm + 1) * (max_score / 2)
-
-  -- penalize short queries in long targets
-  local density = #opts.query / #opts.target
-  local short_penalty = math.pow(density, 0.6)
-
-  return math.max(0, math.min(max_score, scaled * short_penalty))
+  local score_per_char = opts.fuzzy_score / #opts.query
+  local midpoint = 900
+  local steepness = 0.02
+  local function sigmoid(x) return 1 / (1 + math.exp(-x)) end
+  local sigmoid_scaled = sigmoid((score_per_char - midpoint) * steepness)
+  return math.floor(sigmoid_scaled * max_score)
 end
 
 P.caches = {
