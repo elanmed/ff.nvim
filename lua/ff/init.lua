@@ -453,10 +453,18 @@ end
 --- @class RunBatchOpts
 --- @field fn function
 --- @field on_complete? function
---- @opts opts RunBatchOpts
+--- @field curr_tick? number
+
+--- @param opts RunBatchOpts
 P.run_batch = function(opts)
   local gopts = P.defaulted_gopts()
   if gopts.batch_size == false then
+    if opts.curr_tick and P.tick ~= opts.curr_tick then
+      L.benchmark_step_interrupted()
+      L.benchmark_step_closing()
+      return
+    end
+
     opts.fn()
     if opts.on_complete then opts.on_complete() end
     return
@@ -465,6 +473,12 @@ P.run_batch = function(opts)
   local co = coroutine.create(opts.fn)
 
   local function step()
+    if opts.curr_tick and P.tick ~= opts.curr_tick then
+      L.benchmark_step_interrupted()
+      L.benchmark_step_closing()
+      return
+    end
+
     coroutine.resume(co)
     if coroutine.status(co) == "suspended" then
       vim.schedule(step)
@@ -902,52 +916,34 @@ P.get_find_files = function(opts)
   L.benchmark_step("start", "Total per keystroke")
 
   local gopts = P.defaulted_gopts()
-  local process_files = coroutine.create(function()
-    local weighted_files = M.get_weighted_files {
-      query = opts.query,
-      curr_bufname = opts.curr_bufname,
-      alternate_bufname = opts.alternate_bufname,
-    }
+  P.run_batch {
+    curr_tick = opts.curr_tick,
+    fn = function()
+      local weighted_files = M.get_weighted_files {
+        query = opts.query,
+        curr_bufname = opts.curr_bufname,
+        alternate_bufname = opts.alternate_bufname,
+      }
 
-    if P.tick ~= opts.curr_tick then
-      L.benchmark_step_interrupted()
-      L.benchmark_step_closing()
-      return
-    end
+      L.benchmark_step_heading "Process weighted files"
 
-    L.benchmark_step_heading "Process weighted files"
+      L.benchmark_step("start", "Render results")
+      opts.render_results(weighted_files)
+      L.benchmark_step("end", "Render results")
 
-    L.benchmark_step("start", "Render results")
-    opts.render_results(weighted_files)
-    L.benchmark_step("end", "Render results")
+      if not gopts.hl_enabled then
+        L.benchmark_step("end", "Total per keystroke")
+        L.benchmark_step_closing()
+        return
+      end
 
-    if not gopts.hl_enabled then
+      vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
+      P.highlight_weighted_files { weighted_files = weighted_files, results_buf = opts.results_buf, }
+
       L.benchmark_step("end", "Total per keystroke")
       L.benchmark_step_closing()
-      return
-    end
-
-    vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
-    P.highlight_weighted_files { weighted_files = weighted_files, results_buf = opts.results_buf, }
-
-    L.benchmark_step("end", "Total per keystroke")
-    L.benchmark_step_closing()
-  end)
-
-  local function continue_processing()
-    if P.tick ~= opts.curr_tick then
-      L.benchmark_step_interrupted()
-      L.benchmark_step_closing()
-      return
-    end
-    coroutine.resume(process_files)
-
-    if coroutine.status(process_files) == "suspended" then
-      vim.schedule(continue_processing)
-    end
-  end
-
-  vim.schedule(continue_processing)
+    end,
+  }
 end
 
 --- @param win number
