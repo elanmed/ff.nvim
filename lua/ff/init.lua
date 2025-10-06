@@ -1171,7 +1171,6 @@ M.find = function()
   local function close()
     vim.api.nvim_buf_clear_namespace(results_buf, P.ns_id, 0, -1)
     vim.api.nvim_win_close(input_win, true)
-    vim.api.nvim_win_close(results_win, true)
     M.print_mean_benchmarks()
     vim.cmd "stopinsert"
   end
@@ -1180,8 +1179,7 @@ M.find = function()
     ResultSelect = function()
       if P.preview_active then return end
 
-      vim.api.nvim_set_current_win(results_win)
-      local result = vim.api.nvim_get_current_line()
+      local result = vim.api.nvim_win_call(results_win, vim.api.nvim_get_current_line)
       if #result == 0 then return end
       close()
       vim.cmd("edit " .. vim.split(result, "|")[2])
@@ -1259,6 +1257,15 @@ M.find = function()
     })
   end
   vim.api.nvim_set_option_value("filetype", "ff-picker", { buf = input_buf, })
+
+  vim.api.nvim_create_autocmd("WinClosed", {
+    pattern = tostring(input_win),
+    callback = function()
+      if vim.api.nvim_win_is_valid(results_win) then
+        vim.api.nvim_win_close(results_win, true)
+      end
+    end,
+  })
 
   vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI", }, {
     group = vim.api.nvim_create_augroup("FFPicker", { clear = true, }),
