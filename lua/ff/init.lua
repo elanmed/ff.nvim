@@ -528,7 +528,7 @@ P.scale_fuzzy_to_frecency = function(opts)
   local steepness = 0.02
   local function sigmoid(x) return 1 / (1 + math.exp(-x)) end
   local sigmoid_scaled = sigmoid((score_per_char - midpoint) * steepness)
-  return math.floor(sigmoid_scaled * max_score)
+  return sigmoid_scaled * max_score
 end
 
 P.caches = {
