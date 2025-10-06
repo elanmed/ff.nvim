@@ -17,7 +17,7 @@ A small, fast fuzzy finder with intelligent weights.
 ## Performance
 `ff.nvim` prioritizes performance in a few ways:
 
-- Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
+- Large tables are iterated in batches w/coroutines to avoid blocking the picker UI
 - New searches interrupt ongoing processing for previous searches
 - A max of `vim.g.ff.max_results_considered` files with a fuzzy match are processed
     - `matchfuzzypos` is quick to exclude entries without a match but slow(er) to calculate a match's score. For shorter

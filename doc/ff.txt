@@ -50,7 +50,7 @@ PERFORMANCE                                                   *ff-performance*
 
 `ff.nvim` prioritizes performance in a few ways:
 
-- Files are weighted and sorted in batches w/coroutines to avoid blocking the
+- Large tables are iterated in batches w/coroutines to avoid blocking the
   picker UI
 - New searches interrupt ongoing processing for previous searches
 - A max of `vim.g.ff.max_results_considered` files with a fuzzy match are
