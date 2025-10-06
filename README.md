@@ -2,10 +2,9 @@
 
 A small, fast fuzzy finder with intelligent weights.
 
-- **Small**: ~1200 LOC, 1 source file, 1 test file
+- **Small**: ~1300 LOC, 1 source file, 1 test file
 - **Fast**: Average ~20ms per keystroke on a codebase of 60k files
-- **Fuzzy**: Uses `telescope-fzf-native.nvim` to fuzzy match against the current input
-    - Allows matching with the `fzf` search [syntax](https://github.com/junegunn/fzf#search-syntax)
+- **Fuzzy**: Uses the native `matchfuzzypos` to fuzzy match against the current input
 - **Intelligent weights**: Sorts the results by considering:
     - Open buffers
     - Modified buffers
@@ -279,7 +278,6 @@ function
 - Scroll the preview up half a page
 
 ## Deps
-- [`telescope-fzf-native.nvim`](https://github.com/nvim-telescope/telescope-fzf-native.nvim)
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
     - Or `false` passed as `vim.g.ff.icons_enabled`
 - [`fd`](https://github.com/sharkdp/fd) 

@@ -615,7 +615,7 @@ T["P"]["highlight_weighted_files"]["should apply highlights to buffer"] = functi
   local weighted_files = { {
     formatted_filename = "12.34 📄 |init.lua",
     icon_hl = "TestIconHL",
-    hl_idxs = { 1, 5, },
+    match_idxs = { 1, 5, },
   }, }
 
   vim.g.ff = { max_results_rendered = 1, }

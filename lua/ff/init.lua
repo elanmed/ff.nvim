@@ -507,11 +507,34 @@ P.format_filename = function(abs_path, score, icon_char)
   )
 end
 
---- @param fuzzy_score number
---- @param query string
-P.scale_fzf_to_frecency = function(fuzzy_score, query)
-  local max_fzf_score = 8 + 24 * #query
-  return fuzzy_score / max_fzf_score * P.MAX_FRECENCY_SCORE
+--- @class ScaleFuzzyToFrecencyOpts
+--- @field fuzzy_score number
+--- @field query string
+--- @field target string
+--- @field weights Weights
+--- @param opts ScaleFuzzyToFrecencyOpts
+P.scale_fuzzy_to_frecency = function(opts)
+  local max_weights = math.max(
+    opts.weights.alternate_buf_boost,
+    opts.weights.basename_boost,
+    opts.weights.current_buf_boost,
+    opts.weights.modified_buf_boost,
+    opts.weights.open_buf_boost
+  )
+  local max_score = max_weights + P.MAX_FRECENCY_SCORE
+
+  if opts.fuzzy_score <= -1e9 then return 0 end
+  if opts.fuzzy_score >= 1e9 then return max_score end
+  -- scale to [-1, 1]
+  local norm = math.tanh(opts.fuzzy_score / (#opts.target * max_score))
+  -- scale to [0, max_score]
+  local scaled = (norm + 1) * (max_score / 2)
+
+  -- penalize short queries in long targets
+  local density = #opts.query / #opts.target
+  local short_penalty = math.pow(density, 0.6)
+
+  return math.max(0, math.min(max_score, scaled * short_penalty))
 end
 
 P.caches = {
@@ -635,7 +658,7 @@ end
 --- @field weighted_score number
 --- @field fuzzy_score number
 --- @field buf_and_frecency_score number
---- @field hl_idxs table
+--- @field match_idxs table
 --- @field icon_char string
 --- @field icon_hl string
 --- @field formatted_filename string
@@ -709,43 +732,42 @@ M.get_weighted_files = function(opts)
     return P.caches.weighted_files_per_query[opts.query]
   end
 
-  local fzf = require "fzf_lib"
-  local slab = fzf.allocate_slab()
-
   --- @type WeightedFile[]
   local weighted_files_for_query = {}
 
   --- @param abs_path string
-  local function get_weighted_file(abs_path, slab_arg)
+  local function get_weighted_file_for_empty_query(abs_path)
     local rel_path = H.rel_path(abs_path)
-    if #opts.query == 0 then
-      local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = gopts.icons_enabled, }
+    local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = gopts.icons_enabled, }
 
-      local frecency_score = 0
-      if P.caches.frecency_file_to_score[abs_path] ~= nil then
-        frecency_score = P.caches.frecency_file_to_score[abs_path]
-      end
-      return {
-        abs_path = abs_path,
-        rel_path = rel_path,
-        weighted_score = frecency_score,
-        buf_and_frecency_score = 0,
-        fuzzy_score = 0,
-        hl_idxs = {},
-        icon_hl = icon_info.icon_hl,
-        icon_char = icon_info.icon_char,
-        formatted_filename = P.format_filename(abs_path, frecency_score, icon_info.icon_char),
-      }
+    local frecency_score = 0
+    if P.caches.frecency_file_to_score[abs_path] ~= nil then
+      frecency_score = P.caches.frecency_file_to_score[abs_path]
     end
+    return {
+      abs_path = abs_path,
+      rel_path = rel_path,
+      weighted_score = frecency_score,
+      buf_and_frecency_score = 0,
+      fuzzy_score = 0,
+      match_idxs = {},
+      icon_hl = icon_info.icon_hl,
+      icon_char = icon_info.icon_char,
+      formatted_filename = P.format_filename(abs_path, frecency_score, icon_info.icon_char),
+    }
+  end
 
-    local smart_case_mode = 0
-    local pattern_obj = fzf.parse_pattern(opts.query, smart_case_mode)
-    local fzf_score = fzf.get_score(rel_path, pattern_obj, slab_arg)
-
-    if fzf_score == 0 then
-      fzf.free_pattern(pattern_obj)
-      return nil
-    end
+  --- @param abs_path string
+  --- @param fuzzy_score number
+  --- @param match_idxs number[]
+  local function get_weighted_file(abs_path, fuzzy_score, match_idxs)
+    local rel_path = H.rel_path(abs_path)
+    local scaled_fzf_score = P.scale_fuzzy_to_frecency {
+      fuzzy_score = fuzzy_score,
+      query = opts.query,
+      target = rel_path,
+      weights = gopts.weights,
+    }
 
     local buf_score = 0
     local basename_with_ext = H.basename(abs_path, { with_ext = true, })
@@ -772,75 +794,80 @@ M.get_weighted_files = function(opts)
       buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_path]
     end
 
-    local scaled_fzf_score = P.scale_fzf_to_frecency(fzf_score, opts.query)
     local weighted_score =
         gopts.fuzzy_score_multiple * scaled_fzf_score +
         gopts.file_score_multiple * buf_and_frecency_score
 
     local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = gopts.icons_enabled, }
-    local hl_idxs = {}
-    if gopts.hl_enabled then
-      local pos = fzf.get_pos(rel_path, pattern_obj, slab_arg)
-      if pos then hl_idxs = pos end
-    end
 
-    fzf.free_pattern(pattern_obj)
     return {
       abs_path = abs_path,
       rel_path = rel_path,
       weighted_score = weighted_score,
       fuzzy_score = scaled_fzf_score,
       buf_and_frecency_score = buf_and_frecency_score,
-      hl_idxs = hl_idxs,
+      match_idxs = gopts.hl_enabled and match_idxs or {},
       icon_hl = icon_info.icon_hl,
       icon_char = icon_info.icon_char,
       formatted_filename = P.format_filename(abs_path, weighted_score, icon_info.icon_char),
     }
   end
 
-  local max_results = (function()
-    if opts.query == "" then
-      return gopts.max_results_rendered
-    end
-    return gopts.max_results_considered
-  end)()
+  local all_files = vim.deepcopy(P.caches.frecency_files)
+  vim.list_extend(all_files, P.caches.find_files)
 
-  L.benchmark_step("start", "Populate weighted files with frecency (entire loop)")
-  for idx, abs_path in pairs(P.caches.frecency_files) do
-    if #weighted_files_for_query >= max_results then break end
+  local seen = {}
 
-    local weighted_file = get_weighted_file(abs_path, slab)
-    if weighted_file then
+  if #opts.query == 0 then
+    L.benchmark_step("start", "Populated weighted_files for empty query")
+    for idx, abs_path in ipairs(all_files) do
+      if #weighted_files_for_query >= gopts.max_results_rendered then break end
+
+      if seen[abs_path] then goto continue end
+      seen[abs_path] = true
+      local weighted_file = get_weighted_file_for_empty_query(abs_path)
       table.insert(weighted_files_for_query, weighted_file)
-    end
 
-    if gopts.batch_size and idx % gopts.batch_size == 0 then
-      coroutine.yield()
+      if gopts.batch_size and idx % gopts.batch_size == 0 then
+        coroutine.yield()
+      end
+
+      ::continue::
     end
+    L.benchmark_step("end", "Populated weighted_files for empty query")
+  else
+    L.benchmark_step("start", "Populated weighted_files for populated query")
+    local start_idx = 1
+    while start_idx <= #all_files and #weighted_files_for_query < gopts.max_results_considered do
+      local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
+      local end_idx = math.min(start_idx + batch_size - 1, #all_files)
+      local chunk = vim.list_slice(all_files, start_idx, end_idx)
+      local rel_path_chunk = vim.tbl_map(function(abs_path) return H.rel_path(abs_path) end, chunk)
+
+      local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
+
+      for idx, rel_path in ipairs(matched_files) do
+        local abs_path = H.cwd .. "/" .. rel_path
+        if #weighted_files_for_query >= gopts.max_results_considered then break end
+
+        if seen[abs_path] then goto continue end
+        seen[abs_path] = true
+        local fuzzy_score = match_scores[idx]
+        local match_idxs = match_idxs_tbl[idx]
+        local weighted_file = get_weighted_file(abs_path, fuzzy_score, match_idxs)
+        table.insert(weighted_files_for_query, weighted_file)
+
+        ::continue::
+      end
+
+      start_idx = end_idx + 1
+
+      if gopts.batch_size then
+        coroutine.yield()
+      end
+    end
+    L.benchmark_step("end", "Populated weighted_files for populated query")
   end
-  L.benchmark_step("end", "Populate weighted files with frecency (entire loop)")
-
-  L.benchmark_step("start", "Populate weighted files with fd (entire loop)")
-  for idx, abs_path in ipairs(P.caches.find_files) do
-    if #weighted_files_for_query >= max_results then break end
-    if P.caches.frecency_file_to_score[abs_path] ~= nil then
-      goto continue
-    end
-
-    local weighted_file = get_weighted_file(abs_path, slab)
-    if weighted_file then
-      table.insert(weighted_files_for_query, weighted_file)
-    end
-
-    if gopts.batch_size and idx % gopts.batch_size == 0 then
-      coroutine.yield()
-    end
-
-    ::continue::
-  end
-  L.benchmark_step("end", "Populate weighted files with fd (entire loop)")
-
-  fzf.free_slab(slab)
 
   L.benchmark_step("start", "Sort weighted files")
   table.sort(weighted_files_for_query, function(a, b)
@@ -884,8 +911,8 @@ P.highlight_weighted_files = function(opts)
     end
 
     local file_offset = weighted_file.formatted_filename:find "|"
-    for _, hl_idx in ipairs(weighted_file.hl_idxs) do
-      local file_char_hl_col_0_indexed = hl_idx + file_offset - 1
+    for _, hl_idx in ipairs(weighted_file.match_idxs) do
+      local file_char_hl_col_0_indexed = hl_idx + file_offset
 
       vim.hl.range(
         opts.results_buf,
