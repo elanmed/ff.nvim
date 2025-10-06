@@ -20,6 +20,8 @@ A small, fast fuzzy finder with intelligent weights.
 - Files are weighted and sorted in batches w/coroutines to avoid blocking the picker UI
 - New searches interrupt ongoing processing for previous searches
 - A max of `vim.g.ff.max_results_considered` files with a fuzzy match are processed
+    - `matchfuzzypos` is quick to exclude entries without a match but slow(er) to calculate a match's score. For shorter
+    queries with many matches, capping the fuzzy matches at `vim.g.ff.max_results_considered` is an effective heuristic 
     - Frecent files are checked for a fuzzy match first, then files from `fd`
     - For empty inputs, a max of `vim.g.ff.max_results_rendered` files are processed
 - Extensive caching:
