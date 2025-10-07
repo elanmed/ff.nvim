@@ -354,6 +354,7 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @class FFOpts
 --- @field weights? Weights
+--- @field matchfuzzypos_sigmoid? MatchFuzzyPosSigmoid
 --- @field batch_size? number | false
 --- @field hl_enabled? boolean
 --- @field icons_enabled? boolean
@@ -386,6 +387,10 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field current_buf_boost? number
 --- @field basename_boost? number
 
+--- @class MatchFuzzyPosSigmoid
+--- @field steepness? number
+--- @field midpoint? number
+
 --- @return FFOpts
 P.defaulted_gopts = function()
   local opts = H.default(vim.g.ff, {})
@@ -397,6 +402,10 @@ P.defaulted_gopts = function()
   opts.weights.alternate_buf_boost = H.default(opts.weights.alternate_buf_boost, 30)
   opts.weights.basename_boost = H.default(opts.weights.basename_boost, 40)
   opts.weights.current_buf_boost = H.default(opts.weights.current_buf_boost, -1000)
+
+  opts.matchfuzzypos_sigmoid = H.default(opts.matchfuzzypos_sigmoid, {})
+  opts.matchfuzzypos_sigmoid.steepness = H.default(opts.matchfuzzypos_sigmoid.steepness, 0.02)
+  opts.matchfuzzypos_sigmoid.midpoint = H.default(opts.matchfuzzypos_sigmoid.midpoint, 900)
 
   opts.batch_size = H.default(opts.batch_size, 250)
   opts.hl_enabled = H.default(opts.hl_enabled, true)
@@ -512,6 +521,7 @@ end
 --- @field query string
 --- @field target string
 --- @field weights Weights
+--- @field matchfuzzypos_sigmoid MatchFuzzyPosSigmoid
 --- @param opts ScaleFuzzyToFrecencyOpts
 P.scale_fuzzy_to_frecency = function(opts)
   local max_weights = math.max(
@@ -524,10 +534,11 @@ P.scale_fuzzy_to_frecency = function(opts)
   local max_score = max_weights + P.MAX_FRECENCY_SCORE
 
   local score_per_char = opts.fuzzy_score / #opts.query
-  local midpoint = 900
-  local steepness = 0.02
   local function sigmoid(x) return 1 / (1 + math.exp(-x)) end
-  local sigmoid_scaled = sigmoid((score_per_char - midpoint) * steepness)
+  local sigmoid_scaled = sigmoid(
+    (score_per_char - opts.matchfuzzypos_sigmoid.midpoint) *
+    opts.matchfuzzypos_sigmoid.steepness
+  )
   return sigmoid_scaled * max_score
 end
 
@@ -761,6 +772,7 @@ M.get_weighted_files = function(opts)
       query = opts.query,
       target = rel_path,
       weights = gopts.weights,
+      matchfuzzypos_sigmoid = gopts.matchfuzzypos_sigmoid,
     }
 
     local buf_score = 0

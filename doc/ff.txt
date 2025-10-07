@@ -92,6 +92,12 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       find_cmd = "fd --absolute-path --type f",
       -- call vim.notify when a file's frecency score is updated
       notify_frecency_update = false
+      -- configuration options for the sigmoid function that scales the result of matchfuzzypos
+      -- to a range of [0, max_frecency_score + max_weights_score]
+      matchfuzzypos_sigmoid = {
+        midpoint = 900,
+        steepness = 0.02,
+      },
       weights = {
         open_buf_boost = 10,
         modified_buf_boost = 20,
