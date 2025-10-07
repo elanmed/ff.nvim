@@ -588,7 +588,6 @@ P.refresh_files_cache = function(opts)
       end
       L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
       L.benchmark_step_closing()
-      vim.notify("[ff.nvim] refreshed the files cache", vim.log.levels.INFO)
     end,
     on_complete = opts.on_complete,
   }
