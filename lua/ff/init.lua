@@ -568,9 +568,11 @@ P.refresh_files_cache = function(opts)
   L.benchmark_step_heading "refresh_files_cache"
   P.caches.find_files = {}
   local gopts = P.defaulted_gopts()
+
   L.benchmark_step("start", "find_cmd vim.fn.systemlist")
   local lines = vim.fn.systemlist(gopts.find_cmd)
   L.benchmark_step("end", "find_cmd vim.fn.systemlist")
+
   P.run_batch {
     fn = function()
       L.benchmark_step("start", "refresh_files_cache (entire loop)")
@@ -586,6 +588,7 @@ P.refresh_files_cache = function(opts)
       end
       L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
       L.benchmark_step_closing()
+      vim.notify("[ff.nvim] refreshed the files cache", vim.log.levels.INFO)
     end,
     on_complete = opts.on_complete,
   }
