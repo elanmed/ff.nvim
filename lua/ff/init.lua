@@ -781,7 +781,10 @@ M.get_weighted_files = function(opts)
     local basename_with_ext = H.basename(abs_path, { with_ext = true, })
     local basename_without_ext = H.basename(abs_path, { with_ext = false, })
 
-    if opts.query == basename_with_ext or opts.query == basename_without_ext then
+    if opts.query == basename_with_ext or
+        opts.query == basename_without_ext or
+        opts.query:gsub("%L", "") == basename_without_ext:gsub("%L", "")
+    then
       buf_score = gopts.weights.basename_boost
     elseif P.caches.open_buffer_to_modified[abs_path] ~= nil then
       local modified = P.caches.open_buffer_to_modified[abs_path]

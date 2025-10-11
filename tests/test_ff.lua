@@ -422,7 +422,7 @@ local weighted_file_js = {
 
 --- @type WeightedFile
 local weighted_file_ts = {
-  abs_path = "path/to/dir/mod.ts",
+  abs_path = "path/to/dir/mod_file.ts",
   rel_path = "mod.ts",
   buf_and_frecency_score = 50,
   formatted_filename = "57.00 󰛦 |mod.ts",
@@ -525,6 +525,16 @@ T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boo
   vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { basename_boost = 400, }, }
   local res = M.get_weighted_files {
     query = "init",
+  }
+  MiniTest.expect.equality(#res, 1)
+  MiniTest.expect.equality(res[1].buf_and_frecency_score, 400)
+end
+T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the alphabetic basename matches excluding the extension"] = function()
+  P.caches.find_files = { weighted_file_ts.abs_path, }
+
+  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { basename_boost = 400, }, }
+  local res = M.get_weighted_files {
+    query = "modfile",
   }
   MiniTest.expect.equality(#res, 1)
   MiniTest.expect.equality(res[1].buf_and_frecency_score, 400)
