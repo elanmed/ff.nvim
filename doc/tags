@@ -2,6 +2,7 @@ ff-<plug>ffclose	ff.txt	/*ff-<plug>ffclose*
 ff-<plug>ffpreviewscrolldown	ff.txt	/*ff-<plug>ffpreviewscrolldown*
 ff-<plug>ffpreviewscrollup	ff.txt	/*ff-<plug>ffpreviewscrollup*
 ff-<plug>ffpreviewtoggle	ff.txt	/*ff-<plug>ffpreviewtoggle*
+ff-<plug>ffresultdeletefrecencyscore	ff.txt	/*ff-<plug>ffresultdeletefrecencyscore*
 ff-<plug>ffresultnext	ff.txt	/*ff-<plug>ffresultnext*
 ff-<plug>ffresultprev	ff.txt	/*ff-<plug>ffresultprev*
 ff-<plug>ffresultselect	ff.txt	/*ff-<plug>ffresultselect*

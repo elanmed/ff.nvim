@@ -1,4 +1,4 @@
-*ff.txt*                                          Last change: 2025 October 05
+*ff.txt*                                          Last change: 2025 October 06
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -20,6 +20,7 @@ Plug remaps ................................................. |ff-plug-remaps|
 `<Plug>FFResultSelect` ............................. |ff-<plug>ffresultselect|
 `<Plug>FFResultNext` ................................. |ff-<plug>ffresultnext|
 `<Plug>FFResultPrev` ................................. |ff-<plug>ffresultprev|
+`<Plug>FFResultDeleteFrecencyScore` ... |ff-<plug>ffresultdeletefrecencyscore|
 `<Plug>FFClose` ........................................... |ff-<plug>ffclose|
 `<Plug>FFPreviewToggle` ........................... |ff-<plug>ffpreviewtoggle|
 `<Plug>FFPreviewScrollDown` ................... |ff-<plug>ffpreviewscrolldown|
@@ -158,6 +159,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
         vim.keymap.set("i", "<cr>", "<Plug>FFResultSelect", { buffer = true, })
         vim.keymap.set("i", "<c-n>", "<Plug>FFResultNext", { buffer = true, })
         vim.keymap.set("i", "<c-p>", "<Plug>FFResultPrev", { buffer = true, })
+        vim.keymap.set("i", "<c-x>", "<Plug>FFResultDeleteFrecencyScore", { buffer = true, })
         vim.keymap.set("i", "<esc>", "<Plug>FFClose", { buffer = true, })
         vim.keymap.set("i", "<tab>", "<Plug>FFPreviewToggle", { buffer = true, })
         vim.keymap.set("i", "<c-d>", "<Plug>FFPreviewScrollDown", { buffer = true, })
@@ -347,6 +349,12 @@ PLUG REMAPS                                                   *ff-plug-remaps*
 `<PLUG>FFRESULTPREV`                                   *ff-<plug>ffresultprev*
 
 - Move the cursor to the prev result
+
+                                                                              
+`<PLUG>FFRESULTDELETEFRECENCYSCORE`     *ff-<plug>ffresultdeletefrecencyscore*
+
+- Delete the frecency score of the current result and reload the search
+  results
 
                                                                               
 `<PLUG>FFCLOSE`                                             *ff-<plug>ffclose*
