@@ -180,15 +180,15 @@ end
 
 --- @class UpdateFileScoreOpts
 --- @field update_type "increase" | "remove"
---- @field _db_dir? string
+--- @field db_dir? string
 
 --- @param abs_path string
 --- @param opts UpdateFileScoreOpts
 F.update_file_score = function(abs_path, opts)
   local now = F._now()
 
-  opts._db_dir = H.default(opts._db_dir, F.default_db_dir)
-  local dated_files_path = F.get_dated_files_path(opts._db_dir)
+  opts.db_dir = H.default(opts.db_dir, F.default_db_dir)
+  local dated_files_path = F.get_dated_files_path(opts.db_dir)
   local dated_files = F.read(dated_files_path)
   if dated_files[H.cwd] == nil then
     dated_files[H.cwd] = {}
@@ -1218,6 +1218,22 @@ M.find = function()
         end
         vim.cmd "redraw"
       end)
+    end,
+    ResultDeleteFrecencyScore = function()
+      local result = vim.api.nvim_win_call(results_win, vim.api.nvim_get_current_line)
+      if #result == 0 then return end
+      local rel_path = vim.split(result, "|")[2]
+      local abs_path = vim.fs.joinpath(H.cwd, rel_path)
+      local should_refresh = P.caches.frecency_file_to_score[abs_path] ~= nil
+      F.update_file_score(abs_path, { update_type = "remove", })
+      if should_refresh then
+        M.refresh_open_buffers_cache()
+        M.refresh_frecency_cache {
+          on_complete = function()
+            get_find_files_with_query(vim.api.nvim_get_current_line())
+          end,
+        }
+      end
     end,
     Close = close,
     PreviewToggle = function()

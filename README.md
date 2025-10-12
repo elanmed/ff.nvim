@@ -118,6 +118,7 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
     vim.keymap.set("i", "<cr>", "<Plug>FFResultSelect", { buffer = true, })
     vim.keymap.set("i", "<c-n>", "<Plug>FFResultNext", { buffer = true, })
     vim.keymap.set("i", "<c-p>", "<Plug>FFResultPrev", { buffer = true, })
+    vim.keymap.set("i", "<c-x>", "<Plug>FFResultDeleteFrecencyScore", { buffer = true, })
     vim.keymap.set("i", "<esc>", "<Plug>FFClose", { buffer = true, })
     vim.keymap.set("i", "<tab>", "<Plug>FFPreviewToggle", { buffer = true, })
     vim.keymap.set("i", "<c-d>", "<Plug>FFPreviewScrollDown", { buffer = true, })
@@ -272,6 +273,9 @@ function
 
 #### `<Plug>FFResultPrev`
 - Move the cursor to the prev result
+
+#### `<Plug>FFResultDeleteFrecencyScore`
+- Delete the frecency score of the current result and reload the search results
 
 #### `<Plug>FFClose`
 - Close the picker

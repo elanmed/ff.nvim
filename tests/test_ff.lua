@@ -112,8 +112,8 @@ end
 T["F"] = MiniTest.new_set()
 
 local root_dir = vim.fs.joinpath(vim.fn.getcwd(), "test-ff")
-local _db_dir = vim.fs.joinpath(root_dir, "db-dir")
-local dated_files_path = F.get_dated_files_path(_db_dir)
+local db_dir = vim.fs.joinpath(root_dir, "db-dir")
+local dated_files_path = F.get_dated_files_path(db_dir)
 
 local cwd = vim.fs.joinpath(root_dir, "files")
 local test_file_a = vim.fs.joinpath(cwd, "test-file-a.txt")
@@ -159,7 +159,7 @@ T["F"]["#update_file_score"]["update_type=increase"] = MiniTest.new_set()
 T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new file"] = function()
   F._now = function() return now end
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -171,7 +171,7 @@ end
 T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeated calls"] = function()
   F._now = function() return now end
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -182,7 +182,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeat
 
   F._now = function() return now_after_30_min end
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -196,7 +196,7 @@ end
 T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores when adding a new file"] = function()
   F._now = function() return now end
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -207,7 +207,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
 
   F._now = function() return now_after_30_min end
   F.update_file_score(test_file_b, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -224,7 +224,7 @@ end
 T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = function()
   F._now = function() return now end
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -237,7 +237,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = 
 
   F._now = function() return now_after_30_min end
   F.update_file_score(test_file_b, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -256,7 +256,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted file
 
   vim.fn.delete(test_file_a)
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -269,7 +269,7 @@ end
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories"] = function()
   F._now = function() return now end
   F.update_file_score(test_dir_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -284,7 +284,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories 
 
   vim.fn.delete(test_dir_a)
   F.update_file_score(test_dir_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
     stat_file = true,
   })
@@ -299,7 +299,7 @@ T["F"]["#update_file_score"]["update_type=remove"] = MiniTest.new_set()
 T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing file"] = function()
   F._now = function() return now end
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "increase",
   })
 
@@ -307,7 +307,7 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
 
   F._now = function() return now end
   F.update_file_score(test_file_a, {
-    _db_dir = _db_dir,
+    db_dir = db_dir,
     update_type = "remove",
   })
 
