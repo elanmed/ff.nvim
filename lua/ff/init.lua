@@ -1034,10 +1034,14 @@ M.setup = function()
       local current_win = vim.api.nvim_get_current_win()
       local is_buf_normal = vim.api.nvim_win_get_config(current_win).relative == ""
       if not is_buf_normal then return end
-      local abs_path = vim.fs.normalize(vim.api.nvim_buf_get_name(ev.buf))
-      local rel_path = vim.fs.relpath(H.cwd, abs_path)
-      if abs_path == "" then return end
+      local bufname = vim.api.nvim_buf_get_name(ev.buf)
+      if bufname == "" then return end
+
+      local abs_path = vim.fs.normalize(bufname)
+      if not vim.startswith(abs_path, H.cwd) then return end
       if last_updated_abs_file == abs_path then return end
+
+      local rel_path = vim.fs.relpath(H.cwd, abs_path)
 
       timer_id = vim.fn.timer_start(1000, function()
         last_updated_abs_file = abs_path
