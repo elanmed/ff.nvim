@@ -2,10 +2,12 @@
 
 A small, fast fuzzy finder with intelligent weights.
 
+![demo](https://elanmed.dev/nvim-plugins/ff.png)
+
 - **Small**: ~1300 LOC, 1 source file, 1 test file
 - **Fast**: Average ~20ms per keystroke on a codebase of 60k files
 - **Fuzzy**: Uses the native `matchfuzzypos` to fuzzy match against the current input
-- **Intelligent weights**: Sorts the results by considering:
+- **Intelligent**: Sorts the results by considering:
     - Open buffers
     - Modified buffers
     - The alternate buffer
