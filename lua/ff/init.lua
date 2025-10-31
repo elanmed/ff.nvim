@@ -426,7 +426,9 @@ P.defaulted_gopts = function()
   local results_row = input_row - input_height - (border_height * 2) - 1
 
   opts.max_results_rendered = H.default(opts.max_results_rendered, results_height * 2)
-  opts.input_win_config = H.default(opts.input_win_config, {
+
+  opts.input_win_config = H.default(opts.input_win_config, {})
+  opts.input_win_config = vim.tbl_deep_extend("force", {
     style = "minimal",
     anchor = "SW",
     relative = "editor",
@@ -436,8 +438,10 @@ P.defaulted_gopts = function()
     col = 0,
     border = "rounded",
     title = "Input",
-  })
-  opts.results_win_config = H.default(opts.results_win_config, {
+  }, opts.input_win_config)
+
+  opts.results_win_config = H.default(opts.results_win_config, {})
+  opts.results_win_config = vim.tbl_deep_extend("force", {
     style = "minimal",
     anchor = "SW",
     relative = "editor",
@@ -448,7 +452,7 @@ P.defaulted_gopts = function()
     border = "rounded",
     title = "Results",
     focusable = false,
-  })
+  }, opts.results_win_config)
 
   opts.benchmark_step = H.default(opts.benchmark_step, false)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
