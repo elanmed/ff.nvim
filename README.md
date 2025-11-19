@@ -31,9 +31,9 @@ A small, fast fuzzy finder with intelligent weights.
   - `fd` is executed once and cached when `setup()` is called
   - Frecency scores are calculated once and cached when `find()` is called
   - Info on open buffers are pulled once and cached when `find()` is called
-  - Icons are cached by extension to avoid calling `mini.icons` when possible
   - Results are cached for each user input (instant backspace search)
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
+- Only the icons for the top `vim.g.ff.max_results_rendered` results are calculated
 - Icons and highlights can be disabled for especially large codebases
 
 With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files.
@@ -199,7 +199,11 @@ vim.keymap.set("n", "<leader>ff", function()
       curr_bufname = curr_bufname,
       alternate_bufname = alternate_bufname,
     }
-    local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
+    local decorated_files = ff.get_decorated_files {
+      query = query or "",
+      weighted_files = weighted_files
+    }
+    local lines = vim.tbl_map(function(decorated_file) return decorated_file.formatted_filename end, decorated_files)
 
     local bufnr = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_open_win(bufnr, true, {
@@ -219,14 +223,10 @@ end)
 ```lua
 --- @class WeightedFile
 --- @field abs_path string
---- @field rel_path string
---- @field weighted_score number fuzzy_score_multiple * fuzzy_score + file_score_multiple * buf_and_frecency_score
+--- @field weighted_score number
 --- @field fuzzy_score number
 --- @field buf_and_frecency_score number
---- @field hl_idxs table the indexes of the `rel_path` that are fuzzy matched
---- @field icon_char string
---- @field icon_hl string
---- @field formatted_filename string
+--- @field match_idxs table
 
 --- @class GetWeightedFilesOpts
 --- @field query string
@@ -237,6 +237,30 @@ end)
 --- @return WeightedFile[]
 require "ff".get_weighted_files(opts)
 ```
+
+- Calculates the scores for each file in the files cache
+- The files can be sorted using the `weighted_score` field
+
+
+### `get_decorated_files`
+```lua
+--- @class DecoratedFile: WeightedFile
+--- @field rel_path string
+--- @field icon_char string
+--- @field icon_hl string
+--- @field formatted_filename string
+
+--- @class GetDecoratedFilesOpts
+--- @field query string
+--- @field weighted_files WeightedFile[]
+
+--- @param opts GetDecoratedFilesOpts
+--- @return DecoratedFile[]
+require "ff".get_decorated_files = function(opts)
+```
+
+- Calculates the "decorations" for each file in the `weighted_files` param
+- Only the top `n` results of `get_weighted_files` should be passed to `get_decorated_files` to avoid wasted work
 
 
 ### `refresh_frecency_cache`
@@ -271,7 +295,6 @@ require "ff".print_mean_benchmarks()
 
 ## Plug remaps
 
-
 #### `<Plug>FFResultSelect`
 - Select a result, close the picker, and edit the selected file
 
@@ -304,12 +327,12 @@ require "ff".print_mean_benchmarks()
 - Scroll the preview up half a page
 
 
+
 ## Deps
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
   - Or `false` passed as `vim.g.ff.icons_enabled`
 - [`fd`](https://github.com/sharkdp/fd)
   - Or a custom cli command passed as `vim.g.ff.find_cmd`
-
 
 ## TODO
 - [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
@@ -317,6 +340,7 @@ require "ff".print_mean_benchmarks()
 
 ## Features excluded for simplicity
 - Multi-select
+
 
 
 ## Similar plugins

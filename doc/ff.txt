@@ -1,4 +1,4 @@
-*ff.txt*                                          Last change: 2025 October 31
+*ff.txt*                                         Last change: 2025 November 18
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -11,6 +11,7 @@ API ................................................................. |ff-api|
 `refresh_files_cache` ............................... |ff-refresh_files_cache|
 Using another picker as a frontend for `ff.nvim`  |ff-using-another-picker-as-a-frontend-for-`ff.nvim|
 `get_weighted_files` ................................. |ff-get_weighted_files|
+`get_decorated_files` ............................... |ff-get_decorated_files|
 `refresh_frecency_cache` ......................... |ff-refresh_frecency_cache|
 `refresh_open_buffers_cache` ................. |ff-refresh_open_buffers_cache|
 `reset_benchmarks` ..................................... |ff-reset_benchmarks|
@@ -66,10 +67,11 @@ PERFORMANCE                                                   *ff-performance*
 - Extensive caching: - `fd` is executed once and cached when `setup()` is
   called - Frecency scores are calculated once and cached when `find()` is
   called - Info on open buffers are pulled once and cached when `find()` is
-  called - Icons are cached by extension to avoid calling `mini.icons` when
-  possible - Results are cached for each user input (instant backspace search)
+  called - Results are cached for each user input (instant backspace search)
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results
   window, preventing unecessary highlighting
+- Only the icons for the top `vim.g.ff.max_results_rendered` results are
+  calculated
 - Icons and highlights can be disabled for especially large codebases
 With these optimizations in place, I average around 20ms per keystroke on a
 codebase of 60k files. Enable the `vim.g.ff.benchmark_step` and
@@ -248,7 +250,11 @@ these.
           curr_bufname = curr_bufname,
           alternate_bufname = alternate_bufname,
         }
-        local lines = vim.tbl_map(function(weighted_file) return weighted_file.formatted_filename end, weighted_files)
+        local decorated_files = ff.get_decorated_files {
+          query = query or "",
+          weighted_files = weighted_files
+        }
+        local lines = vim.tbl_map(function(decorated_file) return decorated_file.formatted_filename end, decorated_files)
     
         local bufnr = vim.api.nvim_create_buf(false, true)
         vim.api.nvim_open_win(bufnr, true, {
@@ -269,14 +275,10 @@ these.
 >lua
     --- @class WeightedFile
     --- @field abs_path string
-    --- @field rel_path string
-    --- @field weighted_score number fuzzy_score_multiple * fuzzy_score + file_score_multiple * buf_and_frecency_score
+    --- @field weighted_score number
     --- @field fuzzy_score number
     --- @field buf_and_frecency_score number
-    --- @field hl_idxs table the indexes of the `rel_path` that are fuzzy matched
-    --- @field icon_char string
-    --- @field icon_hl string
-    --- @field formatted_filename string
+    --- @field match_idxs table
     
     --- @class GetWeightedFilesOpts
     --- @field query string
@@ -287,6 +289,30 @@ these.
     --- @return WeightedFile[]
     require "ff".get_weighted_files(opts)
 <
+- Calculates the scores for each file in the files cache
+- The files can be sorted using the `weighted_score` field
+
+                                                                              
+`GET_DECORATED_FILES`                                 *ff-get_decorated_files*
+
+>lua
+    --- @class DecoratedFile: WeightedFile
+    --- @field rel_path string
+    --- @field icon_char string
+    --- @field icon_hl string
+    --- @field formatted_filename string
+    
+    --- @class GetDecoratedFilesOpts
+    --- @field query string
+    --- @field weighted_files WeightedFile[]
+    
+    --- @param opts GetDecoratedFilesOpts
+    --- @return DecoratedFile[]
+    require "ff".get_decorated_files = function(opts)
+<
+- Calculates the "decorations" for each file in the `weighted_files` param
+- Only the top `n` results of `get_weighted_files` should be passed to
+  `get_decorated_files` to avoid wasted work
 
                                                                               
 `REFRESH_FRECENCY_CACHE`                           *ff-refresh_frecency_cache*
