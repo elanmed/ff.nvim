@@ -32,6 +32,7 @@ A small, fast fuzzy finder with intelligent weights.
   - Frecency scores are calculated once and cached when `find()` is called
   - Info on open buffers are pulled once and cached when `find()` is called
   - Results are cached for each user input (instant backspace search)
+  - Icons are cached by extension to avoid calling the icon library when possible
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
 - Only the icons for the top `vim.g.ff.max_results_rendered` results are calculated
 - Icons and highlights can be disabled for especially large codebases

@@ -67,7 +67,9 @@ PERFORMANCE                                                   *ff-performance*
 - Extensive caching: - `fd` is executed once and cached when `setup()` is
   called - Frecency scores are calculated once and cached when `find()` is
   called - Info on open buffers are pulled once and cached when `find()` is
-  called - Results are cached for each user input (instant backspace search)
+  called - Results are cached for each user input (instant backspace search) -
+  Icons are cached by extension to avoid calling the icon library when
+  possible
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results
   window, preventing unecessary highlighting
 - Only the icons for the top `vim.g.ff.max_results_rendered` results are
