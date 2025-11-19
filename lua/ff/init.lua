@@ -366,7 +366,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field results_win_config? vim.api.keyset.win_config
 --- @field results_win_opts? vim.wo
 --- @field preview_win_opts? vim.wo
---- @field on_picker_open? fun(opts:OnPickerOpenOpts):nil
 --- @field refresh_files_cache? "setup"|"find"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
@@ -413,7 +412,6 @@ P.defaulted_gopts = function()
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
   opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
-  opts.on_picker_open = H.default(opts.on_picker_open, function() end)
 
   opts.results_win_opts = H.default(opts.results_win_opts, {})
   opts.preview_win_opts = H.default(opts.preview_win_opts, {})
@@ -1060,8 +1058,8 @@ M.setup = function()
       end)
     end,
   })
-  vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { link = "Search", })
-  vim.api.nvim_set_hl(0, "FFPickerCursorLine", { link = "CursorLine", })
+  vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { default = true, link = "Search", })
+  vim.api.nvim_set_hl(0, "FFPickerCursorLine", { default = true, link = "CursorLine", })
 end
 
 M.refresh_files_cache = function()
@@ -1138,13 +1136,6 @@ M.find = function()
   local input_win = vim.api.nvim_open_win(input_buf, false, gopts.input_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf, })
   vim.api.nvim_set_current_win(input_win)
-
-  gopts.on_picker_open {
-    input_buf = input_buf,
-    input_win = input_win,
-    results_buf = results_buf,
-    results_win = results_win,
-  }
 
   vim.cmd "startinsert"
 

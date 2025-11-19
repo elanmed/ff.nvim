@@ -8,13 +8,14 @@ A small, fast fuzzy finder with intelligent weights.
 - **Fast**: Average ~20ms per keystroke on a codebase of 60k files
 - **Fuzzy**: Uses the native `matchfuzzypos` to fuzzy match against the current input
 - **Intelligent**: Sorts the results by considering:
-    - Open buffers
-    - Modified buffers
-    - The alternate buffer
-    - The current buffer
-    - The frecency (frequent + recently opened) score of a result
-    - The basename of a result (with and without an extension)
-    - The fuzzy score of a result
+  - Open buffers
+  - Modified buffers
+  - The alternate buffer
+  - The current buffer
+  - The frecency (frequent + recently opened) score of a result
+  - The basename of a result (with and without an extension)
+  - The fuzzy score of a result
+
 
 ## Performance
 `ff.nvim` prioritizes performance in a few ways:
@@ -22,21 +23,22 @@ A small, fast fuzzy finder with intelligent weights.
 - Large tables are iterated in batches w/coroutines to avoid blocking the picker UI
 - New searches interrupt ongoing processing for previous searches
 - A max of `vim.g.ff.max_results_considered` files with a fuzzy match are processed
-    - `matchfuzzypos` is quick to exclude entries without a match but slow(er) to calculate a match's score. For shorter
-    queries with many matches, capping the fuzzy matches at `vim.g.ff.max_results_considered` is an effective heuristic 
-    - Frecent files are checked for a fuzzy match first, then files from `fd`
-    - For empty inputs, a max of `vim.g.ff.max_results_rendered` files are processed
+  - `matchfuzzypos` is quick to exclude entries without a match but slow(er) to calculate a match's score. For shorter
+    queries with many matches, capping the fuzzy matches at `vim.g.ff.max_results_considered` is an effective heuristic
+  - Frecent files are checked for a fuzzy match first, then files from `fd`
+  - For empty inputs, a max of `vim.g.ff.max_results_rendered` files are processed
 - Extensive caching:
-    - `fd` is executed once and cached when `setup()` is called
-    - Frecency scores are calculated once and cached when `find()` is called
-    - Info on open buffers are pulled once and cached when `find()` is called
-    - Icons are cached by extension to avoid calling `mini.icons` when possible
-    - Results are cached for each user input (instant backspace search)
+  - `fd` is executed once and cached when `setup()` is called
+  - Frecency scores are calculated once and cached when `find()` is called
+  - Info on open buffers are pulled once and cached when `find()` is called
+  - Icons are cached by extension to avoid calling `mini.icons` when possible
+  - Results are cached for each user input (instant backspace search)
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files. 
+With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files.
 Enable the `vim.g.ff.benchmark_step` and `vim.g.ff.benchmark_mean` options to try yourself
+
 
 ## Configuration example
 ```lua
@@ -109,7 +111,6 @@ vim.g.ff = {
   results_win_opts = {},
   -- vim.wo
   preview_win_opts = {},
-  on_picker_open = function(on_picker_open_opts) end
 }
 
 vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff", })
@@ -133,7 +134,7 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 
 ### `setup`
 
-```lua 
+```lua
 require "ff".setup()
 ```
 
@@ -141,16 +142,18 @@ By default, `setup()` is automatically on startup. This can be disabled by setti
 `setup()` still needs to be called manually.
 
 ### `find`
-```lua 
+
+```lua
 require "ff".find()
 ```
+
 
 ### `refresh_files_cache`
 ```lua
 require "ff".refresh_files_cache()
 ```
 
-By default, `refresh_files_cache()` is called once when `setup()` is run. When performing actions on the file system, 
+By default, `refresh_files_cache()` is called once when `setup()` is run. When performing actions on the file system,
 it can be helpful to refresh the cache so the picker shows the latest files. This can be done with an autocommand like:
 
 ```lua
@@ -211,6 +214,7 @@ vim.keymap.set("n", "<leader>ff", function()
 end)
 ```
 
+
 ### `get_weighted_files`
 ```lua
 --- @class WeightedFile
@@ -234,25 +238,30 @@ end)
 require "ff".get_weighted_files(opts)
 ```
 
+
 ### `refresh_frecency_cache`
 ```lua
 require "ff".refresh_frecency_cache()
 ```
+
 
 ### `refresh_open_buffers_cache`
 ```lua
 require "ff".refresh_open_buffers_cache()
 ```
 
+
 ### `reset_benchmarks`
 ```lua
 require "ff".reset_benchmarks()
 ```
 
+
 ### `print_mean_benchmarks`
 ```lua
 require "ff".print_mean_benchmarks()
 ```
+
 
 ## Highlight Groups
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
@@ -260,48 +269,55 @@ require "ff".print_mean_benchmarks()
 - `FFPickerCursorLine`: The current line in the results window
   - Defaults to `CursorLine`
 
-> [!NOTE]
-> The default highlight groups are set as a part of the `setup()` function. In order to successfully change a highlight group, make sure to override it
-_after_ calling `setup()`. This can be done either by calling `vim.api.nvim_set_hl` in the `after/plugin/` directory or in the `vim.g.ff.on_picker_open` 
-function
-
 ## Plug remaps
+
 
 #### `<Plug>FFResultSelect`
 - Select a result, close the picker, and edit the selected file
 
+
 #### `<Plug>FFResultNext`
 - Move the cursor to the next result
+
 
 #### `<Plug>FFResultPrev`
 - Move the cursor to the prev result
 
+
 #### `<Plug>FFResultDeleteFrecencyScore`
 - Delete the frecency score of the current result and reload the search results
+
 
 #### `<Plug>FFClose`
 - Close the picker
 
+
 #### `<Plug>FFPreviewToggle`
 - Toggle the preview for the file under the cursor
+
 
 #### `<Plug>FFPreviewScrollDown`
 - Scroll the preview down half a page
 
+
 #### `<Plug>FFPreviewScrollUp`
 - Scroll the preview up half a page
 
+
 ## Deps
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
-    - Or `false` passed as `vim.g.ff.icons_enabled`
-- [`fd`](https://github.com/sharkdp/fd) 
-    - Or a custom cli command passed as `vim.g.ff.find_cmd`
+  - Or `false` passed as `vim.g.ff.icons_enabled`
+- [`fd`](https://github.com/sharkdp/fd)
+  - Or a custom cli command passed as `vim.g.ff.find_cmd`
+
 
 ## TODO
 - [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
 
+
 ## Features excluded for simplicity
 - Multi-select
+
 
 ## Similar plugins
 - [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)

@@ -1,4 +1,4 @@
-*ff.txt*                                          Last change: 2025 October 11
+*ff.txt*                                          Last change: 2025 October 31
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -36,14 +36,16 @@ Similar plugins ......................................... |ff-similar-plugins|
 
 A small, fast fuzzy finder with intelligent weights.
 
+demo <https://elanmed.dev/nvim-plugins/ff.png>
+
 - **Small**: ~1300 LOC, 1 source file, 1 test file
 - **Fast**: Average ~20ms per keystroke on a codebase of 60k files
 - **Fuzzy**: Uses the native `matchfuzzypos` to fuzzy match against the
   current input
-- **Intelligent weights**: Sorts the results by considering: - Open buffers -
-  Modified buffers - The alternate buffer - The current buffer - The frecency
-  (frequent + recently opened) score of a result - The basename of a result
-  (with and without an extension) - The fuzzy score of a result
+- **Intelligent**: Sorts the results by considering: - Open buffers - Modified
+  buffers - The alternate buffer - The current buffer - The frecency (frequent
+  + recently opened) score of a result - The basename of a result (with and
+  without an extension) - The fuzzy score of a result
 
 ------------------------------------------------------------------------------
 PERFORMANCE                                                   *ff-performance*
@@ -148,7 +150,6 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       results_win_opts = {},
       -- vim.wo
       preview_win_opts = {},
-      on_picker_open = function(on_picker_open_opts) end
     }
     
     vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff", })
@@ -323,12 +324,6 @@ HIGHLIGHT GROUPS                                         *ff-highlight-groups*
   - Defaults to `Search`
 - `FFPickerCursorLine`: The current line in the results window - Defaults to
   `CursorLine`
-  [!NOTE] The default highlight groups are set as a part of the `setup()`
-  function. In order to successfully change a highlight group, make sure to
-  override it _after_ calling `setup()`. This can be done either by calling
-  `vim.api.nvim_set_hl` in the `after/plugin/` directory or in the
-  `vim.g.ff.on_picker_open` function
-
 
 ------------------------------------------------------------------------------
 PLUG REMAPS                                                   *ff-plug-remaps*
