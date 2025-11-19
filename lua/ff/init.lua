@@ -536,13 +536,19 @@ end
 
 P.caches = {
   --- @type string[]
-  find_files = {},
+  find_abs_paths = {},
 
   --- @type string[]
-  frecency_files = {},
+  find_rel_paths = {},
+
+  --- @type string[]
+  frecency_abs_paths = {},
+
+  --- @type string[]
+  frecency_rel_paths = {},
 
   --- @type table<string, number>
-  frecency_file_to_score = {},
+  frecency_abs_path_to_score = {},
 
   --- @type table<string, {icon_char: string, icon_hl: string|nil}>
   icon_cache = {},
@@ -558,7 +564,9 @@ P.caches = {
 P.refresh_files_cache = function(opts)
   opts = opts or {}
   L.benchmark_step_heading "refresh_files_cache"
-  P.caches.find_files = {}
+  P.caches.find_abs_paths = {}
+  P.caches.find_rel_paths = {}
+
   local gopts = P.defaulted_gopts()
 
   L.benchmark_step("start", "find_cmd vim.fn.systemlist")
@@ -570,7 +578,9 @@ P.refresh_files_cache = function(opts)
       L.benchmark_step("start", "refresh_files_cache (entire loop)")
       for idx, abs_path in ipairs(lines) do
         if #abs_path == 0 then goto continue end
-        table.insert(P.caches.find_files, vim.fs.normalize(abs_path))
+        local normalized_abs_path = vim.fs.normalize(abs_path)
+        table.insert(P.caches.find_abs_paths, normalized_abs_path)
+        table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
 
         if gopts.batch_size and idx % gopts.batch_size == 0 then
           coroutine.yield()
@@ -588,8 +598,9 @@ end
 --- @param opts {on_complete: function}
 M.refresh_frecency_cache = function(opts)
   L.benchmark_step_heading "refresh_frecency_cache"
-  P.caches.frecency_files = {}
-  P.caches.frecency_file_to_score = {}
+  P.caches.frecency_abs_paths = {}
+  P.caches.frecency_rel_paths = {}
+  P.caches.frecency_abs_path_to_score = {}
 
   L.benchmark_step("start", "dated_files file read")
   local dated_files_path = F.get_dated_files_path()
@@ -603,8 +614,8 @@ M.refresh_frecency_cache = function(opts)
   P.run_batch {
     fn = function()
       local now = os.time()
-      L.benchmark_step("start", "Calculate frecency_file_to_score (entire loop)")
-      local frecency_files_to_sort = {}
+      L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
+      local frecency_paths_to_sort = {}
 
       local idx = 1
       for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
@@ -613,8 +624,12 @@ M.refresh_frecency_cache = function(opts)
         if not H.readable(abs_path) then goto continue end
         score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
         P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
-        P.caches.frecency_file_to_score[abs_path] = score
-        table.insert(frecency_files_to_sort, { score = score, abs_path = abs_path, })
+        P.caches.frecency_abs_path_to_score[abs_path] = score
+        table.insert(frecency_paths_to_sort, {
+          score = score,
+          abs_path = abs_path,
+          rel_path = vim.fs.relpath(H.cwd, abs_path),
+        })
 
         if gopts.batch_size and idx % gopts.batch_size == 0 then
           coroutine.yield()
@@ -623,26 +638,35 @@ M.refresh_frecency_cache = function(opts)
         ::continue::
         idx = idx + 1
       end
-      L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_files")
+      L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_abs_paths")
       table.sort(
-        frecency_files_to_sort,
+        frecency_paths_to_sort,
         function(a, b)
           return a.score > b.score
         end
       )
-      L.benchmark_step("end", "Sort frecency files before setting to P.caches.frecency_files")
+      L.benchmark_step("end", "Sort frecency files before setting to P.caches.frecency_abs_paths")
 
-      L.benchmark_step("start", "Set P.caches.frecency_files (vim.tbl_map)")
-      P.caches.frecency_files = vim.tbl_map(
+      L.benchmark_step("start", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
+      P.caches.frecency_abs_paths = vim.tbl_map(
         function(frecency_file)
           return frecency_file.abs_path
         end,
-        frecency_files_to_sort
+        frecency_paths_to_sort
       )
-      L.benchmark_step("end", "Set P.caches.frecency_files (vim.tbl_map)")
+      L.benchmark_step("end", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
+
+      L.benchmark_step("start", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
+      P.caches.frecency_rel_paths = vim.tbl_map(
+        function(frecency_file)
+          return frecency_file.rel_path
+        end,
+        frecency_paths_to_sort
+      )
+      L.benchmark_step("end", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
 
       P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
-      L.benchmark_step("end", "Calculate frecency_file_to_score (entire loop)", { record_mean = false, })
+      L.benchmark_step("end", "Calculate frecency_abs_path_to_score (entire loop)", { record_mean = false, })
       L.benchmark_step_closing()
     end,
     on_complete = opts.on_complete,
@@ -741,10 +765,14 @@ M.get_decorated_files = function(opts)
   local decorated_files = {}
 
   for _, weighted_file in ipairs(sliced_weighted_files) do
+    -- TODO: this is still ~5ms
     local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = gopts.icons_enabled, }
     local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
-    local formatted_filename = P.format_filename(weighted_file.abs_path, weighted_file.weighted_score,
-      icon_info.icon_char)
+    local formatted_filename = P.format_filename(
+      weighted_file.abs_path,
+      weighted_file.weighted_score,
+      icon_info.icon_char
+    )
 
     table.insert(decorated_files, {
       abs_path = weighted_file.abs_path,
@@ -786,8 +814,8 @@ M.get_weighted_files = function(opts)
   --- @param abs_path string
   local function get_weighted_file_for_empty_query(abs_path)
     local frecency_score = 0
-    if P.caches.frecency_file_to_score[abs_path] ~= nil then
-      frecency_score = P.caches.frecency_file_to_score[abs_path]
+    if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+      frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
     end
     return {
       abs_path = abs_path,
@@ -833,8 +861,8 @@ M.get_weighted_files = function(opts)
     end
 
     local buf_and_frecency_score = buf_score
-    if P.caches.frecency_file_to_score[abs_path] ~= nil then
-      buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_file_to_score[abs_path]
+    if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+      buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_abs_path_to_score[abs_path]
     end
 
     local weighted_score =
@@ -850,14 +878,17 @@ M.get_weighted_files = function(opts)
     }
   end
 
-  local all_files = vim.deepcopy(P.caches.frecency_files)
-  vim.list_extend(all_files, P.caches.find_files)
+  local all_abs_paths = vim.deepcopy(P.caches.frecency_abs_paths)
+  vim.list_extend(all_abs_paths, P.caches.find_abs_paths)
+
+  local all_rel_paths = vim.deepcopy(P.caches.frecency_rel_paths)
+  vim.list_extend(all_rel_paths, P.caches.find_rel_paths)
 
   local seen = {}
 
   if #opts.query == 0 then
     L.benchmark_step("start", "Populate weighted_files for empty query")
-    for idx, abs_path in ipairs(all_files) do
+    for idx, abs_path in ipairs(all_abs_paths) do
       if #weighted_files_for_query >= gopts.max_results_rendered then break end
 
       if seen[abs_path] then goto continue end
@@ -876,12 +907,11 @@ M.get_weighted_files = function(opts)
     L.benchmark_step("start", "Populate weighted_files for populated query")
 
     local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
-    for start_idx = 1, #all_files, batch_size do
+    for start_idx = 1, #all_abs_paths, batch_size do
       if #weighted_files_for_query >= gopts.max_results_considered then break end
 
-      local end_idx = math.min(start_idx + batch_size - 1, #all_files)
-      local chunk = vim.list_slice(all_files, start_idx, end_idx)
-      local rel_path_chunk = vim.tbl_map(function(abs_path) return H.rel_path(abs_path) end, chunk)
+      local end_idx = math.min(start_idx + batch_size - 1, #all_abs_paths)
+      local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
 
       local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
 
@@ -1078,7 +1108,7 @@ M.setup = function()
           vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
         end
         F.update_file_score(abs_path, { update_type = "increase", })
-        if P.caches.frecency_file_to_score[abs_path] == nil then
+        if P.caches.frecency_abs_path_to_score[abs_path] == nil then
           P.refresh_files_cache()
         end
       end)
@@ -1250,7 +1280,7 @@ M.find = function()
       if #result == 0 then return end
       local rel_path = vim.split(result, "|")[2]
       local abs_path = vim.fs.joinpath(H.cwd, rel_path)
-      local should_refresh = P.caches.frecency_file_to_score[abs_path] ~= nil
+      local should_refresh = P.caches.frecency_abs_path_to_score[abs_path] ~= nil
       F.update_file_score(abs_path, { update_type = "remove", })
       if should_refresh then
         M.refresh_open_buffers_cache()
