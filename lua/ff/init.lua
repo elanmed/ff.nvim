@@ -886,7 +886,7 @@ M.get_weighted_files = function(opts)
       local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
 
       for idx, rel_path in ipairs(matched_files) do
-        local abs_path = H.cwd .. "/" .. rel_path
+        local abs_path = vim.fs.joinpath(H.cwd, rel_path)
         if #weighted_files_for_query >= gopts.max_results_considered then break end
 
         if seen[abs_path] then goto continue end
