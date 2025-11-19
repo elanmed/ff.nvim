@@ -874,9 +874,11 @@ M.get_weighted_files = function(opts)
     L.benchmark_step("end", "Populate weighted_files for empty query")
   else
     L.benchmark_step("start", "Populate weighted_files for populated query")
-    local start_idx = 1
-    while start_idx <= #all_files and #weighted_files_for_query < gopts.max_results_considered do
-      local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
+
+    local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
+    for start_idx = 1, #all_files, batch_size do
+      if #weighted_files_for_query >= gopts.max_results_considered then break end
+
       local end_idx = math.min(start_idx + batch_size - 1, #all_files)
       local chunk = vim.list_slice(all_files, start_idx, end_idx)
       local rel_path_chunk = vim.tbl_map(function(abs_path) return H.rel_path(abs_path) end, chunk)
@@ -897,12 +899,11 @@ M.get_weighted_files = function(opts)
         ::continue::
       end
 
-      start_idx = end_idx + 1
-
       if gopts.batch_size then
         coroutine.yield()
       end
     end
+
     L.benchmark_step("end", "Populate weighted_files for populated query")
   end
 
