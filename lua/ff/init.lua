@@ -604,6 +604,8 @@ M.refresh_frecency_cache = function(opts)
     fn = function()
       local now = os.time()
       L.benchmark_step("start", "Calculate frecency_file_to_score (entire loop)")
+      local frecency_files_to_sort = {}
+
       local idx = 1
       for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
         local score
@@ -612,7 +614,7 @@ M.refresh_frecency_cache = function(opts)
         score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
         P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
         P.caches.frecency_file_to_score[abs_path] = score
-        table.insert(P.caches.frecency_files, abs_path)
+        table.insert(frecency_files_to_sort, { score = score, abs_path = abs_path, })
 
         if gopts.batch_size and idx % gopts.batch_size == 0 then
           coroutine.yield()
@@ -621,6 +623,24 @@ M.refresh_frecency_cache = function(opts)
         ::continue::
         idx = idx + 1
       end
+      L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_files")
+      table.sort(
+        frecency_files_to_sort,
+        function(a, b)
+          return a.score > b.score
+        end
+      )
+      L.benchmark_step("end", "Sort frecency files before setting to P.caches.frecency_files")
+
+      L.benchmark_step("start", "Set P.caches.frecency_files (vim.tbl_map)")
+      P.caches.frecency_files = vim.tbl_map(
+        function(frecency_file)
+          return frecency_file.abs_path
+        end,
+        frecency_files_to_sort
+      )
+      L.benchmark_step("end", "Set P.caches.frecency_files (vim.tbl_map)")
+
       P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
       L.benchmark_step("end", "Calculate frecency_file_to_score (entire loop)", { record_mean = false, })
       L.benchmark_step_closing()
@@ -1198,7 +1218,7 @@ M.find = function()
       local result = vim.api.nvim_win_call(results_win, vim.api.nvim_get_current_line)
       if #result == 0 then return end
       close()
-      vim.cmd("edit " .. vim.split(result, "|")[2])
+      vim.cmd.edit(vim.split(result, "|")[2])
     end,
     ResultNext = function()
       if P.preview_active then return end
