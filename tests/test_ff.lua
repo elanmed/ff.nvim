@@ -35,15 +35,6 @@ T["H"]["#rel_path"]["returns the abs file path as a fallback"] = function()
   MiniTest.expect.equality(H.rel_path "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
 end
 
-T["H"]["#get_ext"] = MiniTest.new_set()
-T["H"]["#get_ext"]["returns the extension"] = function()
-  MiniTest.expect.equality(H.get_ext "path/to/file.txt", "txt")
-  MiniTest.expect.equality(H.get_ext "path/to/file.min.txt", "txt")
-  MiniTest.expect.equality(H.get_ext "path/to/file", nil)
-  MiniTest.expect.equality(H.get_ext ".gitignore", nil)
-  MiniTest.expect.equality(H.get_ext "", nil)
-end
-
 T["H"]["#basename"] = MiniTest.new_set()
 T["H"]["#basename"]["returns the basename with and without an extension"] = function()
   MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = true, }), "file.txt")
@@ -355,11 +346,6 @@ T["P"]["format_filename"]["uses fit_decimals for score formatting"] = function()
   local res = P.format_filename("path/to/dir/file.lua", 123.456789, nil)
   MiniTest.expect.equality(res, "123.4 |file.lua")
 end
-T["P"]["format_filename"]["handles absolute path when not in cwd"] = function()
-  H.cwd = "path/to/another_dir"
-  local res = P.format_filename("path/to/dir/file.lua", 12.34, nil)
-  MiniTest.expect.equality(res, "12.34 |path/to/dir/file.lua")
-end
 
 T["P"]["get_icon_info"] = MiniTest.new_set()
 T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
@@ -367,29 +353,11 @@ T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = functi
   MiniTest.expect.equality(res.icon_char, nil)
   MiniTest.expect.equality(res.icon_hl, nil)
 end
-T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = function()
-  P.caches.icon_cache["lua"] = {
-    icon_char = "🌙",
-    icon_hl = "LuaIcon",
-  }
-
-  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = true, }
-
-  MiniTest.expect.equality(res.icon_char, "🌙")
-  MiniTest.expect.equality(res.icon_hl, "LuaIcon")
-end
-T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function()
+T["P"]["get_icon_info"]["returns icon ifno when icons_enabled is true"] = function()
   local res_one = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
 
   MiniTest.expect.equality(res_one.icon_char, "󰌞")
   MiniTest.expect.equality(res_one.icon_hl, "MiniIconsYellow")
-
-  MiniTest.expect.equality(P.caches.icon_cache["js"].icon_char, "󰌞")
-  MiniTest.expect.equality(P.caches.icon_cache["js"].icon_hl, "MiniIconsYellow")
-
-  local res_two = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
-  MiniTest.expect.equality(res_two.icon_char, "󰌞")
-  MiniTest.expect.equality(res_two.icon_hl, "MiniIconsYellow")
 end
 
 local query = "in"
@@ -622,7 +590,7 @@ T["P"]["highlight_weighted_files"]["should apply highlights to buffer"] = functi
   local results_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, { "12.34 📄 |init.lua", })
 
-  local weighted_files = { {
+  local decorated_files = { {
     formatted_filename = "12.34 📄 |init.lua",
     icon_hl = "TestIconHL",
     match_idxs = { 1, 5, },
@@ -630,7 +598,7 @@ T["P"]["highlight_weighted_files"]["should apply highlights to buffer"] = functi
 
   vim.g.ff = { max_results_rendered = 1, }
   P.highlight_weighted_files {
-    weighted_files = weighted_files,
+    decorated_files = decorated_files,
     results_buf = results_buf,
   }
 

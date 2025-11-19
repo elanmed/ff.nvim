@@ -39,15 +39,6 @@ H.basename = function(path, opts)
   return basename
 end
 
---- @param abs_path string
-H.get_ext = function(abs_path)
-  local last_dot_pos = abs_path:find "%.[^.]*$"
-  if last_dot_pos and last_dot_pos > 1 then
-    return abs_path:sub(last_dot_pos + 1)
-  end
-  return nil
-end
-
 --- @param str string
 --- @param len number
 H.pad_str = function(str, len)
@@ -510,7 +501,7 @@ P.format_filename = function(abs_path, score, icon_char)
     P.MAX_SCORE_LEN
   )
   local formatted_icon_char = icon_char and icon_char .. " " or ""
-  local rel_path = H.rel_path(abs_path)
+  local rel_path = vim.fs.relpath(H.cwd, abs_path)
   return ("%s %s|%s"):format(
     formatted_score,
     formatted_icon_char,
@@ -521,7 +512,6 @@ end
 --- @class ScaleFuzzyToFrecencyOpts
 --- @field fuzzy_score number
 --- @field query string
---- @field target string
 --- @field weights Weights
 --- @field matchfuzzypos_sigmoid MatchFuzzyPosSigmoid
 --- @param opts ScaleFuzzyToFrecencyOpts
@@ -663,11 +653,13 @@ end
 
 --- @class WeightedFile
 --- @field abs_path string
---- @field rel_path string
 --- @field weighted_score number
 --- @field fuzzy_score number
 --- @field buf_and_frecency_score number
 --- @field match_idxs table
+
+--- @class DecoratedFile: WeightedFile
+--- @field rel_path string
 --- @field icon_char string
 --- @field icon_hl string
 --- @field formatted_filename string
@@ -681,14 +673,6 @@ P.get_icon_info = function(opts)
     return {
       icon_char = nil,
       icon_hl = nil,
-    }
-  end
-
-  local ext = H.get_ext(opts.abs_path)
-  if ext and P.caches.icon_cache[ext] then
-    return {
-      icon_char = P.caches.icon_cache[ext].icon_char,
-      icon_hl = P.caches.icon_cache[ext].icon_hl,
     }
   end
 
@@ -716,14 +700,49 @@ P.get_icon_info = function(opts)
   end
 
   local icon_char, icon_hl = icon_library.get_icon(opts.abs_path)
-  if ext then
-    P.caches.icon_cache[ext] = { icon_char = icon_char, icon_hl = icon_hl, }
-  end
 
   return {
     icon_char = icon_char,
     icon_hl = icon_hl,
   }
+end
+
+--- @class GetDecoratedFilesOpts
+--- @field query string
+--- @field weighted_files WeightedFile[]
+--- @param opts GetDecoratedFilesOpts
+M.get_decorated_files = function(opts)
+  L.benchmark_step_heading(("Get decorated_files for query: '%s'"):format(opts.query))
+  L.benchmark_step("start", "Get decorated_files")
+  local gopts = P.defaulted_gopts()
+  local sliced_weighted_files = vim.list_slice(opts.weighted_files, 1, gopts.max_results_rendered)
+
+  --- @type DecoratedFile[]
+  local decorated_files = {}
+
+  for _, weighted_file in ipairs(sliced_weighted_files) do
+    local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = gopts.icons_enabled, }
+    local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
+    local formatted_filename = P.format_filename(weighted_file.abs_path, weighted_file.weighted_score,
+      icon_info.icon_char)
+
+    table.insert(decorated_files, {
+      abs_path = weighted_file.abs_path,
+      weighted_score = weighted_file.weighted_score,
+      fuzzy_score = weighted_file.fuzzy_score,
+      buf_and_frecency_score = weighted_file.buf_and_frecency_score,
+      match_idxs = weighted_file.match_idxs,
+
+      rel_path = rel_path,
+      icon_char = icon_info.icon_char,
+      icon_hl = icon_info.icon_hl,
+      formatted_filename = formatted_filename,
+    })
+  end
+  L.benchmark_step("end", "Get decorated_files")
+  L.benchmark_step_closing()
+
+  return decorated_files
 end
 
 --- @class GetWeightedFilesOpts
@@ -746,23 +765,16 @@ M.get_weighted_files = function(opts)
 
   --- @param abs_path string
   local function get_weighted_file_for_empty_query(abs_path)
-    local rel_path = H.rel_path(abs_path)
-    local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = gopts.icons_enabled, }
-
     local frecency_score = 0
     if P.caches.frecency_file_to_score[abs_path] ~= nil then
       frecency_score = P.caches.frecency_file_to_score[abs_path]
     end
     return {
       abs_path = abs_path,
-      rel_path = rel_path,
       weighted_score = frecency_score,
       buf_and_frecency_score = 0,
       fuzzy_score = 0,
       match_idxs = {},
-      icon_hl = icon_info.icon_hl,
-      icon_char = icon_info.icon_char,
-      formatted_filename = P.format_filename(abs_path, frecency_score, icon_info.icon_char),
     }
   end
 
@@ -770,11 +782,9 @@ M.get_weighted_files = function(opts)
   --- @param fuzzy_score number
   --- @param match_idxs number[]
   local function get_weighted_file(abs_path, fuzzy_score, match_idxs)
-    local rel_path = H.rel_path(abs_path)
     local scaled_fzf_score = P.scale_fuzzy_to_frecency {
       fuzzy_score = fuzzy_score,
       query = opts.query,
-      target = rel_path,
       weights = gopts.weights,
       matchfuzzypos_sigmoid = gopts.matchfuzzypos_sigmoid,
     }
@@ -811,18 +821,12 @@ M.get_weighted_files = function(opts)
         gopts.fuzzy_score_multiple * scaled_fzf_score +
         gopts.file_score_multiple * buf_and_frecency_score
 
-    local icon_info = P.get_icon_info { abs_path = abs_path, icons_enabled = gopts.icons_enabled, }
-
     return {
       abs_path = abs_path,
-      rel_path = rel_path,
       weighted_score = weighted_score,
       fuzzy_score = scaled_fzf_score,
       buf_and_frecency_score = buf_and_frecency_score,
       match_idxs = gopts.hl_enabled and match_idxs or {},
-      icon_hl = icon_info.icon_hl,
-      icon_char = icon_info.icon_char,
-      formatted_filename = P.format_filename(abs_path, weighted_score, icon_info.icon_char),
     }
   end
 
@@ -832,7 +836,7 @@ M.get_weighted_files = function(opts)
   local seen = {}
 
   if #opts.query == 0 then
-    L.benchmark_step("start", "Populated weighted_files for empty query")
+    L.benchmark_step("start", "Populate weighted_files for empty query")
     for idx, abs_path in ipairs(all_files) do
       if #weighted_files_for_query >= gopts.max_results_rendered then break end
 
@@ -847,9 +851,9 @@ M.get_weighted_files = function(opts)
 
       ::continue::
     end
-    L.benchmark_step("end", "Populated weighted_files for empty query")
+    L.benchmark_step("end", "Populate weighted_files for empty query")
   else
-    L.benchmark_step("start", "Populated weighted_files for populated query")
+    L.benchmark_step("start", "Populate weighted_files for populated query")
     local start_idx = 1
     while start_idx <= #all_files and #weighted_files_for_query < gopts.max_results_considered do
       local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
@@ -879,7 +883,7 @@ M.get_weighted_files = function(opts)
         coroutine.yield()
       end
     end
-    L.benchmark_step("end", "Populated weighted_files for populated query")
+    L.benchmark_step("end", "Populate weighted_files for populated query")
   end
 
   L.benchmark_step("start", "Sort weighted files")
@@ -894,7 +898,7 @@ M.get_weighted_files = function(opts)
 end
 
 --- @class HighlightWeightedFilesOpts
---- @field weighted_files WeightedFile[]
+--- @field decorated_files DecoratedFile[]
 --- @field results_buf number
 --- @param opts HighlightWeightedFilesOpts
 P.highlight_weighted_files = function(opts)
@@ -906,25 +910,24 @@ P.highlight_weighted_files = function(opts)
   local icon_char_idx = formatted_score_last_idx + 2
 
   L.benchmark_step("start", "Highlight results")
-  for idx, weighted_file in ipairs(opts.weighted_files) do
-    if idx > gopts.max_results_rendered then break end
+  for idx, decorated_file in ipairs(opts.decorated_files) do
     local row_0_indexed = idx - 1
 
-    if weighted_file.icon_hl then
+    if decorated_file.icon_hl then
       local icon_hl_col_1_indexed = icon_char_idx
       local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
 
       vim.hl.range(
         opts.results_buf,
         P.ns_id,
-        weighted_file.icon_hl,
+        decorated_file.icon_hl,
         { row_0_indexed, icon_hl_col_0_indexed, },
         { row_0_indexed, icon_hl_col_0_indexed + 1, }
       )
     end
 
-    local file_offset = weighted_file.formatted_filename:find "|"
-    for _, hl_idx in ipairs(weighted_file.match_idxs) do
+    local file_offset = decorated_file.formatted_filename:find "|"
+    for _, hl_idx in ipairs(decorated_file.match_idxs) do
       local file_char_hl_col_0_indexed = hl_idx + file_offset
 
       vim.hl.range(
@@ -949,7 +952,7 @@ end
 --- @field curr_bufname string
 --- @field alternate_bufname string
 --- @field curr_tick number
---- @field render_results fun(weighted_files:WeightedFile[]):nil
+--- @field render_results fun(decorated_files:DecoratedFile[]):nil
 
 --- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
@@ -965,10 +968,12 @@ P.get_find_files = function(opts)
         alternate_bufname = opts.alternate_bufname,
       }
 
+      local decorated_files = M.get_decorated_files { weighted_files = weighted_files, query = opts.query, }
+
       L.benchmark_step_heading "Process weighted files"
 
       L.benchmark_step("start", "Render results")
-      opts.render_results(weighted_files)
+      opts.render_results(decorated_files)
       L.benchmark_step("end", "Render results")
 
       if not gopts.hl_enabled then
@@ -978,7 +983,7 @@ P.get_find_files = function(opts)
       end
 
       vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
-      P.highlight_weighted_files { weighted_files = weighted_files, results_buf = opts.results_buf, }
+      P.highlight_weighted_files { decorated_files = decorated_files, results_buf = opts.results_buf, }
 
       L.benchmark_step("end", "Total per keystroke")
       L.benchmark_step_closing()
@@ -1147,12 +1152,13 @@ M.find = function()
       curr_bufname = curr_bufname,
       alternate_bufname = alternate_bufname,
       curr_tick = P.tick,
-      render_results = function(weighted_files)
-        local formatted_filenames = {}
-        for idx, weighted_file in ipairs(weighted_files) do
-          if idx >= gopts.max_results_rendered then break end
-          table.insert(formatted_filenames, weighted_file.formatted_filename)
-        end
+      render_results = function(decorated_files)
+        local formatted_filenames = vim.tbl_map(
+          function(decorated_file)
+            return decorated_file.formatted_filename
+          end,
+          decorated_files
+        )
         vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, formatted_filenames)
       end,
     }
