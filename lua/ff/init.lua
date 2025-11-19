@@ -39,6 +39,15 @@ H.basename = function(path, opts)
   return basename
 end
 
+--- @param abs_path string
+H.get_ext = function(abs_path)
+  local last_dot_pos = abs_path:find "%.[^.]*$"
+  if last_dot_pos and last_dot_pos > 1 then
+    return abs_path:sub(last_dot_pos + 1)
+  end
+  return nil
+end
+
 --- @param str string
 --- @param len number
 H.pad_str = function(str, len)
@@ -720,6 +729,14 @@ P.get_icon_info = function(opts)
     }
   end
 
+  local ext = H.get_ext(opts.abs_path)
+  if ext and P.caches.icon_cache[ext] then
+    return {
+      icon_char = P.caches.icon_cache[ext].icon_char,
+      icon_hl = P.caches.icon_cache[ext].icon_hl,
+    }
+  end
+
   local icon_library = (function()
     local devicons_ok, devicons = pcall(require, "nvim-web-devicons")
     if devicons_ok then return devicons end
@@ -744,6 +761,9 @@ P.get_icon_info = function(opts)
   end
 
   local icon_char, icon_hl = icon_library.get_icon(opts.abs_path)
+  if ext then
+    P.caches.icon_cache[ext] = { icon_char = icon_char, icon_hl = icon_hl, }
+  end
 
   return {
     icon_char = icon_char,
