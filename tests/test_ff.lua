@@ -364,11 +364,27 @@ T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = functi
   MiniTest.expect.equality(res.icon_char, nil)
   MiniTest.expect.equality(res.icon_hl, nil)
 end
-T["P"]["get_icon_info"]["returns icon ifno when icons_enabled is true"] = function()
-  local res_one = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
+T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = function()
+  P.caches.icon_cache["lua"] = {
+    icon_char = "🌙",
+    icon_hl = "LuaIcon",
+  }
+  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = true, }
+  MiniTest.expect.equality(res.icon_char, "🌙")
+  MiniTest.expect.equality(res.icon_hl, "LuaIcon")
+end
 
+T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function()
+  local res_one = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
   MiniTest.expect.equality(res_one.icon_char, "󰌞")
   MiniTest.expect.equality(res_one.icon_hl, "MiniIconsYellow")
+
+  MiniTest.expect.equality(P.caches.icon_cache["js"].icon_char, "󰌞")
+  MiniTest.expect.equality(P.caches.icon_cache["js"].icon_hl, "MiniIconsYellow")
+
+  local res_two = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
+  MiniTest.expect.equality(res_two.icon_char, "󰌞")
+  MiniTest.expect.equality(res_two.icon_hl, "MiniIconsYellow")
 end
 
 local query = "in"
