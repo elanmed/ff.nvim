@@ -725,7 +725,7 @@ end
 --- @field curr_tick number
 --- @field render_results fun(decorated_files:DecoratedFile[]):nil
 --- @param opts GetFindFilesOpts
-P.get_find_files = function(opts)
+P.render_find_files = function(opts)
   L.benchmark_step("start", "Total per keystroke")
 
   L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
@@ -1121,8 +1121,8 @@ M.find = function()
   vim.cmd "startinsert"
 
   --- @param query string
-  local function get_find_files_with_query(query)
-    P.get_find_files {
+  local function render_find_files_for_query(query)
+    P.render_find_files {
       query = query,
       results_buf = results_buf,
       curr_bufname = curr_bufname,
@@ -1146,11 +1146,11 @@ M.find = function()
         P.refresh_files_cache()
         P.refresh_open_buffers_cache()
         P.refresh_frecency_cache()
-        get_find_files_with_query ""
+        render_find_files_for_query ""
       else
         P.refresh_open_buffers_cache()
         P.refresh_frecency_cache()
-        get_find_files_with_query ""
+        render_find_files_for_query ""
       end
     end
   )
@@ -1205,7 +1205,7 @@ M.find = function()
       if should_refresh then
         P.refresh_open_buffers_cache()
         P.refresh_frecency_cache()
-        get_find_files_with_query(vim.api.nvim_get_current_line())
+        render_find_files_for_query(vim.api.nvim_get_current_line())
       end
     end,
     Close = close,
@@ -1273,7 +1273,7 @@ M.find = function()
     callback = function()
       P.tick = P.tick + 1
       if P.preview_active then keymap_fns["PreviewToggle"]() end
-      get_find_files_with_query(vim.api.nvim_get_current_line())
+      render_find_files_for_query(vim.api.nvim_get_current_line())
     end,
   })
 end
