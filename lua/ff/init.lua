@@ -529,9 +529,7 @@ P.caches = {
   weighted_files_per_query = {},
 }
 
---- @param opts? {on_complete: function}
-P.refresh_files_cache = function(opts)
-  opts = opts or {}
+P.refresh_files_cache = function()
   L.benchmark_step_heading "refresh_files_cache"
   P.caches.find_abs_paths = {}
   P.caches.find_rel_paths = {}
@@ -557,13 +555,9 @@ P.refresh_files_cache = function(opts)
   end
   L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
   L.benchmark_step_closing()
-  if opts.on_complete then
-    opts.on_complete()
-  end
 end
 
---- @param opts {on_complete: function}
-M.refresh_frecency_cache = function(opts)
+M.refresh_frecency_cache = function()
   L.benchmark_step_heading "refresh_frecency_cache"
   P.caches.frecency_abs_paths = {}
   P.caches.frecency_rel_paths = {}
@@ -633,9 +627,6 @@ M.refresh_frecency_cache = function(opts)
   P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
   L.benchmark_step("end", "Calculate frecency_abs_path_to_score (entire loop)", { record_mean = false, })
   L.benchmark_step_closing()
-  if opts.on_complete then
-    opts.on_complete()
-  end
 end
 
 M.refresh_open_buffers_cache = function()
@@ -1189,19 +1180,14 @@ M.find = function()
   vim.schedule(
     function()
       if gopts.refresh_files_cache == "find" then
-        P.refresh_files_cache {
-          on_complete = function()
-            M.refresh_open_buffers_cache()
-            M.refresh_frecency_cache {
-              on_complete = function() get_find_files_with_query "" end,
-            }
-          end,
-        }
+        P.refresh_files_cache()
+        M.refresh_open_buffers_cache()
+        M.refresh_frecency_cache()
+        get_find_files_with_query ""
       else
         M.refresh_open_buffers_cache()
-        M.refresh_frecency_cache {
-          on_complete = function() get_find_files_with_query "" end,
-        }
+        M.refresh_frecency_cache()
+        get_find_files_with_query ""
       end
     end
   )
@@ -1255,11 +1241,8 @@ M.find = function()
       F.update_file_score(abs_path, { update_type = "remove", })
       if should_refresh then
         M.refresh_open_buffers_cache()
-        M.refresh_frecency_cache {
-          on_complete = function()
-            get_find_files_with_query(vim.api.nvim_get_current_line())
-          end,
-        }
+        M.refresh_frecency_cache()
+        get_find_files_with_query(vim.api.nvim_get_current_line())
       end
     end,
     Close = close,
