@@ -461,46 +461,6 @@ P.defaulted_gopts = function()
   return opts
 end
 
---- @class RunBatchOpts
---- @field fn function
---- @field on_complete? function
---- @field curr_tick? number
-
---- @param opts RunBatchOpts
-P.run_batch = function(opts)
-  local gopts = P.defaulted_gopts()
-  if gopts.batch_size == false then
-    if opts.curr_tick and P.tick ~= opts.curr_tick then
-      L.benchmark_step_interrupted()
-      L.benchmark_step_closing()
-      return
-    end
-
-    opts.fn()
-    if opts.on_complete then opts.on_complete() end
-    return
-  end
-
-  local co = coroutine.create(opts.fn)
-
-  local function step()
-    if opts.curr_tick and P.tick ~= opts.curr_tick then
-      L.benchmark_step_interrupted()
-      L.benchmark_step_closing()
-      return
-    end
-
-    coroutine.resume(co)
-    if coroutine.status(co) == "suspended" then
-      vim.schedule(step)
-    elseif opts.on_complete then
-      opts.on_complete()
-    end
-  end
-
-  step()
-end
-
 --- @param abs_path string
 --- @param score number
 --- @param icon_char string|nil
@@ -582,26 +542,24 @@ P.refresh_files_cache = function(opts)
   local lines = vim.fn.systemlist(gopts.find_cmd)
   L.benchmark_step("end", "find_cmd vim.fn.systemlist")
 
-  P.run_batch {
-    fn = function()
-      L.benchmark_step("start", "refresh_files_cache (entire loop)")
-      for idx, abs_path in ipairs(lines) do
-        if #abs_path == 0 then goto continue end
-        local normalized_abs_path = vim.fs.normalize(abs_path)
-        table.insert(P.caches.find_abs_paths, normalized_abs_path)
-        table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
+  L.benchmark_step("start", "refresh_files_cache (entire loop)")
+  for _, abs_path in ipairs(lines) do
+    if #abs_path == 0 then goto continue end
+    local normalized_abs_path = vim.fs.normalize(abs_path)
+    table.insert(P.caches.find_abs_paths, normalized_abs_path)
+    table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
 
-        if gopts.batch_size and idx % gopts.batch_size == 0 then
-          coroutine.yield()
-        end
+    -- if gopts.batch_size and idx % gopts.batch_size == 0 then
+    --   coroutine.yield()
+    -- end
 
-        ::continue::
-      end
-      L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
-      L.benchmark_step_closing()
-    end,
-    on_complete = opts.on_complete,
-  }
+    ::continue::
+  end
+  L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
+  L.benchmark_step_closing()
+  if opts.on_complete then
+    opts.on_complete()
+  end
 end
 
 --- @param opts {on_complete: function}
@@ -619,67 +577,65 @@ M.refresh_frecency_cache = function(opts)
   end
   L.benchmark_step("end", "dated_files file read", { record_mean = false, })
 
-  local gopts = P.defaulted_gopts()
-  P.run_batch {
-    fn = function()
-      local now = os.time()
-      L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
-      local frecency_paths_to_sort = {}
+  -- local gopts = P.defaulted_gopts()
+  local now = os.time()
+  L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
+  local frecency_paths_to_sort = {}
 
-      local idx = 1
-      for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
-        local score
+  local idx = 1
+  for abs_path, date_at_score_one in pairs(dated_files[H.cwd]) do
+    local score
 
-        if not H.readable(abs_path) then goto continue end
-        score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
-        P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
-        P.caches.frecency_abs_path_to_score[abs_path] = score
-        table.insert(frecency_paths_to_sort, {
-          score = score,
-          abs_path = abs_path,
-          rel_path = vim.fs.relpath(H.cwd, abs_path),
-        })
+    if not H.readable(abs_path) then goto continue end
+    score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
+    P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
+    P.caches.frecency_abs_path_to_score[abs_path] = score
+    table.insert(frecency_paths_to_sort, {
+      score = score,
+      abs_path = abs_path,
+      rel_path = vim.fs.relpath(H.cwd, abs_path),
+    })
 
-        if gopts.batch_size and idx % gopts.batch_size == 0 then
-          coroutine.yield()
-        end
+    -- if gopts.batch_size and idx % gopts.batch_size == 0 then
+    --   coroutine.yield()
+    -- end
 
-        ::continue::
-        idx = idx + 1
-      end
-      L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_abs_paths")
-      table.sort(
-        frecency_paths_to_sort,
-        function(a, b)
-          return a.score > b.score
-        end
-      )
-      L.benchmark_step("end", "Sort frecency files before setting to P.caches.frecency_abs_paths")
+    ::continue::
+    idx = idx + 1
+  end
+  L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_abs_paths")
+  table.sort(
+    frecency_paths_to_sort,
+    function(a, b)
+      return a.score > b.score
+    end
+  )
+  L.benchmark_step("end", "Sort frecency files before setting to P.caches.frecency_abs_paths")
 
-      L.benchmark_step("start", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
-      P.caches.frecency_abs_paths = vim.tbl_map(
-        function(frecency_file)
-          return frecency_file.abs_path
-        end,
-        frecency_paths_to_sort
-      )
-      L.benchmark_step("end", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
-
-      L.benchmark_step("start", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
-      P.caches.frecency_rel_paths = vim.tbl_map(
-        function(frecency_file)
-          return frecency_file.rel_path
-        end,
-        frecency_paths_to_sort
-      )
-      L.benchmark_step("end", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
-
-      P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
-      L.benchmark_step("end", "Calculate frecency_abs_path_to_score (entire loop)", { record_mean = false, })
-      L.benchmark_step_closing()
+  L.benchmark_step("start", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
+  P.caches.frecency_abs_paths = vim.tbl_map(
+    function(frecency_file)
+      return frecency_file.abs_path
     end,
-    on_complete = opts.on_complete,
-  }
+    frecency_paths_to_sort
+  )
+  L.benchmark_step("end", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
+
+  L.benchmark_step("start", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
+  P.caches.frecency_rel_paths = vim.tbl_map(
+    function(frecency_file)
+      return frecency_file.rel_path
+    end,
+    frecency_paths_to_sort
+  )
+  L.benchmark_step("end", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
+
+  P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
+  L.benchmark_step("end", "Calculate frecency_abs_path_to_score (entire loop)", { record_mean = false, })
+  L.benchmark_step_closing()
+  if opts.on_complete then
+    opts.on_complete()
+  end
 end
 
 M.refresh_open_buffers_cache = function()
@@ -908,7 +864,7 @@ M.get_weighted_files = function(opts)
 
   if #opts.query == 0 then
     L.benchmark_step("start", "Populate weighted_files for empty query")
-    for idx, abs_path in ipairs(all_abs_paths) do
+    for _, abs_path in ipairs(all_abs_paths) do
       if #weighted_files_for_query >= gopts.max_results_rendered then break end
 
       if seen[abs_path] then goto continue end
@@ -916,9 +872,9 @@ M.get_weighted_files = function(opts)
       local weighted_file = get_weighted_file_for_empty_query(abs_path)
       table.insert(weighted_files_for_query, weighted_file)
 
-      if gopts.batch_size and idx % gopts.batch_size == 0 then
-        coroutine.yield()
-      end
+      -- if gopts.batch_size and idx % gopts.batch_size == 0 then
+      --   coroutine.yield()
+      -- end
 
       ::continue::
     end
@@ -949,9 +905,9 @@ M.get_weighted_files = function(opts)
         ::continue::
       end
 
-      if gopts.batch_size then
-        coroutine.yield()
-      end
+      -- if gopts.batch_size then
+      --   coroutine.yield()
+      -- end
     end
 
     L.benchmark_step("end", "Populate weighted_files for populated query")
@@ -973,7 +929,7 @@ end
 --- @field results_buf number
 --- @param opts HighlightWeightedFilesOpts
 P.highlight_weighted_files = function(opts)
-  local gopts = P.defaulted_gopts()
+  -- local gopts = P.defaulted_gopts()
   local formatted_score_last_idx = #H.pad_str(
     H.fit_decimals(P.MAX_FRECENCY_SCORE, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
@@ -1010,9 +966,9 @@ P.highlight_weighted_files = function(opts)
       )
     end
 
-    if gopts.batch_size and idx % gopts.batch_size == 0 then
-      coroutine.yield()
-    end
+    -- if gopts.batch_size and idx % gopts.batch_size == 0 then
+    --   coroutine.yield()
+    -- end
   end
   L.benchmark_step("end", "Highlight results")
 end
@@ -1030,36 +986,31 @@ P.get_find_files = function(opts)
   L.benchmark_step("start", "Total per keystroke")
 
   local gopts = P.defaulted_gopts()
-  P.run_batch {
-    curr_tick = opts.curr_tick,
-    fn = function()
-      local weighted_files = M.get_weighted_files {
-        query = opts.query,
-        curr_bufname = opts.curr_bufname,
-        alternate_bufname = opts.alternate_bufname,
-      }
-
-      local decorated_files = M.get_decorated_files { weighted_files = weighted_files, query = opts.query, }
-
-      L.benchmark_step_heading "Process weighted files"
-
-      L.benchmark_step("start", "Render results")
-      opts.render_results(decorated_files)
-      L.benchmark_step("end", "Render results")
-
-      if not gopts.hl_enabled then
-        L.benchmark_step("end", "Total per keystroke")
-        L.benchmark_step_closing()
-        return
-      end
-
-      vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
-      P.highlight_weighted_files { decorated_files = decorated_files, results_buf = opts.results_buf, }
-
-      L.benchmark_step("end", "Total per keystroke")
-      L.benchmark_step_closing()
-    end,
+  local weighted_files = M.get_weighted_files {
+    query = opts.query,
+    curr_bufname = opts.curr_bufname,
+    alternate_bufname = opts.alternate_bufname,
   }
+
+  local decorated_files = M.get_decorated_files { weighted_files = weighted_files, query = opts.query, }
+
+  L.benchmark_step_heading "Process weighted files"
+
+  L.benchmark_step("start", "Render results")
+  opts.render_results(decorated_files)
+  L.benchmark_step("end", "Render results")
+
+  if not gopts.hl_enabled then
+    L.benchmark_step("end", "Total per keystroke")
+    L.benchmark_step_closing()
+    return
+  end
+
+  vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
+  P.highlight_weighted_files { decorated_files = decorated_files, results_buf = opts.results_buf, }
+
+  L.benchmark_step("end", "Total per keystroke")
+  L.benchmark_step_closing()
 end
 
 --- @param win number
