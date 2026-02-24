@@ -740,21 +740,6 @@ P.render_find_files = function(opts)
     weighted_files_for_query = P.caches.weighted_files_per_query[opts.query]
   else
     --- @param abs_path string
-    local function get_weighted_file_for_empty_query(abs_path)
-      local frecency_score = 0
-      if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
-        frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
-      end
-      return {
-        abs_path = abs_path,
-        weighted_score = frecency_score,
-        buf_and_frecency_score = 0,
-        fuzzy_score = 0,
-        match_idxs = {},
-      }
-    end
-
-    --- @param abs_path string
     --- @param fuzzy_score number
     --- @param match_idxs number[]
     local function get_weighted_file(abs_path, fuzzy_score, match_idxs)
@@ -821,7 +806,19 @@ P.render_find_files = function(opts)
 
         if seen[abs_path] then goto continue end
         seen[abs_path] = true
-        local weighted_file = get_weighted_file_for_empty_query(abs_path)
+        local weighted_file = (function()
+          local frecency_score = 0
+          if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+            frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
+          end
+          return {
+            abs_path = abs_path,
+            weighted_score = frecency_score,
+            buf_and_frecency_score = 0,
+            fuzzy_score = 0,
+            match_idxs = {},
+          }
+        end)()
         table.insert(weighted_files_for_query, weighted_file)
 
         -- if gopts.batch_size and idx % gopts.batch_size == 0 then
