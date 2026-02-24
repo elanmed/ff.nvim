@@ -571,7 +571,6 @@ P.refresh_frecency_cache = function()
   end
   L.benchmark_step("end", "dated_files file read", { record_mean = false, })
 
-  -- local gopts = P.defaulted_gopts()
   local now = os.time()
   L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
   local frecency_paths_to_sort = {}
@@ -734,147 +733,147 @@ P.get_find_files = function(opts)
 
   local gopts = P.defaulted_gopts()
 
-  if P.caches.weighted_files_per_query[opts.query] then
-    return P.caches.weighted_files_per_query[opts.query]
-  end
-
   --- @type WeightedFile[]
   local weighted_files_for_query = {}
 
-  --- @param abs_path string
-  local function get_weighted_file_for_empty_query(abs_path)
-    local frecency_score = 0
-    if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
-      frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
-    end
-    return {
-      abs_path = abs_path,
-      weighted_score = frecency_score,
-      buf_and_frecency_score = 0,
-      fuzzy_score = 0,
-      match_idxs = {},
-    }
-  end
-
-  --- @param abs_path string
-  --- @param fuzzy_score number
-  --- @param match_idxs number[]
-  local function get_weighted_file(abs_path, fuzzy_score, match_idxs)
-    local scaled_fzf_score = P.scale_fuzzy_to_frecency {
-      fuzzy_score = fuzzy_score,
-      query = opts.query,
-      weights = gopts.weights,
-      matchfuzzypos_sigmoid = gopts.matchfuzzypos_sigmoid,
-    }
-
-    local buf_score = 0
-    local basename_with_ext = H.basename(abs_path, { with_ext = true, })
-    local basename_without_ext = H.basename(abs_path, { with_ext = false, })
-
-    if opts.query == basename_with_ext or
-        opts.query == basename_without_ext or
-        opts.query:gsub("%L", "") == basename_without_ext:gsub("%L", "")
-    then
-      buf_score = gopts.weights.basename_boost
-    elseif P.caches.open_buffer_to_modified[abs_path] ~= nil then
-      local modified = P.caches.open_buffer_to_modified[abs_path]
-
-      if abs_path == opts.curr_bufname then
-        buf_score = gopts.weights.current_buf_boost
-      elseif abs_path == opts.alternate_bufname then
-        buf_score = gopts.weights.alternate_buf_boost
-      elseif modified then
-        buf_score = gopts.weights.modified_buf_boost
-      else
-        buf_score = gopts.weights.open_buf_boost
-      end
-    end
-
-    local buf_and_frecency_score = buf_score
-    if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
-      buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_abs_path_to_score[abs_path]
-    end
-
-    local weighted_score =
-        gopts.fuzzy_score_multiple * scaled_fzf_score +
-        gopts.file_score_multiple * buf_and_frecency_score
-
-    return {
-      abs_path = abs_path,
-      weighted_score = weighted_score,
-      fuzzy_score = scaled_fzf_score,
-      buf_and_frecency_score = buf_and_frecency_score,
-      match_idxs = gopts.hl_enabled and match_idxs or {},
-    }
-  end
-
-  local all_abs_paths = vim.deepcopy(P.caches.frecency_abs_paths)
-  vim.list_extend(all_abs_paths, P.caches.find_abs_paths)
-
-  local all_rel_paths = vim.deepcopy(P.caches.frecency_rel_paths)
-  vim.list_extend(all_rel_paths, P.caches.find_rel_paths)
-
-  local seen = {}
-
-  if #opts.query == 0 then
-    L.benchmark_step("start", "Populate weighted_files for empty query")
-    for _, abs_path in ipairs(all_abs_paths) do
-      if #weighted_files_for_query >= gopts.max_results_rendered then break end
-
-      if seen[abs_path] then goto continue end
-      seen[abs_path] = true
-      local weighted_file = get_weighted_file_for_empty_query(abs_path)
-      table.insert(weighted_files_for_query, weighted_file)
-
-      -- if gopts.batch_size and idx % gopts.batch_size == 0 then
-      --   coroutine.yield()
-      -- end
-
-      ::continue::
-    end
-    L.benchmark_step("end", "Populate weighted_files for empty query")
+  if P.caches.weighted_files_per_query[opts.query] then
+    weighted_files_for_query = P.caches.weighted_files_per_query[opts.query]
   else
-    L.benchmark_step("start", "Populate weighted_files for populated query")
+    --- @param abs_path string
+    local function get_weighted_file_for_empty_query(abs_path)
+      local frecency_score = 0
+      if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+        frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
+      end
+      return {
+        abs_path = abs_path,
+        weighted_score = frecency_score,
+        buf_and_frecency_score = 0,
+        fuzzy_score = 0,
+        match_idxs = {},
+      }
+    end
 
-    local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
-    for start_idx = 1, #all_abs_paths, batch_size do
-      if #weighted_files_for_query >= gopts.max_results_considered then break end
+    --- @param abs_path string
+    --- @param fuzzy_score number
+    --- @param match_idxs number[]
+    local function get_weighted_file(abs_path, fuzzy_score, match_idxs)
+      local scaled_fzf_score = P.scale_fuzzy_to_frecency {
+        fuzzy_score = fuzzy_score,
+        query = opts.query,
+        weights = gopts.weights,
+        matchfuzzypos_sigmoid = gopts.matchfuzzypos_sigmoid,
+      }
 
-      local end_idx = math.min(start_idx + batch_size - 1, #all_abs_paths)
-      local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
+      local buf_score = 0
+      local basename_with_ext = H.basename(abs_path, { with_ext = true, })
+      local basename_without_ext = H.basename(abs_path, { with_ext = false, })
 
-      local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
+      if opts.query == basename_with_ext or
+          opts.query == basename_without_ext or
+          opts.query:gsub("%L", "") == basename_without_ext:gsub("%L", "")
+      then
+        buf_score = gopts.weights.basename_boost
+      elseif P.caches.open_buffer_to_modified[abs_path] ~= nil then
+        local modified = P.caches.open_buffer_to_modified[abs_path]
 
-      for idx, rel_path in ipairs(matched_files) do
-        local abs_path = vim.fs.joinpath(H.cwd, rel_path)
-        if #weighted_files_for_query >= gopts.max_results_considered then break end
+        if abs_path == opts.curr_bufname then
+          buf_score = gopts.weights.current_buf_boost
+        elseif abs_path == opts.alternate_bufname then
+          buf_score = gopts.weights.alternate_buf_boost
+        elseif modified then
+          buf_score = gopts.weights.modified_buf_boost
+        else
+          buf_score = gopts.weights.open_buf_boost
+        end
+      end
+
+      local buf_and_frecency_score = buf_score
+      if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+        buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_abs_path_to_score[abs_path]
+      end
+
+      local weighted_score =
+          gopts.fuzzy_score_multiple * scaled_fzf_score +
+          gopts.file_score_multiple * buf_and_frecency_score
+
+      return {
+        abs_path = abs_path,
+        weighted_score = weighted_score,
+        fuzzy_score = scaled_fzf_score,
+        buf_and_frecency_score = buf_and_frecency_score,
+        match_idxs = gopts.hl_enabled and match_idxs or {},
+      }
+    end
+
+    local all_abs_paths = vim.deepcopy(P.caches.frecency_abs_paths)
+    vim.list_extend(all_abs_paths, P.caches.find_abs_paths)
+
+    local all_rel_paths = vim.deepcopy(P.caches.frecency_rel_paths)
+    vim.list_extend(all_rel_paths, P.caches.find_rel_paths)
+
+    local seen = {}
+
+    if #opts.query == 0 then
+      L.benchmark_step("start", "Populate weighted_files for empty query")
+      for _, abs_path in ipairs(all_abs_paths) do
+        if #weighted_files_for_query >= gopts.max_results_rendered then break end
 
         if seen[abs_path] then goto continue end
         seen[abs_path] = true
-        local fuzzy_score = match_scores[idx]
-        local match_idxs = match_idxs_tbl[idx]
-        local weighted_file = get_weighted_file(abs_path, fuzzy_score, match_idxs)
+        local weighted_file = get_weighted_file_for_empty_query(abs_path)
         table.insert(weighted_files_for_query, weighted_file)
+
+        -- if gopts.batch_size and idx % gopts.batch_size == 0 then
+        --   coroutine.yield()
+        -- end
 
         ::continue::
       end
+      L.benchmark_step("end", "Populate weighted_files for empty query")
+    else
+      L.benchmark_step("start", "Populate weighted_files for populated query")
 
-      -- if gopts.batch_size then
-      --   coroutine.yield()
-      -- end
+      local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
+      for start_idx = 1, #all_abs_paths, batch_size do
+        if #weighted_files_for_query >= gopts.max_results_considered then break end
+
+        local end_idx = math.min(start_idx + batch_size - 1, #all_abs_paths)
+        local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
+
+        local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
+
+        for idx, rel_path in ipairs(matched_files) do
+          local abs_path = vim.fs.joinpath(H.cwd, rel_path)
+          if #weighted_files_for_query >= gopts.max_results_considered then break end
+
+          if seen[abs_path] then goto continue end
+          seen[abs_path] = true
+          local fuzzy_score = match_scores[idx]
+          local match_idxs = match_idxs_tbl[idx]
+          local weighted_file = get_weighted_file(abs_path, fuzzy_score, match_idxs)
+          table.insert(weighted_files_for_query, weighted_file)
+
+          ::continue::
+        end
+
+        -- if gopts.batch_size then
+        --   coroutine.yield()
+        -- end
+      end
+
+      L.benchmark_step("end", "Populate weighted_files for populated query")
     end
 
-    L.benchmark_step("end", "Populate weighted_files for populated query")
+    L.benchmark_step("start", "Sort weighted files")
+    table.sort(weighted_files_for_query, function(a, b)
+      return a.weighted_score > b.weighted_score
+    end)
+    L.benchmark_step("end", "Sort weighted files")
+    L.benchmark_step_closing()
+
+    P.caches.weighted_files_per_query[opts.query] = weighted_files_for_query
   end
-
-  L.benchmark_step("start", "Sort weighted files")
-  table.sort(weighted_files_for_query, function(a, b)
-    return a.weighted_score > b.weighted_score
-  end)
-  L.benchmark_step("end", "Sort weighted files")
-  L.benchmark_step_closing()
-
-  P.caches.weighted_files_per_query[opts.query] = weighted_files_for_query
 
   L.benchmark_step_heading(("Get decorated_files for query: '%s'"):format(opts.query))
   L.benchmark_step("start", "Get decorated_files")
@@ -923,7 +922,6 @@ P.get_find_files = function(opts)
 
   vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
 
-  -- local gopts = P.defaulted_gopts()
   local formatted_score_last_idx = #H.pad_str(
     H.fit_decimals(P.MAX_FRECENCY_SCORE, P.MAX_SCORE_LEN),
     P.MAX_SCORE_LEN
