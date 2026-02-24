@@ -718,58 +718,17 @@ P.get_icon_info = function(opts)
   }
 end
 
--- TODO: here
-
---- @class GetDecoratedFilesOpts
+--- @class GetFindFilesOpts
 --- @field query string
---- @field weighted_files WeightedFile[]
---- @param opts GetDecoratedFilesOpts
-P.get_decorated_files = function(opts)
-  L.benchmark_step_heading(("Get decorated_files for query: '%s'"):format(opts.query))
-  L.benchmark_step("start", "Get decorated_files")
-  local gopts = P.defaulted_gopts()
-  local sliced_weighted_files = vim.list_slice(opts.weighted_files, 1, gopts.max_results_rendered)
-
-  --- @type DecoratedFile[]
-  local decorated_files = {}
-
-  for _, weighted_file in ipairs(sliced_weighted_files) do
-    -- TODO: this is still ~5ms
-    local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = gopts.icons_enabled, }
-    local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
-    local formatted_filename = P.format_filename(
-      weighted_file.abs_path,
-      weighted_file.weighted_score,
-      icon_info.icon_char
-    )
-
-    table.insert(decorated_files, {
-      abs_path = weighted_file.abs_path,
-      weighted_score = weighted_file.weighted_score,
-      fuzzy_score = weighted_file.fuzzy_score,
-      buf_and_frecency_score = weighted_file.buf_and_frecency_score,
-      match_idxs = weighted_file.match_idxs,
-
-      rel_path = rel_path,
-      icon_char = icon_info.icon_char,
-      icon_hl = icon_info.icon_hl,
-      formatted_filename = formatted_filename,
-    })
-  end
-  L.benchmark_step("end", "Get decorated_files")
-  L.benchmark_step_closing()
-
-  return decorated_files
-end
-
--- TODO: and here
-
---- @class GetWeightedFilesOpts
---- @field query string
+--- @field results_buf number
 --- @field curr_bufname string
 --- @field alternate_bufname string
---- @param opts GetWeightedFilesOpts
-P.get_weighted_files = function(opts)
+--- @field curr_tick number
+--- @field render_results fun(decorated_files:DecoratedFile[]):nil
+--- @param opts GetFindFilesOpts
+P.get_find_files = function(opts)
+  L.benchmark_step("start", "Total per keystroke")
+
   L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
   H.cwd = vim.uv.cwd()
 
@@ -916,16 +875,54 @@ P.get_weighted_files = function(opts)
   L.benchmark_step_closing()
 
   P.caches.weighted_files_per_query[opts.query] = weighted_files_for_query
-  return weighted_files_for_query
-end
 
--- TODO: and here
+  L.benchmark_step_heading(("Get decorated_files for query: '%s'"):format(opts.query))
+  L.benchmark_step("start", "Get decorated_files")
+  local sliced_weighted_files = vim.list_slice(weighted_files_for_query, 1, gopts.max_results_rendered)
 
---- @class HighlightWeightedFilesOpts
---- @field decorated_files DecoratedFile[]
---- @field results_buf number
---- @param opts HighlightWeightedFilesOpts
-P.highlight_weighted_files = function(opts)
+  --- @type DecoratedFile[]
+  local decorated_files = {}
+
+  for _, weighted_file in ipairs(sliced_weighted_files) do
+    -- TODO: this is still ~5ms
+    local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = gopts.icons_enabled, }
+    local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
+    local formatted_filename = P.format_filename(
+      weighted_file.abs_path,
+      weighted_file.weighted_score,
+      icon_info.icon_char
+    )
+
+    table.insert(decorated_files, {
+      abs_path = weighted_file.abs_path,
+      weighted_score = weighted_file.weighted_score,
+      fuzzy_score = weighted_file.fuzzy_score,
+      buf_and_frecency_score = weighted_file.buf_and_frecency_score,
+      match_idxs = weighted_file.match_idxs,
+
+      rel_path = rel_path,
+      icon_char = icon_info.icon_char,
+      icon_hl = icon_info.icon_hl,
+      formatted_filename = formatted_filename,
+    })
+  end
+  L.benchmark_step("end", "Get decorated_files")
+  L.benchmark_step_closing()
+
+  L.benchmark_step_heading "Process weighted files"
+
+  L.benchmark_step("start", "Render results")
+  opts.render_results(decorated_files)
+  L.benchmark_step("end", "Render results")
+
+  if not gopts.hl_enabled then
+    L.benchmark_step("end", "Total per keystroke")
+    L.benchmark_step_closing()
+    return
+  end
+
+  vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
+
   -- local gopts = P.defaulted_gopts()
   local formatted_score_last_idx = #H.pad_str(
     H.fit_decimals(P.MAX_FRECENCY_SCORE, P.MAX_SCORE_LEN),
@@ -934,7 +931,7 @@ P.highlight_weighted_files = function(opts)
   local icon_char_idx = formatted_score_last_idx + 2
 
   L.benchmark_step("start", "Highlight results")
-  for idx, decorated_file in ipairs(opts.decorated_files) do
+  for idx, decorated_file in ipairs(decorated_files) do
     local row_0_indexed = idx - 1
 
     if decorated_file.icon_hl then
@@ -968,45 +965,6 @@ P.highlight_weighted_files = function(opts)
     -- end
   end
   L.benchmark_step("end", "Highlight results")
-end
-
--- TODO: and here
-
---- @class GetFindFilesOpts
---- @field query string
---- @field results_buf number
---- @field curr_bufname string
---- @field alternate_bufname string
---- @field curr_tick number
---- @field render_results fun(decorated_files:DecoratedFile[]):nil
---- @param opts GetFindFilesOpts
-P.get_find_files = function(opts)
-  L.benchmark_step("start", "Total per keystroke")
-
-  local gopts = P.defaulted_gopts()
-  local weighted_files = P.get_weighted_files {
-    query = opts.query,
-    curr_bufname = opts.curr_bufname,
-    alternate_bufname = opts.alternate_bufname,
-  }
-
-  local decorated_files = P.get_decorated_files { weighted_files = weighted_files, query = opts.query, }
-
-  L.benchmark_step_heading "Process weighted files"
-
-  L.benchmark_step("start", "Render results")
-  opts.render_results(decorated_files)
-  L.benchmark_step("end", "Render results")
-
-  if not gopts.hl_enabled then
-    L.benchmark_step("end", "Total per keystroke")
-    L.benchmark_step_closing()
-    return
-  end
-
-  vim.api.nvim_buf_clear_namespace(opts.results_buf, P.ns_id, 0, -1)
-  P.highlight_weighted_files { decorated_files = decorated_files, results_buf = opts.results_buf, }
-
   L.benchmark_step("end", "Total per keystroke")
   L.benchmark_step_closing()
 end
