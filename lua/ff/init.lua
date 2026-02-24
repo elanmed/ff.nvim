@@ -717,6 +717,66 @@ P.get_icon_info = function(opts)
   }
 end
 
+--- @class GetWeightedFileOpts
+--- @field abs_path string
+--- @field fuzzy_score number
+--- @field match_idxs number[]
+--- @field query string
+--- @field curr_bufname string
+--- @field alternate_bufname string
+--- @param opts GetWeightedFileOpts
+local function get_weighted_file(opts)
+  local gopts = P.defaulted_gopts()
+
+  local scaled_fzf_score = P.scale_fuzzy_to_frecency {
+    fuzzy_score = opts.fuzzy_score,
+    query = opts.query,
+    weights = gopts.weights,
+    matchfuzzypos_sigmoid = gopts.matchfuzzypos_sigmoid,
+  }
+
+  local buf_score = 0
+  local basename_with_ext = H.basename(opts.abs_path, { with_ext = true, })
+  local basename_without_ext = H.basename(opts.abs_path, { with_ext = false, })
+
+  if opts.query == basename_with_ext or
+      opts.query == basename_without_ext or
+      opts.query:gsub("%L", "") == basename_without_ext:gsub("%L", "")
+  then
+    buf_score = gopts.weights.basename_boost
+  elseif P.caches.open_buffer_to_modified[opts.abs_path] ~= nil then
+    local modified = P.caches.open_buffer_to_modified[opts.abs_path]
+
+    if opts.abs_path == opts.curr_bufname then
+      buf_score = gopts.weights.current_buf_boost
+    elseif opts.abs_path == opts.alternate_bufname then
+      buf_score = gopts.weights.alternate_buf_boost
+    elseif modified then
+      buf_score = gopts.weights.modified_buf_boost
+    else
+      buf_score = gopts.weights.open_buf_boost
+    end
+  end
+
+  local buf_and_frecency_score = buf_score
+  if P.caches.frecency_abs_path_to_score[opts.abs_path] ~= nil then
+    buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_abs_path_to_score[opts.abs_path]
+  end
+
+  local weighted_score =
+      gopts.fuzzy_score_multiple * scaled_fzf_score +
+      gopts.file_score_multiple * buf_and_frecency_score
+
+  return {
+    abs_path = opts.abs_path,
+    weighted_score = weighted_score,
+    fuzzy_score = scaled_fzf_score,
+    buf_and_frecency_score = buf_and_frecency_score,
+    match_idxs = gopts.hl_enabled and opts.match_idxs or {},
+  }
+end
+
+
 --- @class GetFindFilesOpts
 --- @field query string
 --- @field results_buf number
@@ -739,58 +799,6 @@ P.render_find_files = function(opts)
   if P.caches.weighted_files_per_query[opts.query] then
     weighted_files_for_query = P.caches.weighted_files_per_query[opts.query]
   else
-    --- @param abs_path string
-    --- @param fuzzy_score number
-    --- @param match_idxs number[]
-    local function get_weighted_file(abs_path, fuzzy_score, match_idxs)
-      local scaled_fzf_score = P.scale_fuzzy_to_frecency {
-        fuzzy_score = fuzzy_score,
-        query = opts.query,
-        weights = gopts.weights,
-        matchfuzzypos_sigmoid = gopts.matchfuzzypos_sigmoid,
-      }
-
-      local buf_score = 0
-      local basename_with_ext = H.basename(abs_path, { with_ext = true, })
-      local basename_without_ext = H.basename(abs_path, { with_ext = false, })
-
-      if opts.query == basename_with_ext or
-          opts.query == basename_without_ext or
-          opts.query:gsub("%L", "") == basename_without_ext:gsub("%L", "")
-      then
-        buf_score = gopts.weights.basename_boost
-      elseif P.caches.open_buffer_to_modified[abs_path] ~= nil then
-        local modified = P.caches.open_buffer_to_modified[abs_path]
-
-        if abs_path == opts.curr_bufname then
-          buf_score = gopts.weights.current_buf_boost
-        elseif abs_path == opts.alternate_bufname then
-          buf_score = gopts.weights.alternate_buf_boost
-        elseif modified then
-          buf_score = gopts.weights.modified_buf_boost
-        else
-          buf_score = gopts.weights.open_buf_boost
-        end
-      end
-
-      local buf_and_frecency_score = buf_score
-      if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
-        buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_abs_path_to_score[abs_path]
-      end
-
-      local weighted_score =
-          gopts.fuzzy_score_multiple * scaled_fzf_score +
-          gopts.file_score_multiple * buf_and_frecency_score
-
-      return {
-        abs_path = abs_path,
-        weighted_score = weighted_score,
-        fuzzy_score = scaled_fzf_score,
-        buf_and_frecency_score = buf_and_frecency_score,
-        match_idxs = gopts.hl_enabled and match_idxs or {},
-      }
-    end
-
     local all_abs_paths = vim.deepcopy(P.caches.frecency_abs_paths)
     vim.list_extend(all_abs_paths, P.caches.find_abs_paths)
 
@@ -806,19 +814,17 @@ P.render_find_files = function(opts)
 
         if seen[abs_path] then goto continue end
         seen[abs_path] = true
-        local weighted_file = (function()
-          local frecency_score = 0
-          if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
-            frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
-          end
-          return {
-            abs_path = abs_path,
-            weighted_score = frecency_score,
-            buf_and_frecency_score = 0,
-            fuzzy_score = 0,
-            match_idxs = {},
-          }
-        end)()
+        local frecency_score = 0
+        if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+          frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
+        end
+        local weighted_file = {
+          abs_path = abs_path,
+          weighted_score = frecency_score,
+          buf_and_frecency_score = 0,
+          fuzzy_score = 0,
+          match_idxs = {},
+        }
         table.insert(weighted_files_for_query, weighted_file)
 
         -- if gopts.batch_size and idx % gopts.batch_size == 0 then
@@ -848,7 +854,14 @@ P.render_find_files = function(opts)
           seen[abs_path] = true
           local fuzzy_score = match_scores[idx]
           local match_idxs = match_idxs_tbl[idx]
-          local weighted_file = get_weighted_file(abs_path, fuzzy_score, match_idxs)
+          local weighted_file = get_weighted_file {
+            abs_path = abs_path,
+            fuzzy_score = fuzzy_score,
+            match_idxs = match_idxs,
+            alternate_bufname = opts.alternate_bufname,
+            curr_bufname = opts.curr_bufname,
+            query = opts.query,
+          }
           table.insert(weighted_files_for_query, weighted_file)
 
           ::continue::
