@@ -557,7 +557,7 @@ P.refresh_files_cache = function()
   L.benchmark_step_closing()
 end
 
-M.refresh_frecency_cache = function()
+P.refresh_frecency_cache = function()
   L.benchmark_step_heading "refresh_frecency_cache"
   P.caches.frecency_abs_paths = {}
   P.caches.frecency_rel_paths = {}
@@ -629,7 +629,7 @@ M.refresh_frecency_cache = function()
   L.benchmark_step_closing()
 end
 
-M.refresh_open_buffers_cache = function()
+P.refresh_open_buffers_cache = function()
   P.caches.weighted_files_per_query = {}
   P.caches.open_buffer_to_modified = {}
 
@@ -718,11 +718,13 @@ P.get_icon_info = function(opts)
   }
 end
 
+-- TODO: here
+
 --- @class GetDecoratedFilesOpts
 --- @field query string
 --- @field weighted_files WeightedFile[]
 --- @param opts GetDecoratedFilesOpts
-M.get_decorated_files = function(opts)
+P.get_decorated_files = function(opts)
   L.benchmark_step_heading(("Get decorated_files for query: '%s'"):format(opts.query))
   L.benchmark_step("start", "Get decorated_files")
   local gopts = P.defaulted_gopts()
@@ -760,12 +762,14 @@ M.get_decorated_files = function(opts)
   return decorated_files
 end
 
+-- TODO: and here
+
 --- @class GetWeightedFilesOpts
 --- @field query string
 --- @field curr_bufname string
 --- @field alternate_bufname string
 --- @param opts GetWeightedFilesOpts
-M.get_weighted_files = function(opts)
+P.get_weighted_files = function(opts)
   L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
   H.cwd = vim.uv.cwd()
 
@@ -915,6 +919,8 @@ M.get_weighted_files = function(opts)
   return weighted_files_for_query
 end
 
+-- TODO: and here
+
 --- @class HighlightWeightedFilesOpts
 --- @field decorated_files DecoratedFile[]
 --- @field results_buf number
@@ -964,6 +970,8 @@ P.highlight_weighted_files = function(opts)
   L.benchmark_step("end", "Highlight results")
 end
 
+-- TODO: and here
+
 --- @class GetFindFilesOpts
 --- @field query string
 --- @field results_buf number
@@ -971,19 +979,18 @@ end
 --- @field alternate_bufname string
 --- @field curr_tick number
 --- @field render_results fun(decorated_files:DecoratedFile[]):nil
-
 --- @param opts GetFindFilesOpts
 P.get_find_files = function(opts)
   L.benchmark_step("start", "Total per keystroke")
 
   local gopts = P.defaulted_gopts()
-  local weighted_files = M.get_weighted_files {
+  local weighted_files = P.get_weighted_files {
     query = opts.query,
     curr_bufname = opts.curr_bufname,
     alternate_bufname = opts.alternate_bufname,
   }
 
-  local decorated_files = M.get_decorated_files { weighted_files = weighted_files, query = opts.query, }
+  local decorated_files = P.get_decorated_files { weighted_files = weighted_files, query = opts.query, }
 
   L.benchmark_step_heading "Process weighted files"
 
@@ -1181,12 +1188,12 @@ M.find = function()
     function()
       if gopts.refresh_files_cache == "find" then
         P.refresh_files_cache()
-        M.refresh_open_buffers_cache()
-        M.refresh_frecency_cache()
+        P.refresh_open_buffers_cache()
+        P.refresh_frecency_cache()
         get_find_files_with_query ""
       else
-        M.refresh_open_buffers_cache()
-        M.refresh_frecency_cache()
+        P.refresh_open_buffers_cache()
+        P.refresh_frecency_cache()
         get_find_files_with_query ""
       end
     end
@@ -1240,8 +1247,8 @@ M.find = function()
       local should_refresh = P.caches.frecency_abs_path_to_score[abs_path] ~= nil
       F.update_file_score(abs_path, { update_type = "remove", })
       if should_refresh then
-        M.refresh_open_buffers_cache()
-        M.refresh_frecency_cache()
+        P.refresh_open_buffers_cache()
+        P.refresh_frecency_cache()
         get_find_files_with_query(vim.api.nvim_get_current_line())
       end
     end,
