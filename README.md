@@ -16,8 +16,8 @@ A small, fast fuzzy finder with intelligent weights.
   - The basename of a result (with and without an extension)
   - The fuzzy score of a result
 
-
 ## Performance
+
 `ff.nvim` prioritizes performance in a few ways:
 
 - Large tables are iterated in batches w/coroutines to avoid blocking the picker UI
@@ -40,8 +40,8 @@ A small, fast fuzzy finder with intelligent weights.
 With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files.
 Enable the `vim.g.ff.benchmark_step` and `vim.g.ff.benchmark_mean` options to try yourself
 
-
 ## Configuration example
+
 ```lua
 -- defaults:
 vim.g.ff = {
@@ -148,8 +148,8 @@ By default, `setup()` is automatically on startup. This can be disabled by setti
 require "ff".find()
 ```
 
-
 ### `refresh_files_cache`
+
 ```lua
 require "ff".refresh_files_cache()
 ```
@@ -219,8 +219,8 @@ vim.keymap.set("n", "<leader>ff", function()
 end)
 ```
 
-
 ### `get_weighted_files`
+
 ```lua
 --- @class WeightedFile
 --- @field abs_path string
@@ -242,8 +242,8 @@ require "ff".get_weighted_files(opts)
 - Calculates the scores for each file in the files cache
 - The files can be sorted using the `weighted_score` field
 
-
 ### `get_decorated_files`
+
 ```lua
 --- @class DecoratedFile: WeightedFile
 --- @field rel_path string
@@ -263,32 +263,32 @@ require "ff".get_decorated_files = function(opts)
 - Calculates the "decorations" for each file in the `weighted_files` param
 - Only the top `n` results of `get_weighted_files` should be passed to `get_decorated_files` to avoid wasted work
 
-
 ### `refresh_frecency_cache`
+
 ```lua
 require "ff".refresh_frecency_cache()
 ```
 
-
 ### `refresh_open_buffers_cache`
+
 ```lua
 require "ff".refresh_open_buffers_cache()
 ```
 
-
 ### `reset_benchmarks`
+
 ```lua
 require "ff".reset_benchmarks()
 ```
 
-
 ### `print_mean_benchmarks`
+
 ```lua
 require "ff".print_mean_benchmarks()
 ```
 
-
 ## Highlight Groups
+
 - `FFPickerFuzzyHighlightChar`: The chars in a result currently fuzzy matched
   - Defaults to `Search`
 - `FFPickerCursorLine`: The current line in the results window
@@ -297,54 +297,54 @@ require "ff".print_mean_benchmarks()
 ## Plug remaps
 
 #### `<Plug>FFResultSelect`
+
 - Select a result, close the picker, and edit the selected file
 
-
 #### `<Plug>FFResultNext`
+
 - Move the cursor to the next result
 
-
 #### `<Plug>FFResultPrev`
+
 - Move the cursor to the prev result
 
-
 #### `<Plug>FFResultDeleteFrecencyScore`
+
 - Delete the frecency score of the current result and reload the search results
 
-
 #### `<Plug>FFClose`
+
 - Close the picker
 
-
 #### `<Plug>FFPreviewToggle`
+
 - Toggle the preview for the file under the cursor
 
-
 #### `<Plug>FFPreviewScrollDown`
+
 - Scroll the preview down half a page
 
-
 #### `<Plug>FFPreviewScrollUp`
+
 - Scroll the preview up half a page
 
-
-
 ## Deps
+
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
   - Or `false` passed as `vim.g.ff.icons_enabled`
 - [`fd`](https://github.com/sharkdp/fd)
   - Or a custom cli command passed as `vim.g.ff.find_cmd`
 
 ## TODO
+
 - [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
 
-
 ## Features excluded for simplicity
+
 - Multi-select
 
-
-
 ## Similar plugins
+
 - [smart-open.nvim](https://github.com/danielfalk/smart-open.nvim)
 - [fff.nvim](https://github.com/dmtrKovalenko/fff.nvim)
 - [snacks.nvim's smart picker](https://github.com/folke/snacks.nvim/blob/main/docs/picker.md#smart)
