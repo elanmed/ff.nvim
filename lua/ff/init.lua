@@ -400,6 +400,8 @@ L.benchmark_step = function(type, label, opts)
     local end_time = os.clock()
     local start_time = L.ongoing_benchmarks[label]
 
+    if start_time == nil then return end
+
     local elapsed_ms = (end_time - start_time) * 1000
     local formatted_ms = H.pad_str(H.exact_decimals(elapsed_ms, 3), 8)
 
@@ -878,6 +880,14 @@ end
 --- @field render_results fun(decorated_files:DecoratedFile[]):nil
 --- @param opts GetFindFilesOpts
 P.render_find_files = async(function(opts)
+  local function is_stale()
+    if P.tick ~= opts.curr_tick then
+      L.benchmark_step_interrupted()
+      return true
+    end
+    return false
+  end
+
   L.benchmark_step("start", "Total per keystroke")
 
   L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
@@ -930,7 +940,7 @@ P.render_find_files = async(function(opts)
           end,
           {
             on_complete = resolve,
-            should_cancel = function() return should_break end,
+            should_cancel = function() return should_break or is_stale() end,
           }
         )
       end)
@@ -975,7 +985,7 @@ P.render_find_files = async(function(opts)
           end,
           {
             on_complete = resolve,
-            should_cancel = function() return #weighted_files_for_query >= gopts.max_results_considered end,
+            should_cancel = function() return is_stale() or #weighted_files_for_query >= gopts.max_results_considered end,
           }
         )
       end)
@@ -1026,7 +1036,7 @@ P.render_find_files = async(function(opts)
           formatted_filename = formatted_filename,
         })
       end,
-      { on_complete = resolve, }
+      { on_complete = resolve, should_cancel = is_stale, }
     )
   end)
   L.benchmark_step("end", "Get decorated_files")
@@ -1085,7 +1095,7 @@ P.render_find_files = async(function(opts)
           )
         end
       end,
-      { on_complete = resolve, }
+      { on_complete = resolve, should_cancel = is_stale, }
     )
   end)
   L.benchmark_step("end", "Highlight results")
