@@ -293,6 +293,7 @@ F.update_file_score = function(abs_path, opts)
   dated_files[H.cwd][abs_path] = updated_date_at_score_one
 
   local readable_dated_files_cwd = {}
+  -- TODO here
   for dated_file, date_at_score_one in pairs(dated_files[H.cwd]) do
     if H.readable(dated_file) then
       readable_dated_files_cwd[dated_file] = date_at_score_one
@@ -938,35 +939,47 @@ P.render_find_files = async(function(opts)
       L.benchmark_step("start", "Populate weighted_files for populated query")
 
       local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
+      local batch_starts = {}
       for start_idx = 1, #all_abs_paths, batch_size do
-        if #weighted_files_for_query >= gopts.max_results_considered then break end
-
-        local end_idx = math.min(start_idx + batch_size - 1, #all_abs_paths)
-        local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
-
-        local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
-
-        for idx, rel_path in ipairs(matched_files) do
-          local abs_path = vim.fs.joinpath(H.cwd, rel_path)
-          if #weighted_files_for_query >= gopts.max_results_considered then break end
-
-          if seen[abs_path] then goto continue end
-          seen[abs_path] = true
-          local fuzzy_score = match_scores[idx]
-          local match_idxs = match_idxs_tbl[idx]
-          local weighted_file = get_weighted_file {
-            abs_path = abs_path,
-            fuzzy_score = fuzzy_score,
-            match_idxs = match_idxs,
-            alternate_bufname = opts.alternate_bufname,
-            curr_bufname = opts.curr_bufname,
-            query = opts.query,
-          }
-          table.insert(weighted_files_for_query, weighted_file)
-
-          ::continue::
-        end
+        table.insert(batch_starts, start_idx)
       end
+
+      await(function(resolve)
+        H.throttled_iterator(
+          function() return ipairs(batch_starts) end,
+          function(_, start_idx)
+            local end_idx = math.min(start_idx + batch_size - 1, #all_abs_paths)
+            local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
+
+            local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
+
+            for idx, rel_path in ipairs(matched_files) do
+              local abs_path = vim.fs.joinpath(H.cwd, rel_path)
+              if #weighted_files_for_query >= gopts.max_results_considered then break end
+
+              if seen[abs_path] then goto continue end
+              seen[abs_path] = true
+              local fuzzy_score = match_scores[idx]
+              local match_idxs = match_idxs_tbl[idx]
+              local weighted_file = get_weighted_file {
+                abs_path = abs_path,
+                fuzzy_score = fuzzy_score,
+                match_idxs = match_idxs,
+                alternate_bufname = opts.alternate_bufname,
+                curr_bufname = opts.curr_bufname,
+                query = opts.query,
+              }
+              table.insert(weighted_files_for_query, weighted_file)
+
+              ::continue::
+            end
+          end,
+          {
+            on_complete = resolve,
+            should_cancel = function() return #weighted_files_for_query >= gopts.max_results_considered end,
+          }
+        )
+      end)
 
       L.benchmark_step("end", "Populate weighted_files for populated query")
     end
