@@ -622,12 +622,10 @@ P.refresh_files_cache = async(function(resolve)
       H.throttled_iterator(
         function() return ipairs(lines) end,
         function(_, abs_path)
-          if #abs_path == 0 then goto continue end
+          if #abs_path == 0 then return end
           local normalized_abs_path = vim.fs.normalize(abs_path)
           table.insert(P.caches.find_abs_paths, normalized_abs_path)
           table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
-
-          ::continue::
         end,
         { on_complete = iterator_resolve, }
       )
@@ -665,7 +663,7 @@ P.refresh_frecency_cache = function(resolve)
         function(abs_path, date_at_score_one)
           local score
 
-          if not H.readable(abs_path) then goto continue end
+          if not H.readable(abs_path) then return end
           score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
           P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
           P.caches.frecency_abs_path_to_score[abs_path] = score
@@ -674,8 +672,6 @@ P.refresh_frecency_cache = function(resolve)
             abs_path = abs_path,
             rel_path = vim.fs.relpath(H.cwd, abs_path),
           })
-
-          ::continue::
         end,
         { on_complete = iterator_resolve, }
       )
@@ -716,26 +712,34 @@ P.refresh_frecency_cache = function(resolve)
   end)()
 end
 
-P.refresh_open_buffers_cache = function()
+P.refresh_open_buffers_cache = function(resolve)
   P.caches.weighted_files_per_query = {}
   P.caches.open_buffer_to_modified = {}
 
   L.benchmark_step_heading "refresh_open_buffers_cache"
   L.benchmark_step("start", "Calculate open_buffer_to_modified (entire loop)")
-  for _, bufnr in pairs(vim.api.nvim_list_bufs()) do
-    if not vim.api.nvim_buf_is_loaded(bufnr) then goto continue end
-    if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then goto continue end
-    local buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
-    if buf_name == "" then goto continue end
-    if not vim.startswith(buf_name, H.cwd) then goto continue end
 
-    local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
-    P.caches.open_buffer_to_modified[buf_name] = modified
+  local bufs = vim.api.nvim_list_bufs()
+  H.throttled_iterator(
+    function() return ipairs(bufs) end,
+    function(_, bufnr)
+      if not vim.api.nvim_buf_is_loaded(bufnr) then return end
+      if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then return end
+      local buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
+      if buf_name == "" then return end
+      if not vim.startswith(buf_name, H.cwd) then return end
 
-    ::continue::
-  end
-  L.benchmark_step("end", "Calculate open_buffer_to_modified (entire loop)", { record_mean = false, })
-  L.benchmark_step_closing()
+      local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
+      P.caches.open_buffer_to_modified[buf_name] = modified
+    end,
+    {
+      on_complete = function()
+        L.benchmark_step("end", "Calculate open_buffer_to_modified (entire loop)", { record_mean = false, })
+        L.benchmark_step_closing()
+        resolve()
+      end,
+    }
+  )
 end
 
 --- @class WeightedFile
@@ -910,7 +914,7 @@ P.render_find_files = async(function(opts)
               return
             end
 
-            if seen[abs_path] then goto continue end
+            if seen[abs_path] then return end
             seen[abs_path] = true
             local frecency_score = 0
             if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
@@ -924,8 +928,6 @@ P.render_find_files = async(function(opts)
               match_idxs = {},
             }
             table.insert(weighted_files_for_query, weighted_file)
-
-            ::continue::
           end,
           {
             on_complete = resolve,
@@ -957,7 +959,7 @@ P.render_find_files = async(function(opts)
               local abs_path = vim.fs.joinpath(H.cwd, rel_path)
               if #weighted_files_for_query >= gopts.max_results_considered then break end
 
-              if seen[abs_path] then goto continue end
+              if seen[abs_path] then return end
               seen[abs_path] = true
               local fuzzy_score = match_scores[idx]
               local match_idxs = match_idxs_tbl[idx]
@@ -970,8 +972,6 @@ P.render_find_files = async(function(opts)
                 query = opts.query,
               }
               table.insert(weighted_files_for_query, weighted_file)
-
-              ::continue::
             end
           end,
           {
@@ -1264,7 +1264,7 @@ M.find = async(function()
     }
   end
 
-  P.refresh_open_buffers_cache()
+  await(P.refresh_open_buffers_cache)
   await(P.refresh_frecency_cache)
   render_find_files_for_query ""
 
@@ -1316,7 +1316,7 @@ M.find = async(function()
       local should_refresh = P.caches.frecency_abs_path_to_score[abs_path] ~= nil
       F.update_file_score(abs_path, { update_type = "remove", })
       if should_refresh then
-        P.refresh_open_buffers_cache()
+        await(P.refresh_open_buffers_cache)
         await(P.refresh_frecency_cache)
         render_find_files_for_query(vim.api.nvim_get_current_line())
       end
