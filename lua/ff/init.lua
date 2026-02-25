@@ -104,6 +104,83 @@ H.readable = function(abs_path)
   return stat_result ~= nil and stat_result.type == "file"
 end
 
+
+local function safe_resume(...)
+  local ok, err = coroutine.resume(...)
+  if not ok then error(err) end
+end
+
+--- @class ThrottledIteratorOpts
+--- @field on_complete? fun():nil
+--- @field threshold_ns? number
+--- @field should_cancel? fun():boolean
+
+--- @generic InvariantState, ControlVar
+--- @param iterator_factory fun(): ((fun(invariant_state: InvariantState, control_var: ControlVar):ControlVar), InvariantState, ControlVar)
+--- @param on_iteration fun(control_var: ControlVar, ...):nil
+--- @param opts? ThrottledIteratorOpts
+H.throttled_iterator = function(iterator_factory, on_iteration, opts)
+  opts = opts or {}
+  local threshold_ns = opts.threshold_ns or (10 * 1000000)
+  local on_complete = opts.on_complete or (function() end)
+  local should_cancel = opts.should_cancel or (function() return false end)
+
+  local function create_throttle()
+    local last_yield = vim.uv.hrtime()
+    return function()
+      local now = vim.uv.hrtime()
+      if (now - last_yield) >= threshold_ns then
+        last_yield = now
+        local thread = coroutine.running()
+        vim.schedule(function() safe_resume(thread) end)
+        coroutine.yield()
+      end
+    end
+  end
+
+  local function process()
+    local maybe_pause = create_throttle()
+
+    local iter_fn, invariant_state, control_var = iterator_factory()
+    while true do
+      if should_cancel() then
+        on_complete()
+        return
+      end
+      maybe_pause()
+
+      local values = { iter_fn(invariant_state, control_var), }
+      control_var = values[1]
+
+      if control_var == nil then
+        on_complete()
+        return
+      end
+
+      on_iteration(unpack(values))
+    end
+  end
+
+  safe_resume(coroutine.create(process))
+end
+
+--- @alias Promise fun(resolve: fun():nil):nil
+
+--- @param promise Promise
+local await = function(promise)
+  local thread = coroutine.running()
+  assert(thread ~= nil, "`await` can only be called in a coroutine")
+  vim.schedule(function() promise(function() coroutine.resume(thread) end) end)
+  coroutine.yield()
+end
+
+--- @param fn fun(...):nil
+local async = function(fn)
+  return function(...)
+    safe_resume(coroutine.create(fn), ...)
+  end
+end
+
 -- ======================================================
 -- == Frecency ==========================================
 -- ======================================================
@@ -547,10 +624,6 @@ P.refresh_files_cache = function()
     table.insert(P.caches.find_abs_paths, normalized_abs_path)
     table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
 
-    -- if gopts.batch_size and idx % gopts.batch_size == 0 then
-    --   coroutine.yield()
-    -- end
-
     ::continue::
   end
   L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
@@ -588,10 +661,6 @@ P.refresh_frecency_cache = function()
       abs_path = abs_path,
       rel_path = vim.fs.relpath(H.cwd, abs_path),
     })
-
-    -- if gopts.batch_size and idx % gopts.batch_size == 0 then
-    --   coroutine.yield()
-    -- end
 
     ::continue::
     idx = idx + 1
@@ -725,6 +794,7 @@ end
 --- @field curr_bufname string
 --- @field alternate_bufname string
 --- @param opts GetWeightedFileOpts
+--- @return WeightedFile
 local function get_weighted_file(opts)
   local gopts = P.defaulted_gopts()
 
@@ -785,7 +855,7 @@ end
 --- @field curr_tick number
 --- @field render_results fun(decorated_files:DecoratedFile[]):nil
 --- @param opts GetFindFilesOpts
-P.render_find_files = function(opts)
+P.render_find_files = async(function(opts)
   L.benchmark_step("start", "Total per keystroke")
 
   L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
@@ -809,30 +879,42 @@ P.render_find_files = function(opts)
 
     if #opts.query == 0 then
       L.benchmark_step("start", "Populate weighted_files for empty query")
-      for _, abs_path in ipairs(all_abs_paths) do
-        if #weighted_files_for_query >= gopts.max_results_rendered then break end
 
-        if seen[abs_path] then goto continue end
-        seen[abs_path] = true
-        local frecency_score = 0
-        if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
-          frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
-        end
-        local weighted_file = {
-          abs_path = abs_path,
-          weighted_score = frecency_score,
-          buf_and_frecency_score = 0,
-          fuzzy_score = 0,
-          match_idxs = {},
-        }
-        table.insert(weighted_files_for_query, weighted_file)
+      await(function(resolve)
+        local should_break = false
+        H.throttled_iterator(
+          function() return ipairs(all_abs_paths) end,
+          --- @param abs_path string
+          function(_, abs_path)
+            if #weighted_files_for_query >= gopts.max_results_rendered then
+              should_break = true
+              return
+            end
 
-        -- if gopts.batch_size and idx % gopts.batch_size == 0 then
-        --   coroutine.yield()
-        -- end
+            if seen[abs_path] then goto continue end
+            seen[abs_path] = true
+            local frecency_score = 0
+            if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+              frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
+            end
+            local weighted_file = {
+              abs_path = abs_path,
+              weighted_score = frecency_score,
+              buf_and_frecency_score = 0,
+              fuzzy_score = 0,
+              match_idxs = {},
+            }
+            table.insert(weighted_files_for_query, weighted_file)
 
-        ::continue::
-      end
+            ::continue::
+          end,
+          {
+            on_complete = resolve,
+            should_cancel = function() return should_break end,
+          }
+        )
+      end)
+
       L.benchmark_step("end", "Populate weighted_files for empty query")
     else
       L.benchmark_step("start", "Populate weighted_files for populated query")
@@ -866,10 +948,6 @@ P.render_find_files = function(opts)
 
           ::continue::
         end
-
-        -- if gopts.batch_size then
-        --   coroutine.yield()
-        -- end
       end
 
       L.benchmark_step("end", "Populate weighted_files for populated query")
@@ -967,15 +1045,11 @@ P.render_find_files = function(opts)
         { row_0_indexed, file_char_hl_col_0_indexed + 1, }
       )
     end
-
-    -- if gopts.batch_size and idx % gopts.batch_size == 0 then
-    --   coroutine.yield()
-    -- end
   end
   L.benchmark_step("end", "Highlight results")
   L.benchmark_step("end", "Total per keystroke")
   L.benchmark_step_closing()
-end
+end)
 
 --- @param win number
 P.save_minimal_opts = function(win)
