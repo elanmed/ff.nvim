@@ -452,12 +452,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field notify_frecency_update? boolean
 --- @field auto_setup? boolean
 
---- @class OnPickerOpenOpts
---- @field results_win number
---- @field results_buf number
---- @field input_win number
---- @field input_buf number
-
 --- @class Weights
 --- @field open_buf_boost? number
 --- @field modified_buf_boost? number
