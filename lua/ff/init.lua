@@ -262,46 +262,57 @@ end
 --- @param abs_path string
 --- @param opts UpdateFileScoreOpts
 F.update_file_score = function(abs_path, opts)
-  local now = F._now()
+  return function(resolve)
+    local now = F._now()
 
-  opts.db_dir = H.default(opts.db_dir, F.default_db_dir)
-  local dated_files_path = F.get_dated_files_path(opts.db_dir)
-  local dated_files = F.read(dated_files_path)
-  if dated_files[H.cwd] == nil then
-    dated_files[H.cwd] = {}
-  end
-
-  local updated_date_at_score_one = (function()
-    if opts.update_type == "increase" then
-      if not H.readable(abs_path) then
-        return nil
-      end
-
-      local score = 0
-      local date_at_score_one = dated_files[H.cwd][abs_path]
-      if date_at_score_one then
-        score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
-      end
-      local updated_score = score + 1
-
-      return F.compute_date_at_score_one { now = now, score = updated_score, }
+    opts.db_dir = H.default(opts.db_dir, F.default_db_dir)
+    local dated_files_path = F.get_dated_files_path(opts.db_dir)
+    local dated_files = F.read(dated_files_path)
+    if dated_files[H.cwd] == nil then
+      dated_files[H.cwd] = {}
     end
 
-    return nil
-  end)()
+    local updated_date_at_score_one = (function()
+      if opts.update_type == "increase" then
+        if not H.readable(abs_path) then
+          return nil
+        end
 
-  dated_files[H.cwd][abs_path] = updated_date_at_score_one
+        local score = 0
+        local date_at_score_one = dated_files[H.cwd][abs_path]
+        if date_at_score_one then
+          score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
+        end
+        local updated_score = score + 1
 
-  local readable_dated_files_cwd = {}
-  -- TODO here
-  for dated_file, date_at_score_one in pairs(dated_files[H.cwd]) do
-    if H.readable(dated_file) then
-      readable_dated_files_cwd[dated_file] = date_at_score_one
-    end
+        return F.compute_date_at_score_one { now = now, score = updated_score, }
+      end
+
+      return nil
+    end)()
+
+    dated_files[H.cwd][abs_path] = updated_date_at_score_one
+
+    local readable_dated_files_cwd = {}
+    -- TODO here
+    H.throttled_iterator(
+      function() return pairs(dated_files[H.cwd]) end,
+      --- @param dated_file string
+      --- @param date_at_score_one number
+      function(dated_file, date_at_score_one)
+        if H.readable(dated_file) then
+          readable_dated_files_cwd[dated_file] = date_at_score_one
+        end
+      end,
+      {
+        on_complete = function()
+          dated_files[H.cwd] = readable_dated_files_cwd
+          F.write(dated_files_path, dated_files)
+          if resolve then resolve() end
+        end,
+      }
+    )
   end
-
-  dated_files[H.cwd] = readable_dated_files_cwd
-  F.write(dated_files_path, dated_files)
 end
 
 -- ======================================================
@@ -1159,7 +1170,8 @@ M.setup = function()
         if gopts.notify_frecency_update then
           vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
         end
-        F.update_file_score(abs_path, { update_type = "increase", })
+        F.update_file_score(abs_path, { update_type = "increase", })()
+        -- TODO
         if P.caches.frecency_abs_path_to_score[abs_path] == nil then
           P.refresh_files_cache()
         end
@@ -1311,19 +1323,19 @@ M.find = async(function()
         vim.cmd "redraw"
       end)
     end,
-    ResultDeleteFrecencyScore = function()
+    ResultDeleteFrecencyScore = async(function()
       local result = vim.api.nvim_win_call(results_win, vim.api.nvim_get_current_line)
       if #result == 0 then return end
       local rel_path = vim.split(result, "|")[2]
       local abs_path = vim.fs.joinpath(H.cwd, rel_path)
       local should_refresh = P.caches.frecency_abs_path_to_score[abs_path] ~= nil
-      F.update_file_score(abs_path, { update_type = "remove", })
+      await(F.update_file_score(abs_path, { update_type = "remove", }))
       if should_refresh then
         await(P.refresh_open_buffers_cache)
         await(P.refresh_frecency_cache)
         render_find_files_for_query(vim.api.nvim_get_current_line())
       end
-    end,
+    end),
     Close = close,
     PreviewToggle = function()
       if P.preview_active then
