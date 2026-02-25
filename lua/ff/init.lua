@@ -605,36 +605,35 @@ P.caches = {
   weighted_files_per_query = {},
 }
 
-P.refresh_files_cache = async(function(resolve)
-  async(function()
-    L.benchmark_step_heading "refresh_files_cache"
-    P.caches.find_abs_paths = {}
-    P.caches.find_rel_paths = {}
+P.refresh_files_cache = function(resolve)
+  L.benchmark_step_heading "refresh_files_cache"
+  P.caches.find_abs_paths = {}
+  P.caches.find_rel_paths = {}
 
-    local gopts = P.defaulted_gopts()
+  local gopts = P.defaulted_gopts()
 
-    L.benchmark_step("start", "find_cmd vim.fn.systemlist")
-    local lines = vim.fn.systemlist(gopts.find_cmd)
-    L.benchmark_step("end", "find_cmd vim.fn.systemlist")
+  L.benchmark_step("start", "find_cmd vim.fn.systemlist")
+  local lines = vim.fn.systemlist(gopts.find_cmd)
+  L.benchmark_step("end", "find_cmd vim.fn.systemlist")
 
-    L.benchmark_step("start", "refresh_files_cache (entire loop)")
-    await(function(iterator_resolve)
-      H.throttled_iterator(
-        function() return ipairs(lines) end,
-        function(_, abs_path)
-          if #abs_path == 0 then return end
-          local normalized_abs_path = vim.fs.normalize(abs_path)
-          table.insert(P.caches.find_abs_paths, normalized_abs_path)
-          table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
-        end,
-        { on_complete = iterator_resolve, }
-      )
-    end)
-    L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
-    L.benchmark_step_closing()
-    if resolve then resolve() end
-  end)()
-end)
+  L.benchmark_step("start", "refresh_files_cache (entire loop)")
+  H.throttled_iterator(
+    function() return ipairs(lines) end,
+    function(_, abs_path)
+      if #abs_path == 0 then return end
+      local normalized_abs_path = vim.fs.normalize(abs_path)
+      table.insert(P.caches.find_abs_paths, normalized_abs_path)
+      table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
+    end,
+    {
+      on_complete = function()
+        L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
+        L.benchmark_step_closing()
+        if resolve then resolve() end
+      end,
+    }
+  )
+end
 
 P.refresh_frecency_cache = function(resolve)
   async(function()
