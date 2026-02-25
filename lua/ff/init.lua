@@ -973,7 +973,7 @@ P.render_find_files = async(function(opts)
               local abs_path = vim.fs.joinpath(H.cwd, rel_path)
               if #weighted_files_for_query >= gopts.max_results_considered then break end
 
-              if seen[abs_path] then return end
+              if seen[abs_path] then goto continue end
               seen[abs_path] = true
               local fuzzy_score = match_scores[idx]
               local match_idxs = match_idxs_tbl[idx]
@@ -986,6 +986,8 @@ P.render_find_files = async(function(opts)
                 query = opts.query,
               }
               table.insert(weighted_files_for_query, weighted_file)
+
+              ::continue::
             end
           end,
           {
