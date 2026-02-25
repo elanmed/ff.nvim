@@ -1281,10 +1281,6 @@ M.find = async(function()
     }
   end
 
-  await(P.refresh_open_buffers_cache)
-  await(P.refresh_frecency_cache)
-  render_find_files_for_query ""
-
   local function close()
     vim.api.nvim_buf_clear_namespace(results_buf, P.ns_id, 0, -1)
     vim.api.nvim_win_close(input_win, true)
@@ -1406,6 +1402,10 @@ M.find = async(function()
       render_find_files_for_query(vim.api.nvim_get_current_line())
     end,
   })
+
+  await(P.refresh_open_buffers_cache)
+  await(P.refresh_frecency_cache)
+  render_find_files_for_query ""
 end)
 
 if _G.FF_TEST then
