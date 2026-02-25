@@ -1001,29 +1001,35 @@ P.render_find_files = async(function(opts)
   --- @type DecoratedFile[]
   local decorated_files = {}
 
-  for _, weighted_file in ipairs(sliced_weighted_files) do
-    -- TODO: this is still ~5ms
-    local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = gopts.icons_enabled, }
-    local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
-    local formatted_filename = P.format_filename(
-      weighted_file.abs_path,
-      weighted_file.weighted_score,
-      icon_info.icon_char
+  await(function(resolve)
+    H.throttled_iterator(
+      function() return ipairs(sliced_weighted_files) end,
+      function(_, weighted_file)
+        -- TODO: this is still ~5ms
+        local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = gopts.icons_enabled, }
+        local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
+        local formatted_filename = P.format_filename(
+          weighted_file.abs_path,
+          weighted_file.weighted_score,
+          icon_info.icon_char
+        )
+
+        table.insert(decorated_files, {
+          abs_path = weighted_file.abs_path,
+          weighted_score = weighted_file.weighted_score,
+          fuzzy_score = weighted_file.fuzzy_score,
+          buf_and_frecency_score = weighted_file.buf_and_frecency_score,
+          match_idxs = weighted_file.match_idxs,
+
+          rel_path = rel_path,
+          icon_char = icon_info.icon_char,
+          icon_hl = icon_info.icon_hl,
+          formatted_filename = formatted_filename,
+        })
+      end,
+      { on_complete = resolve, }
     )
-
-    table.insert(decorated_files, {
-      abs_path = weighted_file.abs_path,
-      weighted_score = weighted_file.weighted_score,
-      fuzzy_score = weighted_file.fuzzy_score,
-      buf_and_frecency_score = weighted_file.buf_and_frecency_score,
-      match_idxs = weighted_file.match_idxs,
-
-      rel_path = rel_path,
-      icon_char = icon_info.icon_char,
-      icon_hl = icon_info.icon_hl,
-      formatted_filename = formatted_filename,
-    })
-  end
+  end)
   L.benchmark_step("end", "Get decorated_files")
   L.benchmark_step_closing()
 
@@ -1048,35 +1054,41 @@ P.render_find_files = async(function(opts)
   local icon_char_idx = formatted_score_last_idx + 2
 
   L.benchmark_step("start", "Highlight results")
-  for idx, decorated_file in ipairs(decorated_files) do
-    local row_0_indexed = idx - 1
+  await(function(resolve)
+    H.throttled_iterator(
+      function() return ipairs(decorated_files) end,
+      function(idx, decorated_file)
+        local row_0_indexed = idx - 1
 
-    if decorated_file.icon_hl then
-      local icon_hl_col_1_indexed = icon_char_idx
-      local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
+        if decorated_file.icon_hl then
+          local icon_hl_col_1_indexed = icon_char_idx
+          local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
 
-      vim.hl.range(
-        opts.results_buf,
-        P.ns_id,
-        decorated_file.icon_hl,
-        { row_0_indexed, icon_hl_col_0_indexed, },
-        { row_0_indexed, icon_hl_col_0_indexed + 1, }
-      )
-    end
+          vim.hl.range(
+            opts.results_buf,
+            P.ns_id,
+            decorated_file.icon_hl,
+            { row_0_indexed, icon_hl_col_0_indexed, },
+            { row_0_indexed, icon_hl_col_0_indexed + 1, }
+          )
+        end
 
-    local file_offset = decorated_file.formatted_filename:find "|"
-    for _, hl_idx in ipairs(decorated_file.match_idxs) do
-      local file_char_hl_col_0_indexed = hl_idx + file_offset
+        local file_offset = decorated_file.formatted_filename:find "|"
+        for _, hl_idx in ipairs(decorated_file.match_idxs) do
+          local file_char_hl_col_0_indexed = hl_idx + file_offset
 
-      vim.hl.range(
-        opts.results_buf,
-        P.ns_id,
-        "FFPickerFuzzyHighlightChar",
-        { row_0_indexed, file_char_hl_col_0_indexed, },
-        { row_0_indexed, file_char_hl_col_0_indexed + 1, }
-      )
-    end
-  end
+          vim.hl.range(
+            opts.results_buf,
+            P.ns_id,
+            "FFPickerFuzzyHighlightChar",
+            { row_0_indexed, file_char_hl_col_0_indexed, },
+            { row_0_indexed, file_char_hl_col_0_indexed + 1, }
+          )
+        end
+      end,
+      { on_complete = resolve, }
+    )
+  end)
   L.benchmark_step("end", "Highlight results")
   L.benchmark_step("end", "Total per keystroke")
   L.benchmark_step_closing()
