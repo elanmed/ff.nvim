@@ -443,7 +443,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field results_win_config? vim.api.keyset.win_config
 --- @field results_win_opts? vim.wo
 --- @field preview_win_opts? vim.wo
---- @field refresh_files_cache? "setup"|"find"
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field find_cmd? string
@@ -532,7 +531,6 @@ P.defaulted_gopts = function()
   opts.benchmark_step = H.default(opts.benchmark_step, false)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
   opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
-  opts.refresh_files_cache = H.default(opts.refresh_files_cache, "setup")
   opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
   opts.auto_setup = H.default(opts.auto_setup, true)
   return opts
@@ -606,28 +604,37 @@ P.caches = {
   weighted_files_per_query = {},
 }
 
-P.refresh_files_cache = function()
-  L.benchmark_step_heading "refresh_files_cache"
-  P.caches.find_abs_paths = {}
-  P.caches.find_rel_paths = {}
+P.refresh_files_cache = function(resolve)
+  async(function()
+    L.benchmark_step_heading "refresh_files_cache"
+    P.caches.find_abs_paths = {}
+    P.caches.find_rel_paths = {}
 
-  local gopts = P.defaulted_gopts()
+    local gopts = P.defaulted_gopts()
 
-  L.benchmark_step("start", "find_cmd vim.fn.systemlist")
-  local lines = vim.fn.systemlist(gopts.find_cmd)
-  L.benchmark_step("end", "find_cmd vim.fn.systemlist")
+    L.benchmark_step("start", "find_cmd vim.fn.systemlist")
+    local lines = vim.fn.systemlist(gopts.find_cmd)
+    L.benchmark_step("end", "find_cmd vim.fn.systemlist")
 
-  L.benchmark_step("start", "refresh_files_cache (entire loop)")
-  for _, abs_path in ipairs(lines) do
-    if #abs_path == 0 then goto continue end
-    local normalized_abs_path = vim.fs.normalize(abs_path)
-    table.insert(P.caches.find_abs_paths, normalized_abs_path)
-    table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
+    L.benchmark_step("start", "refresh_files_cache (entire loop)")
+    await(function(iterator_resolve)
+      H.throttled_iterator(
+        function() return ipairs(lines) end,
+        function(_, abs_path)
+          if #abs_path == 0 then goto continue end
+          local normalized_abs_path = vim.fs.normalize(abs_path)
+          table.insert(P.caches.find_abs_paths, normalized_abs_path)
+          table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
 
-    ::continue::
-  end
-  L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
-  L.benchmark_step_closing()
+          ::continue::
+        end,
+        { on_complete = iterator_resolve, }
+      )
+    end)
+    L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
+    L.benchmark_step_closing()
+    if resolve then resolve() end
+  end)()
 end
 
 P.refresh_frecency_cache = function()
@@ -1084,10 +1091,7 @@ M.setup = function()
 
   if P.setup_called then return end
   P.setup_called = true
-
-  if gopts.refresh_files_cache == "setup" then
-    P.refresh_files_cache()
-  end
+  P.refresh_files_cache()
 
   local timer_id = nil
   local last_updated_abs_file = nil
@@ -1226,16 +1230,9 @@ M.find = function()
 
   vim.schedule(
     function()
-      if gopts.refresh_files_cache == "find" then
-        P.refresh_files_cache()
-        P.refresh_open_buffers_cache()
-        P.refresh_frecency_cache()
-        render_find_files_for_query ""
-      else
-        P.refresh_open_buffers_cache()
-        P.refresh_frecency_cache()
-        render_find_files_for_query ""
-      end
+      P.refresh_open_buffers_cache()
+      P.refresh_frecency_cache()
+      render_find_files_for_query ""
     end
   )
 
