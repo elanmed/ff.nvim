@@ -610,6 +610,9 @@ P.caches = {
 
   --- @type table<string, WeightedFile[]>
   weighted_files_per_query = {},
+
+  --- @type FFOpts
+  gopts = {},
 }
 
 P.refresh_files_cache = function(resolve)
@@ -617,10 +620,8 @@ P.refresh_files_cache = function(resolve)
   P.caches.find_abs_paths = {}
   P.caches.find_rel_paths = {}
 
-  local gopts = P.defaulted_gopts()
-
   L.benchmark_step("start", "find_cmd vim.fn.systemlist")
-  local lines = vim.fn.systemlist(gopts.find_cmd)
+  local lines = vim.fn.systemlist(P.caches.gopts.find_cmd)
   L.benchmark_step("end", "find_cmd vim.fn.systemlist")
 
   L.benchmark_step("start", "refresh_files_cache (entire loop)")
@@ -822,16 +823,14 @@ end
 --- @field query string
 --- @field curr_bufname string
 --- @field alternate_bufname string
---- @field gopts FFOpts
 --- @param opts GetWeightedFileOpts
 --- @return WeightedFile
 P.get_weighted_file = function(opts)
-  local gopts = opts.gopts
   local scaled_fzf_score = P.scale_fuzzy_to_frecency {
     fuzzy_score = opts.fuzzy_score,
     query = opts.query,
-    weights = gopts.weights,
-    matchfuzzypos_sigmoid = gopts.matchfuzzypos_sigmoid,
+    weights = P.caches.gopts.weights,
+    matchfuzzypos_sigmoid = P.caches.gopts.matchfuzzypos_sigmoid,
   }
 
   local buf_score = 0
@@ -842,18 +841,18 @@ P.get_weighted_file = function(opts)
       opts.query == basename_without_ext or
       opts.query:gsub("%L", "") == basename_without_ext:gsub("%L", "")
   then
-    buf_score = gopts.weights.basename_boost
+    buf_score = P.caches.gopts.weights.basename_boost
   elseif P.caches.open_buffer_to_modified[opts.abs_path] ~= nil then
     local modified = P.caches.open_buffer_to_modified[opts.abs_path]
 
     if opts.abs_path == opts.curr_bufname then
-      buf_score = gopts.weights.current_buf_boost
+      buf_score = P.caches.gopts.weights.current_buf_boost
     elseif opts.abs_path == opts.alternate_bufname then
-      buf_score = gopts.weights.alternate_buf_boost
+      buf_score = P.caches.gopts.weights.alternate_buf_boost
     elseif modified then
-      buf_score = gopts.weights.modified_buf_boost
+      buf_score = P.caches.gopts.weights.modified_buf_boost
     else
-      buf_score = gopts.weights.open_buf_boost
+      buf_score = P.caches.gopts.weights.open_buf_boost
     end
   end
 
@@ -863,15 +862,15 @@ P.get_weighted_file = function(opts)
   end
 
   local weighted_score =
-      gopts.fuzzy_score_multiple * scaled_fzf_score +
-      gopts.file_score_multiple * buf_and_frecency_score
+      P.caches.gopts.fuzzy_score_multiple * scaled_fzf_score +
+      P.caches.gopts.file_score_multiple * buf_and_frecency_score
 
   return {
     abs_path = opts.abs_path,
     weighted_score = weighted_score,
     fuzzy_score = scaled_fzf_score,
     buf_and_frecency_score = buf_and_frecency_score,
-    match_idxs = gopts.hl_enabled and opts.match_idxs or {},
+    match_idxs = P.caches.gopts.hl_enabled and opts.match_idxs or {},
   }
 end
 
@@ -898,8 +897,6 @@ P.render_find_files = async(function(opts)
   L.benchmark_step_heading(("Get weighted files for query: '%s'"):format(opts.query))
   H.cwd = vim.uv.cwd()
 
-  local gopts = P.defaulted_gopts()
-
   --- @type WeightedFile[]
   local weighted_files_for_query = {}
 
@@ -923,7 +920,7 @@ P.render_find_files = async(function(opts)
           function() return ipairs(all_abs_paths) end,
           --- @param abs_path string
           function(_, abs_path)
-            if #weighted_files_for_query >= gopts.max_results_rendered then
+            if #weighted_files_for_query >= P.caches.gopts.max_results_rendered then
               should_break = true
               return
             end
@@ -954,7 +951,7 @@ P.render_find_files = async(function(opts)
     else
       L.benchmark_step("start", "Populate weighted_files for populated query")
 
-      local batch_size = gopts.batch_size == false and 250 or gopts.batch_size
+      local batch_size = P.caches.gopts.batch_size == false and 250 or P.caches.gopts.batch_size
       local batch_starts = {}
       for start_idx = 1, #all_abs_paths, batch_size do
         table.insert(batch_starts, start_idx)
@@ -971,14 +968,13 @@ P.render_find_files = async(function(opts)
 
             for idx, rel_path in ipairs(matched_files) do
               local abs_path = vim.fs.joinpath(H.cwd, rel_path)
-              if #weighted_files_for_query >= gopts.max_results_considered then break end
+              if #weighted_files_for_query >= P.caches.gopts.max_results_considered then break end
 
               if seen[abs_path] then goto continue end
               seen[abs_path] = true
               local fuzzy_score = match_scores[idx]
               local match_idxs = match_idxs_tbl[idx]
               local weighted_file = P.get_weighted_file {
-                gopts = gopts,
                 abs_path = abs_path,
                 fuzzy_score = fuzzy_score,
                 match_idxs = match_idxs,
@@ -993,7 +989,10 @@ P.render_find_files = async(function(opts)
           end,
           {
             on_complete = resolve,
-            should_cancel = function() return is_stale() or #weighted_files_for_query >= gopts.max_results_considered end,
+            should_cancel = function()
+              return is_stale() or
+                  #weighted_files_for_query >= P.caches.gopts.max_results_considered
+            end,
           }
         )
       end)
@@ -1013,7 +1012,7 @@ P.render_find_files = async(function(opts)
 
   L.benchmark_step_heading(("Get decorated_files for query: '%s'"):format(opts.query))
   L.benchmark_step("start", "Get decorated_files")
-  local sliced_weighted_files = vim.list_slice(weighted_files_for_query, 1, gopts.max_results_rendered)
+  local sliced_weighted_files = vim.list_slice(weighted_files_for_query, 1, P.caches.gopts.max_results_rendered)
 
   --- @type DecoratedFile[]
   local decorated_files = {}
@@ -1023,7 +1022,7 @@ P.render_find_files = async(function(opts)
       function() return ipairs(sliced_weighted_files) end,
       function(_, weighted_file)
         -- TODO: this is still ~5ms
-        local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = gopts.icons_enabled, }
+        local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = P.caches.gopts.icons_enabled, }
         local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
         local formatted_filename = P.format_filename(
           weighted_file.abs_path,
@@ -1056,7 +1055,7 @@ P.render_find_files = async(function(opts)
   opts.render_results(decorated_files)
   L.benchmark_step("end", "Render results")
 
-  if not gopts.hl_enabled then
+  if not P.caches.gopts.hl_enabled then
     L.benchmark_step("end", "Total per keystroke")
     L.benchmark_step_closing()
     return
@@ -1139,8 +1138,8 @@ end
 P.setup_called = false
 
 M.setup = function()
-  local gopts = P.defaulted_gopts()
-  if not gopts.auto_setup then return end
+  P.caches.gopts = P.defaulted_gopts()
+  if not P.caches.gopts.auto_setup then return end
 
   if P.setup_called then return end
   P.setup_called = true
@@ -1170,7 +1169,7 @@ M.setup = function()
       timer_id = vim.fn.timer_start(1000, function()
         last_updated_abs_file = abs_path
 
-        if gopts.notify_frecency_update then
+        if P.caches.gopts.notify_frecency_update then
           vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
         end
         F.update_file_score(abs_path, { update_type = "increase", })()
@@ -1222,7 +1221,7 @@ M.find = async(function()
   M.reset_benchmarks()
   P.preview_active = false
 
-  local gopts = P.defaulted_gopts()
+  P.caches.gopts = P.defaulted_gopts()
 
   local cursorline_opts = {
     cursorline = true,
@@ -1238,25 +1237,25 @@ M.find = async(function()
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = preview_buf, })
 
   local results_buf = vim.api.nvim_create_buf(false, true)
-  local results_win = vim.api.nvim_open_win(results_buf, false, gopts.results_win_config)
+  local results_win = vim.api.nvim_open_win(results_buf, false, P.caches.gopts.results_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf, })
   local minimal_opts = P.save_minimal_opts(results_win)
 
   local function set_results_win_opts()
     P.set_opts(results_win, minimal_opts)
     P.set_opts(results_win, cursorline_opts)
-    P.set_opts(results_win, gopts.results_win_opts)
+    P.set_opts(results_win, P.caches.gopts.results_win_opts)
   end
 
   local function set_preview_win_opts()
     P.set_opts(results_win, minimal_opts)
-    P.set_opts(results_win, gopts.preview_win_opts)
+    P.set_opts(results_win, P.caches.gopts.preview_win_opts)
   end
 
   set_results_win_opts()
 
   local input_buf = vim.api.nvim_create_buf(false, true)
-  local input_win = vim.api.nvim_open_win(input_buf, false, gopts.input_win_config)
+  local input_win = vim.api.nvim_open_win(input_buf, false, P.caches.gopts.input_win_config)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf, })
   vim.api.nvim_set_current_win(input_win)
 
