@@ -70,8 +70,7 @@ vim.g.ff = {
     basename_boost = 40,
     current_buf_boost = -1000,
   },
-  -- number | false `false` to disable coroutines
-  batch_size = 250,
+  matchfuzzypos_batch_size = 250,
   icons_enabled = true,
   -- highlighting the fuzzy matched characters and icons
   hl_enabled = true,

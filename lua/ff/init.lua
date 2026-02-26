@@ -294,7 +294,6 @@ F.update_file_score = function(abs_path, opts)
     dated_files[H.cwd][abs_path] = updated_date_at_score_one
 
     local readable_dated_files_cwd = {}
-    -- TODO here
     H.throttled_iterator(
       function() return pairs(dated_files[H.cwd]) end,
       --- @param dated_file string
@@ -446,7 +445,7 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @class FFOpts
 --- @field weights? Weights
 --- @field matchfuzzypos_sigmoid? MatchFuzzyPosSigmoid
---- @field batch_size? number | false
+--- @field matchfuzzypos_batch_size? number
 --- @field hl_enabled? boolean
 --- @field icons_enabled? boolean
 --- @field max_results_considered? number
@@ -490,7 +489,7 @@ P.defaulted_gopts = function()
   opts.matchfuzzypos_sigmoid.steepness = H.default(opts.matchfuzzypos_sigmoid.steepness, 0.02)
   opts.matchfuzzypos_sigmoid.midpoint = H.default(opts.matchfuzzypos_sigmoid.midpoint, 900)
 
-  opts.batch_size = H.default(opts.batch_size, 250)
+  opts.matchfuzzypos_batch_size = H.default(opts.matchfuzzypos_batch_size, 250)
   opts.hl_enabled = H.default(opts.hl_enabled, true)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
@@ -951,9 +950,8 @@ P.render_find_files = async(function(opts)
     else
       L.benchmark_step("start", "Populate weighted_files for populated query")
 
-      local batch_size = P.caches.gopts.batch_size == false and 250 or P.caches.gopts.batch_size
       local batch_starts = {}
-      for start_idx = 1, #all_abs_paths, batch_size do
+      for start_idx = 1, #all_abs_paths, P.caches.gopts.matchfuzzypos_batch_size do
         table.insert(batch_starts, start_idx)
       end
 
@@ -961,7 +959,7 @@ P.render_find_files = async(function(opts)
         H.throttled_iterator(
           function() return ipairs(batch_starts) end,
           function(_, start_idx)
-            local end_idx = math.min(start_idx + batch_size - 1, #all_abs_paths)
+            local end_idx = math.min(start_idx + P.caches.gopts.matchfuzzypos_batch_size - 1, #all_abs_paths)
             local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
 
             local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
