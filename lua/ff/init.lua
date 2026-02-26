@@ -451,7 +451,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field max_results_considered? number
 --- @field max_results_rendered? number
 --- @field fuzzy_score_multiple? number
---- @field file_score_multiple? number
 --- @field input_win_config? vim.api.keyset.win_config
 --- @field results_win_config? vim.api.keyset.win_config
 --- @field results_win_opts? vim.wo
@@ -494,7 +493,6 @@ P.defaulted_gopts = function()
   opts.icons_enabled = H.default(opts.icons_enabled, true)
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
-  opts.file_score_multiple = H.default(opts.file_score_multiple, 0.3)
 
   opts.results_win_opts = H.default(opts.results_win_opts, {})
   opts.preview_win_opts = H.default(opts.preview_win_opts, {})
@@ -860,9 +858,10 @@ P.get_weighted_file = function(opts)
     buf_and_frecency_score = buf_and_frecency_score + P.caches.frecency_abs_path_to_score[opts.abs_path]
   end
 
+  local file_score_multiple = 1 - P.caches.gopts.fuzzy_score_multiple
   local weighted_score =
       P.caches.gopts.fuzzy_score_multiple * scaled_fzf_score +
-      P.caches.gopts.file_score_multiple * buf_and_frecency_score
+      file_score_multiple * buf_and_frecency_score
 
   return {
     abs_path = opts.abs_path,

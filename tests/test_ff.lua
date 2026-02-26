@@ -537,7 +537,8 @@ T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_mu
   }
   local expected_buf_and_frecency_score = 20
   MiniTest.expect.equality(res.buf_and_frecency_score, expected_buf_and_frecency_score)
-  local expected_weighted = 0.8 * res.fuzzy_score + 0.2 * expected_buf_and_frecency_score
+  local file_score_multiple = 1 - 0.8
+  local expected_weighted = 0.8 * res.fuzzy_score + file_score_multiple * expected_buf_and_frecency_score
   MiniTest.expect.equality(res.weighted_score, expected_weighted)
 end
 

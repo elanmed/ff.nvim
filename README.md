@@ -75,9 +75,8 @@ vim.g.ff = {
   -- highlighting the fuzzy matched characters and icons
   hl_enabled = true,
   -- how much to weight the fuzzy match score vs the frecency + other weights
+  -- a value between 0 and 1
   fuzzy_score_multiple = 0.7,
-  -- how much to weight the frecency + other weights
-  file_score_multiple = 0.3,
   -- a max of `max_results_considered` files with a fuzzy match are sorted
   max_results_considered = 1000,
   -- a max of `max_results_rendered` sorted files are rendered in the results buffer
