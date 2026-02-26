@@ -6,7 +6,6 @@ local ff = require "ff"
 local H = ff._internal.H
 local F = ff._internal.F
 local P = ff._internal.P
-local M = ff
 
 T["H"] = MiniTest.new_set()
 
@@ -161,7 +160,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new f
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   local dated_files = F.read(dated_files_path)
   local date_at_score_one = dated_files[cwd][test_file_a]
@@ -173,7 +172,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeat
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_a],
@@ -184,7 +183,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeat
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   -- TODO: passes, precision issue
   -- MiniTest.expect.equality(
@@ -198,7 +197,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_a],
@@ -209,7 +208,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
   F.update_file_score(test_file_b, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_a],
@@ -226,7 +225,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = 
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_a],
@@ -239,7 +238,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = 
   F.update_file_score(test_file_b, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_a],
@@ -258,7 +257,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted file
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_a],
@@ -271,7 +270,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories"
   F.update_file_score(test_dir_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_dir_a],
@@ -287,7 +286,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories 
     db_dir = db_dir,
     update_type = "increase",
     stat_file = true,
-  })
+  })()
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_dir_a],
@@ -301,7 +300,7 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
-  })
+  })()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
@@ -309,7 +308,7 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "remove",
-  })
+  })()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
 end
@@ -403,19 +402,6 @@ local weighted_file_lua = {
 }
 
 --- @type WeightedFile
-local weighted_file_js = {
-  abs_path = "path/to/dir/icon.js",
-  rel_path = "icon.js",
-  buf_and_frecency_score = 30,
-  formatted_filename = "37.00 󰌞 |icon.js",
-  fuzzy_score = 40,
-  weighted_score = 37,
-  hl_idxs = {},
-  icon_char = "󰌞",
-  icon_hl = "MiniIconsYellow",
-}
-
---- @type WeightedFile
 local weighted_file_ts = {
   abs_path = "path/to/dir/mod_file.ts",
   rel_path = "mod_file.ts",
@@ -428,230 +414,122 @@ local weighted_file_ts = {
   icon_hl = "MiniIconsAzure",
 }
 
-local vim_uv_cwd = vim.uv.cwd
-T["P"]["get_weighted_files"] = MiniTest.new_set {
-  hooks = {
-    pre_case = function()
-      vim.g.ff = { max_results_rendered = 50, batch_size = false, }
-      vim.uv.cwd = function() return "path/to/dir" end
-    end,
-    post_case = function()
-      vim.uv.cwd = vim_uv_cwd
-    end,
-  },
-}
-T["P"]["get_weighted_files"]["when the query is cached, it should use the cache"] = function()
-  P.caches.weighted_files_per_query[query] = weighted_file_js
-
-  local res = M.get_weighted_files { query = query, }
-  MiniTest.expect.equality(weighted_file_js, res)
-end
-T["P"]["get_weighted_files"]["when the query is not cached, it should update the cache"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, weighted_file_js.abs_path, weighted_file_ts.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, weighted_file_js.rel_path, weighted_file_ts.rel_path, }
-
-  M.get_weighted_files { query = query, }
-  MiniTest.expect.equality(#P.caches.weighted_files_per_query[query], 2)
-  MiniTest.expect.equality(P.caches.weighted_files_per_query[query][1].abs_path, weighted_file_lua.abs_path)
-  MiniTest.expect.equality(P.caches.weighted_files_per_query[query][2].abs_path, weighted_file_js.abs_path)
-end
-T["P"]["get_weighted_files"]["should deduplicate the frecent files and fd files"] = function()
-  P.caches.frecency_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.frecency_rel_paths = { weighted_file_lua.rel_path, }
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, weighted_file_js.abs_path, weighted_file_ts.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, weighted_file_js.rel_path, weighted_file_ts.rel_path, }
-  P.caches.frecency_abs_path_to_score = {
-    [weighted_file_lua.abs_path] = 5,
-  }
-
-  local res = M.get_weighted_files { query = query, }
-  MiniTest.expect.equality(#res, 2)
-  MiniTest.expect.equality(res[1].abs_path, weighted_file_lua.abs_path)
-  MiniTest.expect.equality(res[2].abs_path, weighted_file_js.abs_path)
-end
-T["P"]["get_weighted_files"]["should sort the files based on the weighted_score"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, weighted_file_js.abs_path, weighted_file_ts.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, weighted_file_js.rel_path, weighted_file_ts.rel_path, }
-
-  local res = M.get_weighted_files { query = query, }
-  MiniTest.expect.equality(#res, 2)
-  MiniTest.expect.equality(res[1].weighted_score >= res[2].weighted_score, true)
-end
-
-T["P"]["get_weighted_files"]["get_weighted_file"] = MiniTest.new_set()
-T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"] = MiniTest.new_set()
-T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is a frecency score, it should use it as the weighted_score"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
-  P.caches.frecency_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.frecency_rel_paths = { weighted_file_lua.rel_path, }
-  P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 15.5, }
-
-  local res = M.get_weighted_files { query = "", }
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].weighted_score, 15.5)
-  MiniTest.expect.equality(res[1].fuzzy_score, 0)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 0)
-end
-T["P"]["get_weighted_files"]["get_weighted_file"]["when the query is empty"]["when there is no frecency score, it should set the weighted_score to 0"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
-  P.caches.frecency_abs_paths = {}
-  P.caches.frecency_rel_paths = {}
-  P.caches.frecency_abs_path_to_score = {}
-
-  local res = M.get_weighted_files { query = "", }
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].weighted_score, 0)
-  MiniTest.expect.equality(res[1].fuzzy_score, 0)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 0)
-end
-
-T["P"]["get_weighted_files"]["get_weighted_file"]["with no fuzzy match, it should not process the file"] = function()
-  P.caches.find_abs_paths = { weighted_file_ts.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_ts.rel_path, }
-  local res = M.get_weighted_files { query = query, }
-  MiniTest.expect.equality(#res, 0)
-end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { basename_boost = 100, }, }
-  local res = M.get_weighted_files {
+T["P"]["get_weighted_file"] = MiniTest.new_set()
+T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function()
+  vim.g.ff = { weights = { basename_boost = 100, }, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = "init.lua",
+    curr_bufname = "",
+    alternate_bufname = "",
   }
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 100)
+  MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { basename_boost = 400, }, }
-  local res = M.get_weighted_files {
+T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function()
+  vim.g.ff = { weights = { basename_boost = 400, }, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = "init",
+    curr_bufname = "",
+    alternate_bufname = "",
   }
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 400)
+  MiniTest.expect.equality(res.buf_and_frecency_score, 400)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the basename_boost when the alphabetic basename matches excluding the extension"] = function()
-  P.caches.find_abs_paths = { weighted_file_ts.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_ts.rel_path, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { basename_boost = 400, }, }
-  local res = M.get_weighted_files {
+T["P"]["get_weighted_file"]["should apply the basename_boost when the alphabetic basename matches excluding the extension"] = function()
+  vim.g.ff = { weights = { basename_boost = 400, }, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_ts.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = "modfile",
+    curr_bufname = "",
+    alternate_bufname = "",
   }
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 400)
+  MiniTest.expect.equality(res.buf_and_frecency_score, 400)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
+T["P"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { current_buf_boost = -90, }, }
-  local res = M.get_weighted_files {
+  vim.g.ff = { weights = { current_buf_boost = -90, }, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = query,
     curr_bufname = weighted_file_lua.abs_path,
+    alternate_bufname = "",
   }
-
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, -90)
+  MiniTest.expect.equality(res.buf_and_frecency_score, -90)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
+T["P"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { alternate_buf_boost = 300, }, }
-  local res = M.get_weighted_files {
+  vim.g.ff = { weights = { alternate_buf_boost = 300, }, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = query,
+    curr_bufname = "",
     alternate_bufname = weighted_file_lua.abs_path,
   }
-
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 300)
+  MiniTest.expect.equality(res.buf_and_frecency_score, 300)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
+T["P"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = true, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { modified_buf_boost = 200, }, }
-  local res = M.get_weighted_files {
+  vim.g.ff = { weights = { modified_buf_boost = 200, }, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = query,
+    curr_bufname = "",
+    alternate_bufname = "",
   }
-
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 200)
+  MiniTest.expect.equality(res.buf_and_frecency_score, 200)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
+T["P"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, weights = { open_buf_boost = 100, }, }
-  local res = M.get_weighted_files {
+  vim.g.ff = { weights = { open_buf_boost = 100, }, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = query,
+    curr_bufname = "",
+    alternate_bufname = "",
   }
-
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 100)
+  MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should apply the frecency score"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
-  P.caches.frecency_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.frecency_rel_paths = { weighted_file_lua.rel_path, }
+T["P"]["get_weighted_file"]["should apply the frecency score"] = function()
   P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 100, }
-
-  local res = M.get_weighted_files {
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 0,
+    match_idxs = {},
     query = query,
+    curr_bufname = "",
+    alternate_bufname = "",
   }
-
-  MiniTest.expect.equality(#res, 1)
-  MiniTest.expect.equality(res[1].buf_and_frecency_score, 100)
+  MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
-T["P"]["get_weighted_files"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function()
-  P.caches.find_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.find_rel_paths = { weighted_file_lua.rel_path, }
-  P.caches.frecency_abs_paths = { weighted_file_lua.abs_path, }
-  P.caches.frecency_rel_paths = { weighted_file_lua.rel_path, }
+T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function()
   P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 20, }
-
-  vim.g.ff = { max_results_rendered = 50, batch_size = false, fuzzy_score_multiple = 0.8, file_score_multiple = 0.2, }
-  local res = M.get_weighted_files {
+  vim.g.ff = { fuzzy_score_multiple = 0.8, file_score_multiple = 0.2, }
+  local res = P.get_weighted_file {
+    abs_path = weighted_file_lua.abs_path,
+    fuzzy_score = 100,
+    match_idxs = {},
     query = query,
+    curr_bufname = "",
+    alternate_bufname = "",
   }
-
   local expected_buf_and_frecency_score = 20
-  MiniTest.expect.equality(#res, 1)
-  local expected_weighted = 0.8 * res[1].fuzzy_score + 0.2 * expected_buf_and_frecency_score
-  MiniTest.expect.equality(res[1].weighted_score, expected_weighted)
-end
-
-T["P"]["highlight_weighted_files"] = MiniTest.new_set()
-T["P"]["highlight_weighted_files"]["should apply highlights to buffer"] = function()
-  local results_buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_lines(results_buf, 0, -1, false, { "12.34 📄 |init.lua", })
-
-  local decorated_files = { {
-    formatted_filename = "12.34 📄 |init.lua",
-    icon_hl = "TestIconHL",
-    match_idxs = { 1, 5, },
-  }, }
-
-  vim.g.ff = { max_results_rendered = 1, }
-  P.highlight_weighted_files {
-    decorated_files = decorated_files,
-    results_buf = results_buf,
-  }
-
-  local extmarks = vim.api.nvim_buf_get_extmarks(results_buf, P.ns_id, 0, -1, {})
-  MiniTest.expect.equality(#extmarks > 0, true)
-  vim.api.nvim_buf_delete(results_buf, { force = true, })
+  MiniTest.expect.equality(res.buf_and_frecency_score, expected_buf_and_frecency_score)
+  local expected_weighted = 0.8 * res.fuzzy_score + 0.2 * expected_buf_and_frecency_score
+  MiniTest.expect.equality(res.weighted_score, expected_weighted)
 end
 
 return T

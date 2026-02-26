@@ -824,7 +824,7 @@ end
 --- @field alternate_bufname string
 --- @param opts GetWeightedFileOpts
 --- @return WeightedFile
-local function get_weighted_file(opts)
+P.get_weighted_file = function(opts)
   local gopts = P.defaulted_gopts()
 
   local scaled_fzf_score = P.scale_fuzzy_to_frecency {
@@ -977,7 +977,7 @@ P.render_find_files = async(function(opts)
               seen[abs_path] = true
               local fuzzy_score = match_scores[idx]
               local match_idxs = match_idxs_tbl[idx]
-              local weighted_file = get_weighted_file {
+              local weighted_file = P.get_weighted_file {
                 abs_path = abs_path,
                 fuzzy_score = fuzzy_score,
                 match_idxs = match_idxs,
