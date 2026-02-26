@@ -822,11 +822,11 @@ end
 --- @field query string
 --- @field curr_bufname string
 --- @field alternate_bufname string
+--- @field gopts FFOpts
 --- @param opts GetWeightedFileOpts
 --- @return WeightedFile
 P.get_weighted_file = function(opts)
-  local gopts = P.defaulted_gopts()
-
+  local gopts = opts.gopts
   local scaled_fzf_score = P.scale_fuzzy_to_frecency {
     fuzzy_score = opts.fuzzy_score,
     query = opts.query,
@@ -978,6 +978,7 @@ P.render_find_files = async(function(opts)
               local fuzzy_score = match_scores[idx]
               local match_idxs = match_idxs_tbl[idx]
               local weighted_file = P.get_weighted_file {
+                gopts = gopts,
                 abs_path = abs_path,
                 fuzzy_score = fuzzy_score,
                 match_idxs = match_idxs,
