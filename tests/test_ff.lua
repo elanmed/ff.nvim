@@ -325,6 +325,7 @@ T["P"] = MiniTest.new_set {
       P.caches.open_buffer_to_modified = {}
       P.caches.weighted_files_per_query = {}
       vim.g.ff = nil
+      P.caches.gopts = P.defaulted_gopts()
     end,
   },
 }
@@ -417,6 +418,7 @@ local weighted_file_ts = {
 T["P"]["get_weighted_file"] = MiniTest.new_set()
 T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function()
   vim.g.ff = { weights = { basename_boost = 100, }, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 0,
@@ -429,6 +431,7 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the basename m
 end
 T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function()
   vim.g.ff = { weights = { basename_boost = 400, }, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 0,
@@ -441,6 +444,7 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the basename m
 end
 T["P"]["get_weighted_file"]["should apply the basename_boost when the alphabetic basename matches excluding the extension"] = function()
   vim.g.ff = { weights = { basename_boost = 400, }, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_ts.abs_path,
     fuzzy_score = 0,
@@ -454,6 +458,7 @@ end
 T["P"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
   vim.g.ff = { weights = { current_buf_boost = -90, }, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 0,
@@ -467,6 +472,7 @@ end
 T["P"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
   vim.g.ff = { weights = { alternate_buf_boost = 300, }, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 0,
@@ -480,6 +486,7 @@ end
 T["P"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = true, }
   vim.g.ff = { weights = { modified_buf_boost = 200, }, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 0,
@@ -493,6 +500,7 @@ end
 T["P"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
   vim.g.ff = { weights = { open_buf_boost = 100, }, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 0,
@@ -518,6 +526,7 @@ end
 T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function()
   P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 20, }
   vim.g.ff = { fuzzy_score_multiple = 0.8, file_score_multiple = 0.2, }
+  P.caches.gopts = P.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 100,
