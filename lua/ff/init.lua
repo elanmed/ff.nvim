@@ -104,7 +104,6 @@ H.readable = function(abs_path)
   return stat_result ~= nil and stat_result.type == "file"
 end
 
-
 local function safe_resume(...)
   local ok, err = coroutine.resume(...)
   if not ok then error(err) end
@@ -439,7 +438,7 @@ P.tick = 0
 P.preview_active = false
 P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 
-P.MAX_FRECENCY_SCORE = 99 -- approx the largest reasonable frecency score
+P.MAX_FRECENCY_SCORE = 99 -- decent default
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
 --- @class FFOpts
@@ -901,11 +900,13 @@ P.render_find_files = async(function(opts)
   if P.caches.weighted_files_per_query[opts.query] then
     weighted_files_for_query = P.caches.weighted_files_per_query[opts.query]
   else
+    L.benchmark_step("start", "Build combined path lists (deepcopy + list_extend)")
     local all_abs_paths = vim.deepcopy(P.caches.frecency_abs_paths)
     vim.list_extend(all_abs_paths, P.caches.find_abs_paths)
 
     local all_rel_paths = vim.deepcopy(P.caches.frecency_rel_paths)
     vim.list_extend(all_rel_paths, P.caches.find_rel_paths)
+    L.benchmark_step("end", "Build combined path lists (deepcopy + list_extend)")
 
     local seen = {}
 
@@ -1218,6 +1219,8 @@ M.find = async(function()
   M.reset_benchmarks()
   P.preview_active = false
 
+  L.benchmark_step("start", "M.find (total init)")
+
   P.caches.gopts = P.defaulted_gopts()
 
   local cursorline_opts = {
@@ -1404,8 +1407,16 @@ M.find = async(function()
     end,
   })
 
+  L.benchmark_step("start", "await refresh_open_buffers_cache")
   await(P.refresh_open_buffers_cache)
+  L.benchmark_step("end", "await refresh_open_buffers_cache")
+
+  L.benchmark_step("start", "await refresh_frecency_cache")
   await(P.refresh_frecency_cache)
+  L.benchmark_step("end", "await refresh_frecency_cache")
+
+  L.benchmark_step("end", "M.find (total init)")
+
   render_find_files_for_query ""
 end)
 
