@@ -116,7 +116,7 @@ end
 --- @field should_cancel? fun():boolean
 
 --- @generic InvariantState, ControlVar
---- @param iterator_factory fun(): ((fun(invariant_state: InvariantState, control_var: ControlVar):ControlVar), InvariantState, ControlVar)
+--- @param iterator_factory fun(): ((fun(invariant_state: InvariantState, control_var: ControlVar):ControlVar), InvariantState?, ControlVar?)
 --- @param on_iteration fun(control_var: ControlVar, ...):nil
 --- @param opts? ThrottledIteratorOpts
 H.throttled_iterator = function(iterator_factory, on_iteration, opts)
