@@ -1396,6 +1396,10 @@ M.find = async(function()
     callback = function()
       P.tick = P.tick + 1
       if P.preview_active then keymap_fns["PreviewToggle"]() end
+      vim.api.nvim_win_call(results_win, function()
+        vim.cmd "normal! gg"
+        vim.cmd "redraw"
+      end)
       render_find_files_for_query(vim.api.nvim_get_current_line())
     end,
   })
