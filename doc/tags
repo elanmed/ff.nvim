@@ -12,16 +12,10 @@ ff-deps	ff.txt	/*ff-deps*
 ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
 ff-find	ff.txt	/*ff-find*
-ff-get_decorated_files	ff.txt	/*ff-get_decorated_files*
-ff-get_weighted_files	ff.txt	/*ff-get_weighted_files*
 ff-highlight-groups	ff.txt	/*ff-highlight-groups*
 ff-performance	ff.txt	/*ff-performance*
 ff-plug-remaps	ff.txt	/*ff-plug-remaps*
-ff-print_mean_benchmarks	ff.txt	/*ff-print_mean_benchmarks*
 ff-refresh_files_cache	ff.txt	/*ff-refresh_files_cache*
-ff-refresh_frecency_cache	ff.txt	/*ff-refresh_frecency_cache*
-ff-refresh_open_buffers_cache	ff.txt	/*ff-refresh_open_buffers_cache*
-ff-reset_benchmarks	ff.txt	/*ff-reset_benchmarks*
 ff-setup	ff.txt	/*ff-setup*
 ff-similar-plugins	ff.txt	/*ff-similar-plugins*
 ff-table-of-contents	ff.txt	/*ff-table-of-contents*
