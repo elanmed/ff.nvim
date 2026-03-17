@@ -129,6 +129,21 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 })
 ```
 
+## Lazy-loading
+
+To lazy-load `ff.nvim`, set `auto_setup = false` and use the `on_complete` callback to open the picker once the file cache is ready:
+
+```lua
+vim.g.ff = { auto_setup = false }
+
+vim.keymap.set("n", "<leader>f", function()
+  local ff = require "ff"
+  ff.setup(function() ff.find() end)
+end)
+```
+
+`setup()` is a no-op after the first call, so subsequent keypresses open the picker immediately.
+
 ## API
 
 ### `setup`

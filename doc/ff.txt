@@ -1,10 +1,11 @@
-*ff.txt*                                         Last change: 2026 February 26
+*ff.txt*                                            Last change: 2026 March 17
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
 
 Performance ................................................. |ff-performance|
 Configuration example ............................. |ff-configuration-example|
+Lazy-loading ............................................... |ff-lazy-loading|
 API ................................................................. |ff-api|
 `setup` ........................................................... |ff-setup|
 `find` ............................................................. |ff-find|
@@ -163,6 +164,25 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       end,
     })
 <
+
+------------------------------------------------------------------------------
+LAZY-LOADING                                                 *ff-lazy-loading*
+
+
+To lazy-load `ff.nvim`, set `auto_setup = false` and use the `on_complete`
+callback to open the picker once the file cache is ready:
+
+>lua
+    vim.g.ff = { auto_setup = false }
+    
+    vim.keymap.set("n", "<leader>f", function()
+      local ff = require "ff"
+      ff.setup(function() ff.find() end)
+    end)
+<
+`setup()` is a no-op after the first call, so subsequent keypresses open the
+picker immediately.
+
 
 ------------------------------------------------------------------------------
 API                                                                   *ff-api*

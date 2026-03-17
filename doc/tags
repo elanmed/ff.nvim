@@ -13,6 +13,7 @@ ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
 ff-find	ff.txt	/*ff-find*
 ff-highlight-groups	ff.txt	/*ff-highlight-groups*
+ff-lazy-loading	ff.txt	/*ff-lazy-loading*
 ff-performance	ff.txt	/*ff-performance*
 ff-plug-remaps	ff.txt	/*ff-plug-remaps*
 ff-refresh_files_cache	ff.txt	/*ff-refresh_files_cache*
