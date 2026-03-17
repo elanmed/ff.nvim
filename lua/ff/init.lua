@@ -1189,12 +1189,12 @@ M.refresh_files_cache = function()
   P.refresh_files_cache()
 end
 
-M.reset_benchmarks = function()
+P.reset_benchmarks = function()
   L.ongoing_benchmarks = {}
   L.benchmarks_for_mean = {}
 end
 
-M.print_mean_benchmarks = function()
+P.print_mean_benchmarks = function()
   L.benchmark_mean_heading "Mean benchmarks"
 
   if not L.should_log_mean() then return end
@@ -1216,7 +1216,7 @@ M.find = async(function()
     vim.notify("[ff.nvim]: `setup` must be called before `find`", vim.log.levels.ERROR)
     return
   end
-  M.reset_benchmarks()
+  P.reset_benchmarks()
   P.preview_active = false
 
   L.benchmark_step("start", "M.find (total init)")
@@ -1284,7 +1284,7 @@ M.find = async(function()
   local function close()
     vim.api.nvim_buf_clear_namespace(results_buf, P.ns_id, 0, -1)
     vim.api.nvim_win_close(input_win, true)
-    M.print_mean_benchmarks()
+    P.print_mean_benchmarks()
     vim.cmd "stopinsert"
   end
 
