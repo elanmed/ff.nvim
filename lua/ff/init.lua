@@ -7,6 +7,14 @@ local M = {}
 local H = {}
 H.cwd = vim.uv.cwd()
 
+--- @param level vim.log.levels
+--- @param msg string
+--- @param ... any
+H.notify = function(level, msg, ...)
+  msg = "[ff.nvim]: " .. msg
+  vim.notify(msg:format(...), level)
+end
+
 --- @generic T
 --- @param val T | nil
 --- @param default_val T
@@ -214,13 +222,13 @@ F.write = function(path, data)
   local path_dir = vim.fs.dirname(path)
   local mkdir_res = vim.fn.mkdir(path_dir, "p")
   if mkdir_res == H.vimscript_false then
-    vim.notify("[ff.nvim]: vim.fn.mkdir returned vimscript_false", vim.log.levels.ERROR)
+    H.notify(vim.log.levels.ERROR, "vim.fn.mkdir returned vimscript_false")
     return
   end
 
   local file = io.open(path, "w")
   if file == nil then
-    vim.notify("[ff.nvim]: io.open failed to open the file created with vim.fn.mkdir", vim.log.levels.ERROR)
+    H.notify(vim.log.levels.ERROR, "io.open failed to open the file created with vim.fn.mkdir")
     return
   end
 
@@ -323,7 +331,7 @@ local L = {}
 L.log = function(content)
   local file = io.open("ff.log", "a")
   if file == nil then
-    vim.notify("[ff.nvim]: opening `ff.log` failed", vim.log.levels.ERROR)
+    H.notify(vim.log.levels.ERROR, "opening `ff.log` failed")
     return
   end
   file:write(content .. "\n")
@@ -472,7 +480,7 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field midpoint? number
 
 --- @return FFOpts
-P.defaulted_gopts = function()
+M.defaulted_gopts = function()
   local opts = H.default(vim.g.ff, {})
   opts = vim.deepcopy(opts)
 
@@ -1137,10 +1145,11 @@ P.setup_called = false
 
 --- @param on_complete? fun():nil
 M.setup = async(function(on_complete)
-  P.caches.gopts = P.defaulted_gopts()
-  if not P.caches.gopts.auto_setup then return end
-
-  if P.setup_called then return end
+  P.caches.gopts = M.defaulted_gopts()
+  if P.setup_called then
+    if on_complete then on_complete() end
+    return
+  end
 
   local timer_id = nil
   local last_updated_abs_file = nil
@@ -1167,10 +1176,9 @@ M.setup = async(function(on_complete)
         last_updated_abs_file = abs_path
 
         if P.caches.gopts.notify_frecency_update then
-          vim.notify(("[ff.nvim] frecency score updated for %s"):format(rel_path), vim.log.levels.INFO)
+          H.notify(vim.log.levels.INFO, "frecency score updated for %s", rel_path)
         end
         F.update_file_score(abs_path, { update_type = "increase", })()
-        -- TODO
         if P.caches.frecency_abs_path_to_score[abs_path] == nil then
           P.refresh_files_cache()
         end
@@ -1180,6 +1188,9 @@ M.setup = async(function(on_complete)
   vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { default = true, link = "Search", })
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { default = true, link = "CursorLine", })
 
+  if not P.caches.gopts.auto_setup then
+    H.notify(vim.log.levels.INFO, "populating the files cache, this may take a minute ...")
+  end
   await(P.refresh_files_cache)
   P.setup_called = true
   if on_complete then on_complete() end
@@ -1188,7 +1199,7 @@ end)
 --- @param on_complete? fun():nil
 M.refresh_files_cache = async(function(on_complete)
   if not P.setup_called then
-    vim.notify("[ff.nvim]: `setup` must be called before `refresh_files_cache`", vim.log.levels.ERROR)
+    H.notify(vim.log.levels.ERROR, "`setup` must be called before `refresh_files_cache`")
   end
   await(P.refresh_files_cache)
   if on_complete then on_complete() end
@@ -1218,7 +1229,7 @@ end
 
 M.find = async(function()
   if not P.setup_called then
-    vim.notify("[ff.nvim]: `setup` must be called before `find`", vim.log.levels.ERROR)
+    H.notify(vim.log.levels.ERROR, "`setup` must be called before `find`")
     return
   end
   P.reset_benchmarks()
@@ -1226,7 +1237,7 @@ M.find = async(function()
 
   L.benchmark_step("start", "M.find (total init)")
 
-  P.caches.gopts = P.defaulted_gopts()
+  P.caches.gopts = M.defaulted_gopts()
 
   local cursorline_opts = {
     cursorline = true,
