@@ -134,11 +134,13 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 ### `setup`
 
 ```lua
-require "ff".setup()
+require "ff".setup(on_complete?)
 ```
 
 By default, `setup()` is automatically on startup. This can be disabled by setting `vim.g.ff.auto_setup = false`. Note that if `auto_setup` is disabled,
 `setup()` still needs to be called manually.
+
+An optional `on_complete` callback is called once setup finishes (including the initial file cache population).
 
 ### `find`
 
@@ -149,11 +151,12 @@ require "ff".find()
 ### `refresh_files_cache`
 
 ```lua
-require "ff".refresh_files_cache()
+require "ff".refresh_files_cache(on_complete?)
 ```
 
 By default, `refresh_files_cache()` is called once when `setup()` is run. When performing actions on the file system,
-it can be helpful to refresh the cache so the picker shows the latest files. This can be done with an autocommand like:
+it can be helpful to refresh the cache so the picker shows the latest files. An optional `on_complete` callback is
+called once the cache has been refreshed. This can be used with an autocommand like:
 
 ```lua
 vim.api.nvim_create_autocmd("User", {

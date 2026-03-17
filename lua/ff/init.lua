@@ -1135,13 +1135,12 @@ end
 
 P.setup_called = false
 
-M.setup = function()
+--- @param on_complete? fun():nil
+M.setup = async(function(on_complete)
   P.caches.gopts = P.defaulted_gopts()
   if not P.caches.gopts.auto_setup then return end
 
   if P.setup_called then return end
-  P.setup_called = true
-  P.refresh_files_cache()
 
   local timer_id = nil
   local last_updated_abs_file = nil
@@ -1180,14 +1179,20 @@ M.setup = function()
   })
   vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { default = true, link = "Search", })
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { default = true, link = "CursorLine", })
-end
 
-M.refresh_files_cache = function()
+  await(P.refresh_files_cache)
+  P.setup_called = true
+  if on_complete then on_complete() end
+end)
+
+--- @param on_complete? fun():nil
+M.refresh_files_cache = async(function(on_complete)
   if not P.setup_called then
     vim.notify("[ff.nvim]: `setup` must be called before `refresh_files_cache`", vim.log.levels.ERROR)
   end
-  P.refresh_files_cache()
-end
+  await(P.refresh_files_cache)
+  if on_complete then on_complete() end
+end)
 
 P.reset_benchmarks = function()
   L.ongoing_benchmarks = {}
