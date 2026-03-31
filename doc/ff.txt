@@ -91,8 +91,6 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       benchmark_mean = false,
       -- defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
       find_cmd = "fd --absolute-path --type f",
-      -- call vim.notify when a file's frecency score is updated
-      notify_frecency_update = false
       -- configuration options for the sigmoid function that scales the result of matchfuzzypos
       -- to a range of [0, max_frecency_score + max_weights_score]
       matchfuzzypos_sigmoid = {

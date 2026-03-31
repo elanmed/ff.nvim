@@ -465,7 +465,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field find_cmd? string
---- @field notify_frecency_update? boolean
 --- @field auto_setup? boolean
 
 --- @class Weights
@@ -543,7 +542,6 @@ M.defaulted_gopts = function()
   opts.benchmark_step = H.default(opts.benchmark_step, false)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
   opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
-  opts.notify_frecency_update = H.default(opts.notify_frecency_update, false)
   opts.auto_setup = H.default(opts.auto_setup, true)
   return opts
 end
@@ -1175,9 +1173,6 @@ M.setup = async(function(on_complete)
       timer_id = vim.fn.timer_start(1000, function()
         last_updated_abs_file = abs_path
 
-        if P.caches.gopts.notify_frecency_update then
-          H.notify(vim.log.levels.INFO, "frecency score updated for %s", rel_path)
-        end
         F.update_file_score(abs_path, { update_type = "increase", })()
         if P.caches.frecency_abs_path_to_score[abs_path] == nil then
           P.refresh_files_cache()
@@ -1188,9 +1183,6 @@ M.setup = async(function(on_complete)
   vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { default = true, link = "Search", })
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { default = true, link = "CursorLine", })
 
-  if not P.caches.gopts.auto_setup then
-    H.notify(vim.log.levels.INFO, "populating the files cache, this may take a minute ...")
-  end
   await(P.refresh_files_cache)
   P.setup_called = true
   if on_complete then on_complete() end
