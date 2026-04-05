@@ -1364,6 +1364,7 @@ M.find = async(function()
 
       local filetype = vim.filetype.match { filename = abs_path, }
       if filetype == nil then return end
+      vim.bo[preview_buf].syntax = filetype
 
       local lang_ok, lang = pcall(vim.treesitter.language.get_lang, filetype)
       if not lang_ok then return end
