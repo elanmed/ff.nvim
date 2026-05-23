@@ -1374,14 +1374,17 @@ M.find = async(function()
     PreviewScrollDown = function()
       if not P.preview_active then return end
       vim.api.nvim_win_call(results_win, function()
-        vim.cmd 'execute "normal! \\<C-d>"'
+        vim.cmd [[execute "normal! \<C-d>"]]
       end)
     end,
     PreviewScrollUp = function()
       if not P.preview_active then return end
       vim.api.nvim_win_call(results_win, function()
-        vim.cmd 'execute "normal! \\<C-u>"'
+        vim.cmd [[execute "normal! \<C-u>"]]
       end)
+    end,
+    InputClear = function()
+      vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, {})
     end,
   }
 
