@@ -19,4 +19,3 @@ docs:
 	nvim --headless -c "helptags doc/" -c "qa"
 
 deploy: test lint docs
-
