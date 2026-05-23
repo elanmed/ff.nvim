@@ -615,6 +615,9 @@ P.caches = {
 
   --- @type FFOpts
   gopts = {},
+
+  --- @type string
+  input_line = "",
 }
 
 P.refresh_files_cache = function(resolve)
@@ -1264,10 +1267,14 @@ M.find = async(function()
 
   local input_buf = vim.api.nvim_create_buf(false, true)
   local input_win = vim.api.nvim_open_win(input_buf, false, P.caches.gopts.input_win_config)
+  vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, { P.caches.input_line, })
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf, })
   vim.api.nvim_set_current_win(input_win)
 
   vim.cmd "startinsert"
+  local col_1i = #P.caches.input_line + 1
+  local col_0i = col_1i - 1
+  vim.api.nvim_win_set_cursor(input_win, { 1, col_0i, })
 
   --- @param query string
   local function render_find_files_for_query(query)
@@ -1304,6 +1311,7 @@ M.find = async(function()
       if #result == 0 then return end
       close()
       vim.cmd.edit(vim.split(result, "|")[2])
+      P.caches.input_line = ""
     end,
     ResultNext = function()
       if P.preview_active then return end
@@ -1415,7 +1423,9 @@ M.find = async(function()
         vim.cmd "normal! gg"
         vim.cmd "redraw"
       end)
-      render_find_files_for_query(vim.api.nvim_get_current_line())
+      local curr_line = vim.api.nvim_get_current_line()
+      P.caches.input_line = curr_line
+      render_find_files_for_query(curr_line)
     end,
   })
 
@@ -1429,7 +1439,7 @@ M.find = async(function()
 
   L.benchmark_step("end", "M.find (total init)")
 
-  render_find_files_for_query ""
+  render_find_files_for_query(P.caches.input_line)
 end)
 
 if _G.FF_TEST then
