@@ -158,7 +158,10 @@ An optional `on_complete` callback is called once setup finishes (including the 
 ### `find`
 
 ```lua
-require "ff".find()
+--- `opts` defaults to `{}`
+--- `opts.resume` defaults to `false`
+local opts = { resume = true }
+require "ff".find(opts)
 ```
 
 ### `refresh_files_cache`
