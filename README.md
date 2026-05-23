@@ -227,6 +227,10 @@ vim.api.nvim_create_autocmd("User", {
 
 - Scroll the preview up half a page
 
+#### `<Plug>FFInputClear`
+
+- Clear the input
+
 ## Deps
 
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
