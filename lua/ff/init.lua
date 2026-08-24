@@ -229,13 +229,15 @@ F.update_file_score = function(abs_path, opts)
     local readable_dated_files_cwd = {}
     A.throttled_iterator(
       function() return pairs(dated_files[H.cwd]) end,
-      --- @param dated_file string
-      --- @param date_at_score_one number
-      function(dated_file, date_at_score_one)
-        if H.readable(dated_file) then
-          readable_dated_files_cwd[dated_file] = date_at_score_one
-        end
-      end
+      {
+        --- @param dated_file string
+        --- @param date_at_score_one number
+        on_iteration = function(dated_file, date_at_score_one)
+          if H.readable(dated_file) then
+            readable_dated_files_cwd[dated_file] = date_at_score_one
+          end
+        end,
+      }
     )(function()
           dated_files[H.cwd] = readable_dated_files_cwd
           F.write(dated_files_path, dated_files)
@@ -555,12 +557,14 @@ P.refresh_files_cache = function(resolve)
   L.benchmark_step("start", "refresh_files_cache (entire loop)")
   A.throttled_iterator(
     function() return ipairs(lines) end,
-    function(_, abs_path)
-      if #abs_path == 0 then return end
-      local normalized_abs_path = vim.fs.normalize(abs_path)
-      table.insert(P.caches.find_abs_paths, normalized_abs_path)
-      table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
-    end
+    {
+      on_iteration = function(_, abs_path)
+        if #abs_path == 0 then return end
+        local normalized_abs_path = vim.fs.normalize(abs_path)
+        table.insert(P.caches.find_abs_paths, normalized_abs_path)
+        table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
+      end,
+    }
   )(function()
         L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false, })
         L.benchmark_step_closing()
@@ -589,21 +593,23 @@ P.refresh_frecency_cache = function(resolve)
 
     A.await(A.throttled_iterator(
       function() return pairs(dated_files[H.cwd]) end,
-      --- @param abs_path string
-      --- @param date_at_score_one number
-      function(abs_path, date_at_score_one)
-        local score
+      {
+        --- @param abs_path string
+        --- @param date_at_score_one number
+        on_iteration = function(abs_path, date_at_score_one)
+          local score
 
-        if not H.readable(abs_path) then return end
-        score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
-        P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
-        P.caches.frecency_abs_path_to_score[abs_path] = score
-        table.insert(frecency_paths_to_sort, {
-          score = score,
-          abs_path = abs_path,
-          rel_path = vim.fs.relpath(H.cwd, abs_path),
-        })
-      end
+          if not H.readable(abs_path) then return end
+          score = F.compute_score { now = now, date_at_score_one = date_at_score_one, }
+          P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
+          P.caches.frecency_abs_path_to_score[abs_path] = score
+          table.insert(frecency_paths_to_sort, {
+            score = score,
+            abs_path = abs_path,
+            rel_path = vim.fs.relpath(H.cwd, abs_path),
+          })
+        end,
+      }
     ))
 
     L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_abs_paths")
@@ -652,16 +658,18 @@ P.refresh_open_buffers_cache = function(resolve)
   local bufs = vim.api.nvim_list_bufs()
   A.throttled_iterator(
     function() return ipairs(bufs) end,
-    function(_, bufnr)
-      if not vim.api.nvim_buf_is_loaded(bufnr) then return end
-      if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then return end
-      local buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
-      if buf_name == "" then return end
-      if not vim.startswith(buf_name, H.cwd) then return end
+    {
+      on_iteration = function(_, bufnr)
+        if not vim.api.nvim_buf_is_loaded(bufnr) then return end
+        if not vim.api.nvim_get_option_value("buflisted", { buf = bufnr, }) then return end
+        local buf_name = vim.fs.normalize(vim.api.nvim_buf_get_name(bufnr))
+        if buf_name == "" then return end
+        if not vim.startswith(buf_name, H.cwd) then return end
 
-      local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
-      P.caches.open_buffer_to_modified[buf_name] = modified
-    end
+        local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr, })
+        P.caches.open_buffer_to_modified[buf_name] = modified
+      end,
+    }
   )(function()
         L.benchmark_step("end", "Calculate open_buffer_to_modified (entire loop)", { record_mean = false, })
         L.benchmark_step_closing()
@@ -840,29 +848,31 @@ P.render_find_files = A.make_spawn(function(opts)
       local should_break = false
       A.await(A.throttled_iterator(
         function() return ipairs(all_abs_paths) end,
-        --- @param abs_path string
-        function(_, abs_path)
-          if #weighted_files_for_query >= P.caches.gopts.max_results_rendered then
-            should_break = true
-            return
-          end
+        {
+          --- @param abs_path string
+          on_iteration = function(_, abs_path)
+            if #weighted_files_for_query >= P.caches.gopts.max_results_rendered then
+              should_break = true
+              return
+            end
 
-          if seen[abs_path] then return end
-          seen[abs_path] = true
-          local frecency_score = 0
-          if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
-            frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
-          end
-          local weighted_file = {
-            abs_path = abs_path,
-            weighted_score = frecency_score,
-            buf_and_frecency_score = 0,
-            fuzzy_score = 0,
-            match_idxs = {},
-          }
-          table.insert(weighted_files_for_query, weighted_file)
-        end,
-        { should_cancel = function() return should_break or is_stale() end, }
+            if seen[abs_path] then return end
+            seen[abs_path] = true
+            local frecency_score = 0
+            if P.caches.frecency_abs_path_to_score[abs_path] ~= nil then
+              frecency_score = P.caches.frecency_abs_path_to_score[abs_path]
+            end
+            local weighted_file = {
+              abs_path = abs_path,
+              weighted_score = frecency_score,
+              buf_and_frecency_score = 0,
+              fuzzy_score = 0,
+              match_idxs = {},
+            }
+            table.insert(weighted_files_for_query, weighted_file)
+          end,
+          should_cancel = function() return should_break or is_stale() end,
+        }
       ))
 
       L.benchmark_step("end", "Populate weighted_files for empty query")
@@ -876,34 +886,34 @@ P.render_find_files = A.make_spawn(function(opts)
 
       A.await(A.throttled_iterator(
         function() return ipairs(batch_starts) end,
-        function(_, start_idx)
-          local end_idx = math.min(start_idx + P.caches.gopts.matchfuzzypos_batch_size - 1, #all_abs_paths)
-          local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
-
-          local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
-
-          for idx, rel_path in ipairs(matched_files) do
-            local abs_path = vim.fs.joinpath(H.cwd, rel_path)
-            if #weighted_files_for_query >= P.caches.gopts.max_results_considered then break end
-
-            if seen[abs_path] then goto continue end
-            seen[abs_path] = true
-            local fuzzy_score = match_scores[idx]
-            local match_idxs = match_idxs_tbl[idx]
-            local weighted_file = P.get_weighted_file {
-              abs_path = abs_path,
-              fuzzy_score = fuzzy_score,
-              match_idxs = match_idxs,
-              alternate_bufname = opts.alternate_bufname,
-              curr_bufname = opts.curr_bufname,
-              query = opts.query,
-            }
-            table.insert(weighted_files_for_query, weighted_file)
-
-            ::continue::
-          end
-        end,
         {
+          on_iteration = function(_, start_idx)
+            local end_idx = math.min(start_idx + P.caches.gopts.matchfuzzypos_batch_size - 1, #all_abs_paths)
+            local rel_path_chunk = vim.list_slice(all_rel_paths, start_idx, end_idx)
+
+            local matched_files, match_idxs_tbl, match_scores = unpack(vim.fn.matchfuzzypos(rel_path_chunk, opts.query))
+
+            for idx, rel_path in ipairs(matched_files) do
+              local abs_path = vim.fs.joinpath(H.cwd, rel_path)
+              if #weighted_files_for_query >= P.caches.gopts.max_results_considered then break end
+
+              if seen[abs_path] then goto continue end
+              seen[abs_path] = true
+              local fuzzy_score = match_scores[idx]
+              local match_idxs = match_idxs_tbl[idx]
+              local weighted_file = P.get_weighted_file {
+                abs_path = abs_path,
+                fuzzy_score = fuzzy_score,
+                match_idxs = match_idxs,
+                alternate_bufname = opts.alternate_bufname,
+                curr_bufname = opts.curr_bufname,
+                query = opts.query,
+              }
+              table.insert(weighted_files_for_query, weighted_file)
+
+              ::continue::
+            end
+          end,
           should_cancel = function()
             return is_stale() or
                 #weighted_files_for_query >= P.caches.gopts.max_results_considered
@@ -933,30 +943,32 @@ P.render_find_files = A.make_spawn(function(opts)
 
   A.await(A.throttled_iterator(
     function() return ipairs(sliced_weighted_files) end,
-    function(_, weighted_file)
-      -- TODO: this is still ~5ms
-      local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = P.caches.gopts.icons_enabled, }
-      local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
-      local formatted_filename = P.format_filename(
-        weighted_file.abs_path,
-        weighted_file.weighted_score,
-        icon_info.icon_char
-      )
+    {
+      on_iteration = function(_, weighted_file)
+        -- TODO: this is still ~5ms
+        local icon_info = P.get_icon_info { abs_path = weighted_file.abs_path, icons_enabled = P.caches.gopts.icons_enabled, }
+        local rel_path = vim.fs.relpath(H.cwd, weighted_file.abs_path)
+        local formatted_filename = P.format_filename(
+          weighted_file.abs_path,
+          weighted_file.weighted_score,
+          icon_info.icon_char
+        )
 
-      table.insert(decorated_files, {
-        abs_path = weighted_file.abs_path,
-        weighted_score = weighted_file.weighted_score,
-        fuzzy_score = weighted_file.fuzzy_score,
-        buf_and_frecency_score = weighted_file.buf_and_frecency_score,
-        match_idxs = weighted_file.match_idxs,
+        table.insert(decorated_files, {
+          abs_path = weighted_file.abs_path,
+          weighted_score = weighted_file.weighted_score,
+          fuzzy_score = weighted_file.fuzzy_score,
+          buf_and_frecency_score = weighted_file.buf_and_frecency_score,
+          match_idxs = weighted_file.match_idxs,
 
-        rel_path = rel_path,
-        icon_char = icon_info.icon_char,
-        icon_hl = icon_info.icon_hl,
-        formatted_filename = formatted_filename,
-      })
-    end,
-    { should_cancel = is_stale, }
+          rel_path = rel_path,
+          icon_char = icon_info.icon_char,
+          icon_hl = icon_info.icon_hl,
+          formatted_filename = formatted_filename,
+        })
+      end,
+      should_cancel = is_stale,
+    }
   ))
   L.benchmark_step("end", "Get decorated_files")
   L.benchmark_step_closing()
@@ -984,36 +996,38 @@ P.render_find_files = A.make_spawn(function(opts)
   L.benchmark_step("start", "Highlight results")
   A.await(A.throttled_iterator(
     function() return ipairs(decorated_files) end,
-    function(idx, decorated_file)
-      local row_0_indexed = idx - 1
+    {
+      on_iteration = function(idx, decorated_file)
+        local row_0_indexed = idx - 1
 
-      if decorated_file.icon_hl then
-        local icon_hl_col_1_indexed = icon_char_idx
-        local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
+        if decorated_file.icon_hl then
+          local icon_hl_col_1_indexed = icon_char_idx
+          local icon_hl_col_0_indexed = icon_hl_col_1_indexed - 1
 
-        vim.hl.range(
-          opts.results_buf,
-          P.ns_id,
-          decorated_file.icon_hl,
-          { row_0_indexed, icon_hl_col_0_indexed, },
-          { row_0_indexed, icon_hl_col_0_indexed + 1, }
-        )
-      end
+          vim.hl.range(
+            opts.results_buf,
+            P.ns_id,
+            decorated_file.icon_hl,
+            { row_0_indexed, icon_hl_col_0_indexed, },
+            { row_0_indexed, icon_hl_col_0_indexed + 1, }
+          )
+        end
 
-      local file_offset = decorated_file.formatted_filename:find "|"
-      for _, hl_idx in ipairs(decorated_file.match_idxs) do
-        local file_char_hl_col_0_indexed = hl_idx + file_offset
+        local file_offset = decorated_file.formatted_filename:find "|"
+        for _, hl_idx in ipairs(decorated_file.match_idxs) do
+          local file_char_hl_col_0_indexed = hl_idx + file_offset
 
-        vim.hl.range(
-          opts.results_buf,
-          P.ns_id,
-          "FFPickerFuzzyHighlightChar",
-          { row_0_indexed, file_char_hl_col_0_indexed, },
-          { row_0_indexed, file_char_hl_col_0_indexed + 1, }
-        )
-      end
-    end,
-    { should_cancel = is_stale, }
+          vim.hl.range(
+            opts.results_buf,
+            P.ns_id,
+            "FFPickerFuzzyHighlightChar",
+            { row_0_indexed, file_char_hl_col_0_indexed, },
+            { row_0_indexed, file_char_hl_col_0_indexed + 1, }
+          )
+        end
+      end,
+      should_cancel = is_stale,
+    }
   ))
   L.benchmark_step("end", "Highlight results")
   L.benchmark_step("end", "Total per keystroke")
