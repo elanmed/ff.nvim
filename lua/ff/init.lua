@@ -1091,6 +1091,7 @@ end
 
 P.setup_called = false
 
+--- @async
 local setup_inner = function()
   P.caches.gopts = M.defaulted_gopts()
   if P.setup_called then
