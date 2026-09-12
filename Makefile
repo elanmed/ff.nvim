@@ -1,4 +1,4 @@
-.PHONY: dev clean lint test docs deploy
+.PHONY: dev clean lint test format docs deploy
 
 dev:
 	mkdir -p ~/.local/share/nvim/site/pack/dev/start/ff.nvim
@@ -7,15 +7,20 @@ dev:
 clean:
 	rm -rf ~/.local/share/nvim/site/pack/dev
 
+test:
+	nvim --headless --noplugin -u ./scripts/minimal_init.lua -c "lua MiniTest.run()"
+
 lint:
 	# https://luals.github.io/#install
 	lua-language-server --check=./lua --checklevel=Error
 
-test:
-	nvim --headless --noplugin -u ./scripts/minimal_init.lua -c "lua MiniTest.run()"
+format:
+	# https://github.com/JohnnyMorganz/StyLua#usage
+	stylua .
 
 docs:
+	mkdir -p ./doc
 	./deps/ts-vimdoc.nvim/scripts/docgen.sh README.md doc/ff.txt ff
 	nvim --headless -c "helptags doc/" -c "qa"
 
-deploy: test lint docs
+deploy: test lint format docs
