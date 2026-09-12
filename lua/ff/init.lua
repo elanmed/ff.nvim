@@ -231,7 +231,6 @@ F.update_file_score = function(abs_path, opts)
   dated_files[H.cwd][abs_path] = updated_date_at_score_one
 
   local readable_dated_files_cwd = {}
-  vim.async.await()
   A.await_throttled_iterator {
     iterator_factory = function()
       return pairs(dated_files[H.cwd])
@@ -560,7 +559,7 @@ P.refresh_files_cache = function()
 
   L.benchmark_step("start", "refresh_files_cache (entire loop)")
   A.await_throttled_iterator {
-    iterator_factor = function()
+    iterator_factory = function()
       return ipairs(lines)
     end,
     --- @param abs_path string
@@ -577,74 +576,73 @@ P.refresh_files_cache = function()
   L.benchmark_step_closing()
 end
 
+--- @async
 P.refresh_frecency_cache = function()
-  vim.async.run("refresh_frecency_cache_task", function()
-    L.benchmark_step_heading "refresh_frecency_cache"
-    P.caches.frecency_abs_paths = {}
-    P.caches.frecency_rel_paths = {}
-    P.caches.frecency_abs_path_to_score = {}
+  L.benchmark_step_heading "refresh_frecency_cache"
+  P.caches.frecency_abs_paths = {}
+  P.caches.frecency_rel_paths = {}
+  P.caches.frecency_abs_path_to_score = {}
 
-    L.benchmark_step("start", "dated_files file read")
-    local dated_files_path = F.get_dated_files_path()
-    local dated_files = F.read(dated_files_path)
-    if dated_files[H.cwd] == nil then
-      dated_files[H.cwd] = {}
-    end
-    L.benchmark_step("end", "dated_files file read", { record_mean = false })
+  L.benchmark_step("start", "dated_files file read")
+  local dated_files_path = F.get_dated_files_path()
+  local dated_files = F.read(dated_files_path)
+  if dated_files[H.cwd] == nil then
+    dated_files[H.cwd] = {}
+  end
+  L.benchmark_step("end", "dated_files file read", { record_mean = false })
 
-    local now = os.time()
-    L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
-    local frecency_paths_to_sort = {}
+  local now = os.time()
+  L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
+  local frecency_paths_to_sort = {}
 
-    A.await_throttled_iterator {
-      iterator_factory = function()
-        return pairs(dated_files[H.cwd])
-      end,
-      --- @param abs_path string
-      --- @param date_at_score_one number
-      on_iteration = function(abs_path, date_at_score_one)
-        local score
+  A.await_throttled_iterator {
+    iterator_factory = function()
+      return pairs(dated_files[H.cwd])
+    end,
+    --- @param abs_path string
+    --- @param date_at_score_one number
+    on_iteration = function(abs_path, date_at_score_one)
+      local score
 
-        if not H.readable(abs_path) then
-          return
-        end
-        score = F.compute_score { now = now, date_at_score_one = date_at_score_one }
-        P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
-        P.caches.frecency_abs_path_to_score[abs_path] = score
-        table.insert(frecency_paths_to_sort, {
-          score = score,
-          abs_path = abs_path,
-          rel_path = vim.fs.relpath(H.cwd, abs_path),
-        })
-      end,
-    }
+      if not H.readable(abs_path) then
+        return
+      end
+      score = F.compute_score { now = now, date_at_score_one = date_at_score_one }
+      P.MAX_FRECENCY_SCORE = math.max(P.MAX_FRECENCY_SCORE, score)
+      P.caches.frecency_abs_path_to_score[abs_path] = score
+      table.insert(frecency_paths_to_sort, {
+        score = score,
+        abs_path = abs_path,
+        rel_path = vim.fs.relpath(H.cwd, abs_path),
+      })
+    end,
+  }
 
-    L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_abs_paths")
-    table.sort(frecency_paths_to_sort, function(a, b)
-      return a.score > b.score
-    end)
-    L.benchmark_step("end", "Sort frecency files before setting to P.caches.frecency_abs_paths")
-
-    L.benchmark_step("start", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
-    P.caches.frecency_abs_paths = vim.tbl_map(function(frecency_file)
-      return frecency_file.abs_path
-    end, frecency_paths_to_sort)
-    L.benchmark_step("end", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
-
-    L.benchmark_step("start", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
-    P.caches.frecency_rel_paths = vim.tbl_map(function(frecency_file)
-      return frecency_file.rel_path
-    end, frecency_paths_to_sort)
-    L.benchmark_step("end", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
-
-    P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
-    L.benchmark_step(
-      "end",
-      "Calculate frecency_abs_path_to_score (entire loop)",
-      { record_mean = false }
-    )
-    L.benchmark_step_closing()
+  L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_abs_paths")
+  table.sort(frecency_paths_to_sort, function(a, b)
+    return a.score > b.score
   end)
+  L.benchmark_step("end", "Sort frecency files before setting to P.caches.frecency_abs_paths")
+
+  L.benchmark_step("start", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
+  P.caches.frecency_abs_paths = vim.tbl_map(function(frecency_file)
+    return frecency_file.abs_path
+  end, frecency_paths_to_sort)
+  L.benchmark_step("end", "Set P.caches.frecency_abs_paths (vim.tbl_map)")
+
+  L.benchmark_step("start", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
+  P.caches.frecency_rel_paths = vim.tbl_map(function(frecency_file)
+    return frecency_file.rel_path
+  end, frecency_paths_to_sort)
+  L.benchmark_step("end", "Set P.caches.frecency_rel_paths (vim.tbl_map)")
+
+  P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
+  L.benchmark_step(
+    "end",
+    "Calculate frecency_abs_path_to_score (entire loop)",
+    { record_mean = false }
+  )
+  L.benchmark_step_closing()
 end
 
 --- @async
@@ -657,7 +655,7 @@ P.refresh_open_buffers_cache = function()
 
   local bufs = vim.api.nvim_list_bufs()
   A.await_throttled_iterator {
-    iterator_factor = function()
+    iterator_factory = function()
       return ipairs(bufs)
     end,
     --- @param bufnr number
@@ -1192,7 +1190,7 @@ end
 
 --- @async
 --- @param opts? FFFindOpts
-local find = function(opts)
+M.find = function(opts)
   opts = H.default(opts, {})
   opts.resume = H.default(opts.resume, false)
 
@@ -1435,12 +1433,6 @@ local find = function(opts)
   L.benchmark_step("end", "M.find (total init)")
 
   render_find_files_for_query(opts.resume and P.caches.input_line or "")
-end
---- @param opts? FFFindOpts
-M.find = function(opts)
-  vim.async.run("find_task", function()
-    find(opts)
-  end)
 end
 
 if _G.FF_TEST then
