@@ -1089,14 +1089,9 @@ end
 
 P.setup_called = false
 
---- @async
---- @param on_complete? fun():nil
-M.setup = function(on_complete)
+local setup_inner = function()
   P.caches.gopts = M.defaulted_gopts()
   if P.setup_called then
-    if on_complete then
-      on_complete()
-    end
     return
   end
 
@@ -1146,21 +1141,23 @@ M.setup = function(on_complete)
 
   P.refresh_files_cache()
   P.setup_called = true
-  if on_complete then
-    on_complete()
-  end
 end
 
---- @async
---- @param on_complete? fun():nil
-M.refresh_files_cache = function(on_complete)
-  if not P.setup_called then
-    H.notify(vim.log.levels.ERROR, "`setup` must be called before `refresh_files_cache`")
-  end
-  P.refresh_files_cache()
-  if on_complete then
-    on_complete()
-  end
+--- @return vim.async.Task
+M.setup = function()
+  return vim.async.run("setup_task", function()
+    setup_inner()
+  end)
+end
+
+--- @return vim.async.Task
+M.refresh_files_cache = function()
+  return vim.async.run("refresh_files_cache_task", function()
+    if not P.setup_called then
+      H.notify(vim.log.levels.ERROR, "`setup` must be called before `refresh_files_cache`")
+    end
+    P.refresh_files_cache()
+  end)
 end
 
 P.reset_benchmarks = function()
@@ -1192,7 +1189,7 @@ end
 
 --- @async
 --- @param opts? FFFindOpts
-M.find = function(opts)
+local find_inner = function(opts)
   opts = H.default(opts, {})
   opts.resume = H.default(opts.resume, false)
 
@@ -1435,6 +1432,14 @@ M.find = function(opts)
   L.benchmark_step("end", "M.find (total init)")
 
   render_find_files_for_query(opts.resume and P.caches.input_line or "")
+end
+
+--- @return vim.async.Task
+--- @param opts? FFFindOpts
+M.find = function(opts)
+  return vim.async.run("find_task", function()
+    find_inner(opts)
+  end)
 end
 
 if _G.FF_TEST then
