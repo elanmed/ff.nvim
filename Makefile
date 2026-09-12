@@ -8,7 +8,7 @@ clean:
 	rm -rf ~/.local/share/nvim/site/pack/dev
 
 test:
-	nvim --headless --noplugin -u ./scripts/minimal_init.lua -c "lua MiniTest.run()"
+	timeout 5 nvim --headless --noplugin -u ./scripts/minimal_init.lua -c "lua MiniTest.run()"
 
 lint:
 	# https://luals.github.io/#install
