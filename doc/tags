@@ -1,4 +1,5 @@
 ff-<plug>ffclose	ff.txt	/*ff-<plug>ffclose*
+ff-<plug>ffinputclear	ff.txt	/*ff-<plug>ffinputclear*
 ff-<plug>ffpreviewscrolldown	ff.txt	/*ff-<plug>ffpreviewscrolldown*
 ff-<plug>ffpreviewscrollup	ff.txt	/*ff-<plug>ffpreviewscrollup*
 ff-<plug>ffpreviewtoggle	ff.txt	/*ff-<plug>ffpreviewtoggle*

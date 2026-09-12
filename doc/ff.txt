@@ -1,4 +1,4 @@
-*ff.txt*                                            Last change: 2026 March 17
+*ff.txt*                                              Last change: 2026 May 23
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -20,6 +20,7 @@ Plug remaps ................................................. |ff-plug-remaps|
 `<Plug>FFPreviewToggle` ........................... |ff-<plug>ffpreviewtoggle|
 `<Plug>FFPreviewScrollDown` ................... |ff-<plug>ffpreviewscrolldown|
 `<Plug>FFPreviewScrollUp` ....................... |ff-<plug>ffpreviewscrollup|
+`<Plug>FFInputClear` ................................. |ff-<plug>ffinputclear|
 Deps ............................................................... |ff-deps|
 TODO ............................................................... |ff-todo|
 Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
@@ -205,7 +206,10 @@ the initial file cache population).
 `FIND`                                                               *ff-find*
 
 >lua
-    require "ff".find()
+    --- `opts` defaults to `{}`
+    --- `opts.resume` defaults to `false`
+    local opts = { resume = true }
+    require "ff".find(opts)
 <
 
                                                                               
@@ -289,6 +293,11 @@ PLUG REMAPS                                                   *ff-plug-remaps*
 `<PLUG>FFPREVIEWSCROLLUP`                         *ff-<plug>ffpreviewscrollup*
 
 - Scroll the preview up half a page
+
+                                                                              
+`<PLUG>FFINPUTCLEAR`                                   *ff-<plug>ffinputclear*
+
+- Clear the input
 
 ------------------------------------------------------------------------------
 DEPS                                                                 *ff-deps*

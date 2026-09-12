@@ -1,5 +1,5 @@
 _G.FF_TEST = true
-require "mini.test".setup()
+require("mini.test").setup()
 local T = MiniTest.new_set()
 
 local ff = require "ff"
@@ -28,10 +28,16 @@ T["H"]["#rel_path"] = MiniTest.new_set {
 
 T["H"]["#rel_path"]["returns the rel file path when able"] = function()
   MiniTest.expect.equality(H.rel_path "path/to/dir/file.txt", "file.txt")
-  MiniTest.expect.equality(H.rel_path "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
+  MiniTest.expect.equality(
+    H.rel_path "path/to/another_dir/file.txt",
+    "path/to/another_dir/file.txt"
+  )
 end
 T["H"]["#rel_path"]["returns the abs file path as a fallback"] = function()
-  MiniTest.expect.equality(H.rel_path "path/to/another_dir/file.txt", "path/to/another_dir/file.txt")
+  MiniTest.expect.equality(
+    H.rel_path "path/to/another_dir/file.txt",
+    "path/to/another_dir/file.txt"
+  )
 end
 
 T["H"]["#get_ext"] = MiniTest.new_set()
@@ -45,18 +51,18 @@ end
 
 T["H"]["#basename"] = MiniTest.new_set()
 T["H"]["#basename"]["returns the basename with and without an extension"] = function()
-  MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = true, }), "file.txt")
-  MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = false, }), "file")
-  MiniTest.expect.equality(H.basename("path/to/file.min.txt", { with_ext = true, }), "file.min.txt")
-  MiniTest.expect.equality(H.basename("path/to/file.min.txt", { with_ext = false, }), "file")
-  MiniTest.expect.equality(H.basename("path/to/file", { with_ext = true, }), "file")
-  MiniTest.expect.equality(H.basename("path/to/file", { with_ext = false, }), "file")
-  MiniTest.expect.equality(H.basename("file.txt", { with_ext = true, }), "file.txt")
-  MiniTest.expect.equality(H.basename("file.txt", { with_ext = false, }), "file")
-  MiniTest.expect.equality(H.basename(".gitignore", { with_ext = true, }), ".gitignore")
-  MiniTest.expect.equality(H.basename(".gitignore", { with_ext = false, }), ".gitignore")
-  MiniTest.expect.equality(H.basename("", { with_ext = true, }), "")
-  MiniTest.expect.equality(H.basename("", { with_ext = false, }), "")
+  MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = true }), "file.txt")
+  MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = false }), "file")
+  MiniTest.expect.equality(H.basename("path/to/file.min.txt", { with_ext = true }), "file.min.txt")
+  MiniTest.expect.equality(H.basename("path/to/file.min.txt", { with_ext = false }), "file")
+  MiniTest.expect.equality(H.basename("path/to/file", { with_ext = true }), "file")
+  MiniTest.expect.equality(H.basename("path/to/file", { with_ext = false }), "file")
+  MiniTest.expect.equality(H.basename("file.txt", { with_ext = true }), "file.txt")
+  MiniTest.expect.equality(H.basename("file.txt", { with_ext = false }), "file")
+  MiniTest.expect.equality(H.basename(".gitignore", { with_ext = true }), ".gitignore")
+  MiniTest.expect.equality(H.basename(".gitignore", { with_ext = false }), ".gitignore")
+  MiniTest.expect.equality(H.basename("", { with_ext = true }), "")
+  MiniTest.expect.equality(H.basename("", { with_ext = false }), "")
 end
 
 T["H"]["#default"]["returns original value when not nil"] = function()
@@ -119,25 +125,26 @@ local test_file_a = vim.fs.joinpath(cwd, "test-file-a.txt")
 local test_file_b = vim.fs.joinpath(cwd, "test-file-b.txt")
 local test_dir_a = vim.fs.joinpath(cwd, "test-dir-a")
 
-local now = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 0, sec = 0, }
-local now_after_30_min = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 30, sec = 0, }
+local now = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 0, sec = 0 }
+local now_after_30_min = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 30, sec = 0 }
 local score_when_adding = 1
-local date_at_score_one_now = F.compute_date_at_score_one { now = now, score = score_when_adding, }
+local date_at_score_one_now = F.compute_date_at_score_one { now = now, score = score_when_adding }
 local score_decayed_after_30_min = 0.99951876362267
 
 local function create_file(path)
   vim.fn.mkdir(vim.fs.dirname(path), "p")
-  vim.fn.writefile({ "content", }, path)
+  vim.fn.writefile({ "content" }, path)
 end
 
 local function cleanup()
-  F._now = function() return os.time() end
+  F._now = function()
+    return os.time()
+  end
   vim.fn.delete(root_dir, "rf")
   create_file(test_file_a)
   create_file(test_file_b)
   vim.fn.mkdir(test_dir_a, "p")
 end
-
 
 T["F"]["#update_file_score"] = MiniTest.new_set {
   hooks = {
@@ -156,7 +163,9 @@ T["F"]["#update_file_score"] = MiniTest.new_set {
 }
 T["F"]["#update_file_score"]["update_type=increase"] = MiniTest.new_set()
 T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new file"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
@@ -168,18 +177,19 @@ T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new f
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeated calls"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
   })()
 
-  MiniTest.expect.equality(
-    F.read(dated_files_path)[cwd][test_file_a],
-    date_at_score_one_now
-  )
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
-  F._now = function() return now_after_30_min end
+  F._now = function()
+    return now_after_30_min
+  end
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
@@ -193,18 +203,19 @@ T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeat
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores when adding a new file"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
   })()
 
-  MiniTest.expect.equality(
-    F.read(dated_files_path)[cwd][test_file_a],
-    date_at_score_one_now
-  )
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
-  F._now = function() return now_after_30_min end
+  F._now = function()
+    return now_after_30_min
+  end
   F.update_file_score(test_file_b, {
     db_dir = db_dir,
     update_type = "increase",
@@ -212,46 +223,46 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
 
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_a],
-    F.compute_date_at_score_one { now = now_after_30_min, score = score_decayed_after_30_min, }
+    F.compute_date_at_score_one { now = now_after_30_min, score = score_decayed_after_30_min }
   )
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_b],
-    F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
+    F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding }
   )
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
   })()
 
-  MiniTest.expect.equality(
-    F.read(dated_files_path)[cwd][test_file_a],
-    date_at_score_one_now
-  )
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
   vim.fn.delete(test_file_a)
 
-  F._now = function() return now_after_30_min end
+  F._now = function()
+    return now_after_30_min
+  end
   F.update_file_score(test_file_b, {
     db_dir = db_dir,
     update_type = "increase",
   })()
 
-  MiniTest.expect.equality(
-    F.read(dated_files_path)[cwd][test_file_a],
-    nil
-  )
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
   MiniTest.expect.equality(
     F.read(dated_files_path)[cwd][test_file_b],
-    F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding, }
+    F.compute_date_at_score_one { now = now_after_30_min, score = score_when_adding }
   )
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted files"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
 
   vim.fn.delete(test_file_a)
   F.update_file_score(test_file_a, {
@@ -259,27 +270,25 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted file
     update_type = "increase",
   })()
 
-  MiniTest.expect.equality(
-    F.read(dated_files_path)[cwd][test_file_a],
-    nil
-  )
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
   F.update_file_score(test_dir_a, {
     db_dir = db_dir,
     update_type = "increase",
   })()
 
-  MiniTest.expect.equality(
-    F.read(dated_files_path)[cwd][test_dir_a],
-    nil
-  )
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_dir_a], nil)
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories when stat_file=true"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
 
   vim.fn.delete(test_dir_a)
   F.update_file_score(test_dir_a, {
@@ -288,15 +297,14 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories 
     stat_file = true,
   })()
 
-  MiniTest.expect.equality(
-    F.read(dated_files_path)[cwd][test_dir_a],
-    nil
-  )
+  MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_dir_a], nil)
 end
 
 T["F"]["#update_file_score"]["update_type=remove"] = MiniTest.new_set()
 T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing file"] = function()
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "increase",
@@ -304,7 +312,9 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
-  F._now = function() return now end
+  F._now = function()
+    return now
+  end
   F.update_file_score(test_file_a, {
     db_dir = db_dir,
     update_type = "remove",
@@ -360,7 +370,7 @@ end
 
 T["P"]["get_icon_info"] = MiniTest.new_set()
 T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
-  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = false, }
+  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = false }
   MiniTest.expect.equality(res.icon_char, nil)
   MiniTest.expect.equality(res.icon_hl, nil)
 end
@@ -369,20 +379,20 @@ T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = 
     icon_char = "🌙",
     icon_hl = "LuaIcon",
   }
-  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = true, }
+  local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = true }
   MiniTest.expect.equality(res.icon_char, "🌙")
   MiniTest.expect.equality(res.icon_hl, "LuaIcon")
 end
 
 T["P"]["get_icon_info"]["caches icon info for files with extensions"] = function()
-  local res_one = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
+  local res_one = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true }
   MiniTest.expect.equality(res_one.icon_char, "󰌞")
   MiniTest.expect.equality(res_one.icon_hl, "MiniIconsYellow")
 
   MiniTest.expect.equality(P.caches.icon_cache["js"].icon_char, "󰌞")
   MiniTest.expect.equality(P.caches.icon_cache["js"].icon_hl, "MiniIconsYellow")
 
-  local res_two = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true, }
+  local res_two = P.get_icon_info { abs_path = "path/to/file.js", icons_enabled = true }
   MiniTest.expect.equality(res_two.icon_char, "󰌞")
   MiniTest.expect.equality(res_two.icon_hl, "MiniIconsYellow")
 end
@@ -417,7 +427,7 @@ local weighted_file_ts = {
 
 T["P"]["get_weighted_file"] = MiniTest.new_set()
 T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function()
-  vim.g.ff = { weights = { basename_boost = 100, }, }
+  vim.g.ff = { weights = { basename_boost = 100 } }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
@@ -430,7 +440,7 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the basename m
   MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
 T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function()
-  vim.g.ff = { weights = { basename_boost = 400, }, }
+  vim.g.ff = { weights = { basename_boost = 400 } }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
@@ -443,7 +453,7 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the basename m
   MiniTest.expect.equality(res.buf_and_frecency_score, 400)
 end
 T["P"]["get_weighted_file"]["should apply the basename_boost when the alphabetic basename matches excluding the extension"] = function()
-  vim.g.ff = { weights = { basename_boost = 400, }, }
+  vim.g.ff = { weights = { basename_boost = 400 } }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_ts.abs_path,
@@ -456,8 +466,8 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the alphabetic
   MiniTest.expect.equality(res.buf_and_frecency_score, 400)
 end
 T["P"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
-  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
-  vim.g.ff = { weights = { current_buf_boost = -90, }, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false }
+  vim.g.ff = { weights = { current_buf_boost = -90 } }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
@@ -470,8 +480,8 @@ T["P"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
   MiniTest.expect.equality(res.buf_and_frecency_score, -90)
 end
 T["P"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
-  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
-  vim.g.ff = { weights = { alternate_buf_boost = 300, }, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false }
+  vim.g.ff = { weights = { alternate_buf_boost = 300 } }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
@@ -484,8 +494,8 @@ T["P"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
   MiniTest.expect.equality(res.buf_and_frecency_score, 300)
 end
 T["P"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
-  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = true, }
-  vim.g.ff = { weights = { modified_buf_boost = 200, }, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = true }
+  vim.g.ff = { weights = { modified_buf_boost = 200 } }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
@@ -498,8 +508,8 @@ T["P"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
   MiniTest.expect.equality(res.buf_and_frecency_score, 200)
 end
 T["P"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
-  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false, }
-  vim.g.ff = { weights = { open_buf_boost = 100, }, }
+  P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false }
+  vim.g.ff = { weights = { open_buf_boost = 100 } }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
@@ -512,7 +522,7 @@ T["P"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
   MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
 T["P"]["get_weighted_file"]["should apply the frecency score"] = function()
-  P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 100, }
+  P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 100 }
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
     fuzzy_score = 0,
@@ -524,8 +534,8 @@ T["P"]["get_weighted_file"]["should apply the frecency score"] = function()
   MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
 T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function()
-  P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 20, }
-  vim.g.ff = { fuzzy_score_multiple = 0.8, file_score_multiple = 0.2, }
+  P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 20 }
+  vim.g.ff = { fuzzy_score_multiple = 0.8, file_score_multiple = 0.2 }
   P.caches.gopts = ff.defaulted_gopts()
   local res = P.get_weighted_file {
     abs_path = weighted_file_lua.abs_path,
@@ -538,7 +548,8 @@ T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_mu
   local expected_buf_and_frecency_score = 20
   MiniTest.expect.equality(res.buf_and_frecency_score, expected_buf_and_frecency_score)
   local file_score_multiple = 1 - 0.8
-  local expected_weighted = 0.8 * res.fuzzy_score + file_score_multiple * expected_buf_and_frecency_score
+  local expected_weighted = 0.8 * res.fuzzy_score
+    + file_score_multiple * expected_buf_and_frecency_score
   MiniTest.expect.equality(res.weighted_score, expected_weighted)
 end
 

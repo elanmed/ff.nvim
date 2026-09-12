@@ -20,9 +20,12 @@ function M.check()
     if vim.fn.executable "fd" == 1 then
       vim.health.ok "fd is installed"
     else
-      vim.health.error("vim.g.ff.find_cmd is not set, but the default executable fd is not installed", {
-        "Install fd: https://github.com/sharkdp/fd",
-      })
+      vim.health.error(
+        "vim.g.ff.find_cmd is not set, but the default executable fd is not installed",
+        {
+          "Install fd: https://github.com/sharkdp/fd",
+        }
+      )
     end
   else
     vim.health.ok "vim.g.ff.find_cmd is set, the default executable fd is not required"
