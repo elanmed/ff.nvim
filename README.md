@@ -129,14 +129,17 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 
 ## Lazy-loading
 
-To lazy-load `ff.nvim`, set `auto_setup = false` and use the `on_complete` callback to open the picker once the file cache is ready:
+To lazy-load `ff.nvim`, set `auto_setup = false` and run `setup()` and `find()` inside a `vim.async.run` task:
 
 ```lua
 vim.g.ff = { auto_setup = false }
 
 vim.keymap.set("n", "<leader>f", function()
   local ff = require "ff"
-  ff.setup(function() ff.find() end)
+  vim.async.run(function()
+    vim.async.await(ff.setup())
+    ff.find()
+  end)
 end)
 ```
 
@@ -144,16 +147,17 @@ end)
 
 ## API
 
+`setup()`, `find()`, and `refresh_files_cache()` each return a `vim.async.Task`. Call `Task:wait()` from synchronous code to block until completion, or `vim.async.await(task)` from within another async task. See `:help vim.async.run()` for the full task API.
+
 ### `setup`
 
 ```lua
-require "ff".setup(on_complete?)
+-- returns a vim.async.Task
+require "ff".setup()
 ```
 
 By default, `setup()` is automatically on startup. This can be disabled by setting `vim.g.ff.auto_setup = false`. Note that if `auto_setup` is disabled,
 `setup()` still needs to be called manually.
-
-An optional `on_complete` callback is called once setup finishes (including the initial file cache population).
 
 ### `find`
 
@@ -161,18 +165,20 @@ An optional `on_complete` callback is called once setup finishes (including the 
 --- `opts` defaults to `{}`
 --- `opts.resume` defaults to `false`
 local opts = { resume = true }
+-- returns a vim.async.Task
 require "ff".find(opts)
 ```
 
 ### `refresh_files_cache`
 
 ```lua
-require "ff".refresh_files_cache(on_complete?)
+-- returns a vim.async.Task
+require "ff".refresh_files_cache()
 ```
 
 By default, `refresh_files_cache()` is called once when `setup()` is run. When performing actions on the file system,
-it can be helpful to refresh the cache so the picker shows the latest files. An optional `on_complete` callback is
-called once the cache has been refreshed. This can be used with an autocommand like:
+it can be helpful to refresh the cache so the picker shows the latest files. The returned task can be awaited in an
+autocommand like:
 
 ```lua
 vim.api.nvim_create_autocmd("User", {
@@ -240,10 +246,6 @@ vim.api.nvim_create_autocmd("User", {
   - Or `false` passed as `vim.g.ff.icons_enabled`
 - [`fd`](https://github.com/sharkdp/fd)
   - Or a custom cli command passed as `vim.g.ff.find_cmd`
-
-## TODO
-
-- [x] Support Windows (I don't have a Windows machine to test this on, but it should work)
 
 ## Features excluded for simplicity
 
