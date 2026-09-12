@@ -822,6 +822,8 @@ end
 --- @field alternate_bufname string
 --- @field curr_tick number
 --- @field render_results fun(decorated_files:DecoratedFile[]):nil
+
+--- @async
 --- @param opts GetFindFilesOpts
 P.render_find_files = function(opts)
   local function is_stale()
@@ -1248,6 +1250,7 @@ local find_inner = function(opts)
     vim.api.nvim_win_set_cursor(input_win, { 1, col_0i })
   end
 
+  --- @async
   --- @param query string
   local function render_find_files_for_query(query)
     P.render_find_files {
@@ -1417,7 +1420,9 @@ local find_inner = function(opts)
       end)
       local curr_line = vim.api.nvim_get_current_line()
       P.caches.input_line = curr_line
-      render_find_files_for_query(curr_line)
+      vim.async.run("render_find_files_for_query_task", function()
+        render_find_files_for_query(curr_line)
+      end)
     end,
   })
 
