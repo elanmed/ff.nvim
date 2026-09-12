@@ -196,59 +196,56 @@ end
 --- @field update_type "increase" | "remove"
 --- @field db_dir? string
 
+--- @async
 --- @param abs_path string
 --- @param opts UpdateFileScoreOpts
 F.update_file_score = function(abs_path, opts)
-  return A.from_executor(function(resolve)
-    local now = F._now()
+  local now = F._now()
 
-    opts.db_dir = H.default(opts.db_dir, F.default_db_dir)
-    local dated_files_path = F.get_dated_files_path(opts.db_dir)
-    local dated_files = F.read(dated_files_path)
-    if dated_files[H.cwd] == nil then
-      dated_files[H.cwd] = {}
+  opts.db_dir = H.default(opts.db_dir, F.default_db_dir)
+  local dated_files_path = F.get_dated_files_path(opts.db_dir)
+  local dated_files = F.read(dated_files_path)
+  if dated_files[H.cwd] == nil then
+    dated_files[H.cwd] = {}
+  end
+
+  local updated_date_at_score_one = (function()
+    if opts.update_type == "increase" then
+      if not H.readable(abs_path) then
+        return nil
+      end
+
+      local score = 0
+      local date_at_score_one = dated_files[H.cwd][abs_path]
+      if date_at_score_one then
+        score = F.compute_score { now = now, date_at_score_one = date_at_score_one }
+      end
+      local updated_score = score + 1
+
+      return F.compute_date_at_score_one { now = now, score = updated_score }
     end
 
-    local updated_date_at_score_one = (function()
-      if opts.update_type == "increase" then
-        if not H.readable(abs_path) then
-          return nil
-        end
+    return nil
+  end)()
 
-        local score = 0
-        local date_at_score_one = dated_files[H.cwd][abs_path]
-        if date_at_score_one then
-          score = F.compute_score { now = now, date_at_score_one = date_at_score_one }
-        end
-        local updated_score = score + 1
+  dated_files[H.cwd][abs_path] = updated_date_at_score_one
 
-        return F.compute_date_at_score_one { now = now, score = updated_score }
-      end
-
-      return nil
-    end)()
-
-    dated_files[H.cwd][abs_path] = updated_date_at_score_one
-
-    local readable_dated_files_cwd = {}
-    A.throttled_iterator(function()
+  local readable_dated_files_cwd = {}
+  vim.async.await()
+  A.await_throttled_iterator {
+    iterator_factory = function()
       return pairs(dated_files[H.cwd])
-    end, {
-      --- @param dated_file string
-      --- @param date_at_score_one number
-      on_iteration = function(dated_file, date_at_score_one)
-        if H.readable(dated_file) then
-          readable_dated_files_cwd[dated_file] = date_at_score_one
-        end
-      end,
-    })(function()
-      dated_files[H.cwd] = readable_dated_files_cwd
-      F.write(dated_files_path, dated_files)
-      if resolve then
-        resolve()
+    end,
+    --- @param dated_file string
+    --- @param date_at_score_one number
+    on_iteration = function(dated_file, date_at_score_one)
+      if H.readable(dated_file) then
+        readable_dated_files_cwd[dated_file] = date_at_score_one
       end
-    end)
-  end)
+    end,
+  }
+  dated_files[H.cwd] = readable_dated_files_cwd
+  F.write(dated_files_path, dated_files)
 end
 
 -- ======================================================
@@ -551,7 +548,8 @@ P.caches = {
   input_line = "",
 }
 
-P.refresh_files_cache = function(resolve)
+--- @async
+P.refresh_files_cache = function()
   L.benchmark_step_heading "refresh_files_cache"
   P.caches.find_abs_paths = {}
   P.caches.find_rel_paths = {}
@@ -561,9 +559,11 @@ P.refresh_files_cache = function(resolve)
   L.benchmark_step("end", "find_cmd vim.fn.systemlist")
 
   L.benchmark_step("start", "refresh_files_cache (entire loop)")
-  A.throttled_iterator(function()
-    return ipairs(lines)
-  end, {
+  A.await_throttled_iterator {
+    iterator_factor = function()
+      return ipairs(lines)
+    end,
+    --- @param abs_path string
     on_iteration = function(_, abs_path)
       if #abs_path == 0 then
         return
@@ -572,17 +572,13 @@ P.refresh_files_cache = function(resolve)
       table.insert(P.caches.find_abs_paths, normalized_abs_path)
       table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
     end,
-  })(function()
-    L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false })
-    L.benchmark_step_closing()
-    if resolve then
-      resolve()
-    end
-  end)
+  }
+  L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false })
+  L.benchmark_step_closing()
 end
 
-P.refresh_frecency_cache = function(resolve)
-  local spawn = A.make_spawn(function()
+P.refresh_frecency_cache = function()
+  vim.async.run("refresh_frecency_cache_task", function()
     L.benchmark_step_heading "refresh_frecency_cache"
     P.caches.frecency_abs_paths = {}
     P.caches.frecency_rel_paths = {}
@@ -600,9 +596,10 @@ P.refresh_frecency_cache = function(resolve)
     L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
     local frecency_paths_to_sort = {}
 
-    A.await(A.throttled_iterator(function()
-      return pairs(dated_files[H.cwd])
-    end, {
+    A.await_throttled_iterator {
+      iterator_factory = function()
+        return pairs(dated_files[H.cwd])
+      end,
       --- @param abs_path string
       --- @param date_at_score_one number
       on_iteration = function(abs_path, date_at_score_one)
@@ -620,7 +617,7 @@ P.refresh_frecency_cache = function(resolve)
           rel_path = vim.fs.relpath(H.cwd, abs_path),
         })
       end,
-    }))
+    }
 
     L.benchmark_step("start", "Sort frecency files before setting to P.caches.frecency_abs_paths")
     table.sort(frecency_paths_to_sort, function(a, b)
@@ -647,15 +644,11 @@ P.refresh_frecency_cache = function(resolve)
       { record_mean = false }
     )
     L.benchmark_step_closing()
-
-    if resolve then
-      resolve()
-    end
   end)
-  spawn()
 end
 
-P.refresh_open_buffers_cache = function(resolve)
+--- @async
+P.refresh_open_buffers_cache = function()
   P.caches.weighted_files_per_query = {}
   P.caches.open_buffer_to_modified = {}
 
@@ -663,9 +656,11 @@ P.refresh_open_buffers_cache = function(resolve)
   L.benchmark_step("start", "Calculate open_buffer_to_modified (entire loop)")
 
   local bufs = vim.api.nvim_list_bufs()
-  A.throttled_iterator(function()
-    return ipairs(bufs)
-  end, {
+  A.await_throttled_iterator {
+    iterator_factor = function()
+      return ipairs(bufs)
+    end,
+    --- @param bufnr number
     on_iteration = function(_, bufnr)
       if not vim.api.nvim_buf_is_loaded(bufnr) then
         return
@@ -684,15 +679,13 @@ P.refresh_open_buffers_cache = function(resolve)
       local modified = vim.api.nvim_get_option_value("modified", { buf = bufnr })
       P.caches.open_buffer_to_modified[buf_name] = modified
     end,
-  })(function()
-    L.benchmark_step(
-      "end",
-      "Calculate open_buffer_to_modified (entire loop)",
-      { record_mean = false }
-    )
-    L.benchmark_step_closing()
-    resolve()
-  end)
+  }
+  L.benchmark_step(
+    "end",
+    "Calculate open_buffer_to_modified (entire loop)",
+    { record_mean = false }
+  )
+  L.benchmark_step_closing()
 end
 
 --- @class WeightedFile
@@ -832,7 +825,7 @@ end
 --- @field curr_tick number
 --- @field render_results fun(decorated_files:DecoratedFile[]):nil
 --- @param opts GetFindFilesOpts
-P.render_find_files = A.make_spawn(function(opts)
+P.render_find_files = function(opts)
   local function is_stale()
     if P.tick ~= opts.curr_tick then
       L.benchmark_step_interrupted()
@@ -866,9 +859,10 @@ P.render_find_files = A.make_spawn(function(opts)
       L.benchmark_step("start", "Populate weighted_files for empty query")
 
       local should_break = false
-      A.await(A.throttled_iterator(function()
-        return ipairs(all_abs_paths)
-      end, {
+      A.await_throttled_iterator {
+        iterator_factory = function()
+          return ipairs(all_abs_paths)
+        end,
         --- @param abs_path string
         on_iteration = function(_, abs_path)
           if #weighted_files_for_query >= P.caches.gopts.max_results_rendered then
@@ -896,7 +890,7 @@ P.render_find_files = A.make_spawn(function(opts)
         should_cancel = function()
           return should_break or is_stale()
         end,
-      }))
+      }
 
       L.benchmark_step("end", "Populate weighted_files for empty query")
     else
@@ -907,9 +901,10 @@ P.render_find_files = A.make_spawn(function(opts)
         table.insert(batch_starts, start_idx)
       end
 
-      A.await(A.throttled_iterator(function()
-        return ipairs(batch_starts)
-      end, {
+      A.await_throttled_iterator {
+        iterator_factory = function()
+          return ipairs(batch_starts)
+        end,
         on_iteration = function(_, start_idx)
           local end_idx =
             math.min(start_idx + P.caches.gopts.matchfuzzypos_batch_size - 1, #all_abs_paths)
@@ -946,7 +941,7 @@ P.render_find_files = A.make_spawn(function(opts)
         should_cancel = function()
           return is_stale() or #weighted_files_for_query >= P.caches.gopts.max_results_considered
         end,
-      }))
+      }
 
       L.benchmark_step("end", "Populate weighted_files for populated query")
     end
@@ -969,9 +964,10 @@ P.render_find_files = A.make_spawn(function(opts)
   --- @type DecoratedFile[]
   local decorated_files = {}
 
-  A.await(A.throttled_iterator(function()
-    return ipairs(sliced_weighted_files)
-  end, {
+  A.await_throttled_iterator {
+    iterator_factory = function()
+      return ipairs(sliced_weighted_files)
+    end,
     on_iteration = function(_, weighted_file)
       -- TODO: this is still ~5ms
       local icon_info = P.get_icon_info {
@@ -996,7 +992,7 @@ P.render_find_files = A.make_spawn(function(opts)
       })
     end,
     should_cancel = is_stale,
-  }))
+  }
   L.benchmark_step("end", "Get decorated_files")
   L.benchmark_step_closing()
 
@@ -1019,9 +1015,10 @@ P.render_find_files = A.make_spawn(function(opts)
   local icon_char_idx = formatted_score_last_idx + 2
 
   L.benchmark_step("start", "Highlight results")
-  A.await(A.throttled_iterator(function()
-    return ipairs(decorated_files)
-  end, {
+  A.await_throttled_iterator {
+    iterator_factory = function()
+      return ipairs(decorated_files)
+    end,
     on_iteration = function(idx, decorated_file)
       local row_0_indexed = idx - 1
 
@@ -1052,11 +1049,11 @@ P.render_find_files = A.make_spawn(function(opts)
       end
     end,
     should_cancel = is_stale,
-  }))
+  }
   L.benchmark_step("end", "Highlight results")
   L.benchmark_step("end", "Total per keystroke")
   L.benchmark_step_closing()
-end)
+end
 
 --- @param win number
 P.save_minimal_opts = function(win)
@@ -1094,8 +1091,9 @@ end
 
 P.setup_called = false
 
+--- @async
 --- @param on_complete? fun():nil
-M.setup = A.make_spawn(function(on_complete)
+M.setup = function(on_complete)
   P.caches.gopts = M.defaulted_gopts()
   if P.setup_called then
     if on_complete then
@@ -1146,23 +1144,24 @@ M.setup = A.make_spawn(function(on_complete)
   vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { default = true, link = "Search" })
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { default = true, link = "CursorLine" })
 
-  A.await(P.refresh_files_cache)
+  vim.async.await(P.refresh_files_cache())
   P.setup_called = true
   if on_complete then
     on_complete()
   end
-end)
+end
 
+--- @async
 --- @param on_complete? fun():nil
-M.refresh_files_cache = A.make_spawn(function(on_complete)
+M.refresh_files_cache = function(on_complete)
   if not P.setup_called then
     H.notify(vim.log.levels.ERROR, "`setup` must be called before `refresh_files_cache`")
   end
-  A.await(P.refresh_files_cache)
+  vim.async.await(P.refresh_files_cache())
   if on_complete then
     on_complete()
   end
-end)
+end
 
 P.reset_benchmarks = function()
   L.ongoing_benchmarks = {}
@@ -1191,8 +1190,9 @@ end
 --- @class FFFindOpts
 --- @field resume? boolean
 
+--- @async
 --- @param opts? FFFindOpts
-M.find = A.make_spawn(function(opts)
+local find = function(opts)
   opts = H.default(opts, {})
   opts.resume = H.default(opts.resume, false)
 
@@ -1316,21 +1316,23 @@ M.find = A.make_spawn(function(opts)
         vim.cmd "redraw"
       end)
     end,
-    ResultDeleteFrecencyScore = A.make_spawn(function()
-      local result = vim.api.nvim_win_call(results_win, vim.api.nvim_get_current_line)
-      if #result == 0 then
-        return
-      end
-      local rel_path = vim.split(result, "|")[2]
-      local abs_path = vim.fs.joinpath(H.cwd, rel_path)
-      local should_refresh = P.caches.frecency_abs_path_to_score[abs_path] ~= nil
-      A.await(F.update_file_score(abs_path, { update_type = "remove" }))
-      if should_refresh then
-        A.await(P.refresh_open_buffers_cache)
-        A.await(P.refresh_frecency_cache)
-        render_find_files_for_query(vim.api.nvim_get_current_line())
-      end
-    end),
+    ResultDeleteFrecencyScore = function()
+      vim.async.run("result_delete_frecency_score_task", function()
+        local result = vim.api.nvim_win_call(results_win, vim.api.nvim_get_current_line)
+        if #result == 0 then
+          return
+        end
+        local rel_path = vim.split(result, "|")[2]
+        local abs_path = vim.fs.joinpath(H.cwd, rel_path)
+        local should_refresh = P.caches.frecency_abs_path_to_score[abs_path] ~= nil
+        vim.async.await(F.update_file_score(abs_path, { update_type = "remove" }))
+        if should_refresh then
+          vim.async.await(P.refresh_open_buffers_cache())
+          vim.async.await(P.refresh_frecency_cache())
+          render_find_files_for_query(vim.api.nvim_get_current_line())
+        end
+      end)
+    end,
     Close = close,
     PreviewToggle = function()
       if P.preview_active then
@@ -1423,17 +1425,23 @@ M.find = A.make_spawn(function(opts)
   })
 
   L.benchmark_step("start", "await refresh_open_buffers_cache")
-  A.await(P.refresh_open_buffers_cache)
+  vim.async.await(P.refresh_open_buffers_cache())
   L.benchmark_step("end", "await refresh_open_buffers_cache")
 
   L.benchmark_step("start", "await refresh_frecency_cache")
-  A.await(P.refresh_frecency_cache)
+  vim.async.await(P.refresh_frecency_cache())
   L.benchmark_step("end", "await refresh_frecency_cache")
 
   L.benchmark_step("end", "M.find (total init)")
 
   render_find_files_for_query(opts.resume and P.caches.input_line or "")
-end)
+end
+--- @param opts? FFFindOpts
+M.find = function(opts)
+  vim.async.run("find_task", function()
+    find(opts)
+  end)
+end
 
 if _G.FF_TEST then
   M._internal = {
