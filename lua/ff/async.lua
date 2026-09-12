@@ -100,7 +100,7 @@ local throttled_iterator_callback = function(opts, callback)
   end
 end
 
-M.await_throttled_iterator = vim.async.wrap(
+M.throttled_iterator = vim.async.wrap(
   2,
   --- @generic InvariantState, ControlVar
   --- @param opts ThrottledIteratorOpts<InvariantState, ControlVar>
@@ -120,7 +120,7 @@ M.await_throttled_iterator = vim.async.wrap(
   end
 )
 
-M.await_batched_iterator = vim.async.wrap(
+M.batched_iterator = vim.async.wrap(
   2,
   --- @generic InvariantState, ControlVar
   --- @param opts BatchedIteratorOpts<InvariantState, ControlVar>

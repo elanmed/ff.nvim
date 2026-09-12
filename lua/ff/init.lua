@@ -199,7 +199,7 @@ end
 --- @async
 --- @param abs_path string
 --- @param opts UpdateFileScoreOpts
-F.await_update_file_score = function(abs_path, opts)
+F.update_file_score = function(abs_path, opts)
   local now = F._now()
 
   opts.db_dir = H.default(opts.db_dir, F.default_db_dir)
@@ -231,7 +231,7 @@ F.await_update_file_score = function(abs_path, opts)
   dated_files[H.cwd][abs_path] = updated_date_at_score_one
 
   local readable_dated_files_cwd = {}
-  A.await_throttled_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return pairs(dated_files[H.cwd])
     end,
@@ -548,8 +548,8 @@ P.caches = {
 }
 
 --- @async
-P.await_refresh_files_cache = function()
-  L.benchmark_step_heading "await_refresh_files_cache"
+P.refresh_files_cache = function()
+  L.benchmark_step_heading "refresh_files_cache"
   P.caches.find_abs_paths = {}
   P.caches.find_rel_paths = {}
 
@@ -557,8 +557,8 @@ P.await_refresh_files_cache = function()
   local lines = vim.fn.systemlist(P.caches.gopts.find_cmd)
   L.benchmark_step("end", "find_cmd vim.fn.systemlist")
 
-  L.benchmark_step("start", "await_refresh_files_cache (entire loop)")
-  A.await_throttled_iterator {
+  L.benchmark_step("start", "refresh_files_cache (entire loop)")
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(lines)
     end,
@@ -572,13 +572,13 @@ P.await_refresh_files_cache = function()
       table.insert(P.caches.find_rel_paths, vim.fs.relpath(H.cwd, normalized_abs_path))
     end,
   }
-  L.benchmark_step("end", "await_refresh_files_cache (entire loop)", { record_mean = false })
+  L.benchmark_step("end", "refresh_files_cache (entire loop)", { record_mean = false })
   L.benchmark_step_closing()
 end
 
 --- @async
-P.await_refresh_frecency_cache = function()
-  L.benchmark_step_heading "await_refresh_frecency_cache"
+P.refresh_frecency_cache = function()
+  L.benchmark_step_heading "refresh_frecency_cache"
   P.caches.frecency_abs_paths = {}
   P.caches.frecency_rel_paths = {}
   P.caches.frecency_abs_path_to_score = {}
@@ -595,7 +595,7 @@ P.await_refresh_frecency_cache = function()
   L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
   local frecency_paths_to_sort = {}
 
-  A.await_throttled_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return pairs(dated_files[H.cwd])
     end,
@@ -646,15 +646,15 @@ P.await_refresh_frecency_cache = function()
 end
 
 --- @async
-P.await_refresh_open_buffers_cache = function()
+P.refresh_open_buffers_cache = function()
   P.caches.weighted_files_per_query = {}
   P.caches.open_buffer_to_modified = {}
 
-  L.benchmark_step_heading "await_refresh_open_buffers_cache"
+  L.benchmark_step_heading "refresh_open_buffers_cache"
   L.benchmark_step("start", "Calculate open_buffer_to_modified (entire loop)")
 
   local bufs = vim.api.nvim_list_bufs()
-  A.await_throttled_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(bufs)
     end,
@@ -857,7 +857,7 @@ P.render_find_files = function(opts)
       L.benchmark_step("start", "Populate weighted_files for empty query")
 
       local should_break = false
-      A.await_throttled_iterator {
+      A.throttled_iterator {
         iterator_factory = function()
           return ipairs(all_abs_paths)
         end,
@@ -899,7 +899,7 @@ P.render_find_files = function(opts)
         table.insert(batch_starts, start_idx)
       end
 
-      A.await_throttled_iterator {
+      A.throttled_iterator {
         iterator_factory = function()
           return ipairs(batch_starts)
         end,
@@ -962,7 +962,7 @@ P.render_find_files = function(opts)
   --- @type DecoratedFile[]
   local decorated_files = {}
 
-  A.await_throttled_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(sliced_weighted_files)
     end,
@@ -1013,7 +1013,7 @@ P.render_find_files = function(opts)
   local icon_char_idx = formatted_score_last_idx + 2
 
   L.benchmark_step("start", "Highlight results")
-  A.await_throttled_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(decorated_files)
     end,
@@ -1091,7 +1091,7 @@ P.setup_called = false
 
 --- @async
 --- @param on_complete? fun():nil
-M.await_setup = function(on_complete)
+M.setup = function(on_complete)
   P.caches.gopts = M.defaulted_gopts()
   if P.setup_called then
     if on_complete then
@@ -1131,11 +1131,11 @@ M.await_setup = function(on_complete)
         last_updated_abs_file = abs_path
 
         vim.async.run("update_file_score_task", function()
-          F.await_update_file_score(abs_path, { update_type = "increase" })
+          F.update_file_score(abs_path, { update_type = "increase" })
         end)
         if P.caches.frecency_abs_path_to_score[abs_path] == nil then
           vim.async.run("refresh_files_cache_task", function()
-            P.await_refresh_files_cache()
+            P.refresh_files_cache()
           end)
         end
       end)
@@ -1144,7 +1144,7 @@ M.await_setup = function(on_complete)
   vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { default = true, link = "Search" })
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { default = true, link = "CursorLine" })
 
-  P.await_refresh_files_cache()
+  P.refresh_files_cache()
   P.setup_called = true
   if on_complete then
     on_complete()
@@ -1153,14 +1153,11 @@ end
 
 --- @async
 --- @param on_complete? fun():nil
-M.await_refresh_files_cache = function(on_complete)
+M.refresh_files_cache = function(on_complete)
   if not P.setup_called then
-    H.notify(
-      vim.log.levels.ERROR,
-      "`await_setup` must be called before `await_refresh_files_cache`"
-    )
+    H.notify(vim.log.levels.ERROR, "`setup` must be called before `refresh_files_cache`")
   end
-  P.await_refresh_files_cache()
+  P.refresh_files_cache()
   if on_complete then
     on_complete()
   end
@@ -1195,12 +1192,12 @@ end
 
 --- @async
 --- @param opts? FFFindOpts
-M.await_find = function(opts)
+M.find = function(opts)
   opts = H.default(opts, {})
   opts.resume = H.default(opts.resume, false)
 
   if not P.setup_called then
-    H.notify(vim.log.levels.ERROR, "`await_setup` must be called before `find`")
+    H.notify(vim.log.levels.ERROR, "`setup` must be called before `find`")
     return
   end
   P.reset_benchmarks()
@@ -1328,10 +1325,10 @@ M.await_find = function(opts)
         local rel_path = vim.split(result, "|")[2]
         local abs_path = vim.fs.joinpath(H.cwd, rel_path)
         local should_refresh = P.caches.frecency_abs_path_to_score[abs_path] ~= nil
-        F.await_update_file_score(abs_path, { update_type = "remove" })
+        F.update_file_score(abs_path, { update_type = "remove" })
         if should_refresh then
-          P.await_refresh_open_buffers_cache()
-          P.await_refresh_frecency_cache()
+          P.refresh_open_buffers_cache()
+          P.refresh_frecency_cache()
           render_find_files_for_query(vim.api.nvim_get_current_line())
         end
       end)
@@ -1427,13 +1424,13 @@ M.await_find = function(opts)
     end,
   })
 
-  L.benchmark_step("start", "await_refresh_open_buffers_cache")
-  P.await_refresh_open_buffers_cache()
-  L.benchmark_step("end", "await_refresh_open_buffers_cache")
+  L.benchmark_step("start", "refresh_open_buffers_cache")
+  P.refresh_open_buffers_cache()
+  L.benchmark_step("end", "refresh_open_buffers_cache")
 
-  L.benchmark_step("start", "await_refresh_frecency_cache")
-  P.await_refresh_frecency_cache()
-  L.benchmark_step("end", "await_refresh_frecency_cache")
+  L.benchmark_step("start", "refresh_frecency_cache")
+  P.refresh_frecency_cache()
+  L.benchmark_step("end", "refresh_frecency_cache")
 
   L.benchmark_step("end", "M.find (total init)")
 
