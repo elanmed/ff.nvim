@@ -118,8 +118,16 @@ H.readable = function(abs_path)
   return stat_result ~= nil and stat_result.type == "file"
 end
 
+--- @param cmd string[]
+--- @param opts vim.SystemOpts?
+--- @param callback fun(out: vim.SystemCompleted)
+--- @return vim.SystemObj
+H.system_scheduled = function(cmd, opts, callback)
+  return vim.system(cmd, opts, vim.schedule_wrap(callback))
+end
+
 --- @type fun(cmd: string[], opts: vim.SystemOpts?): vim.SystemCompleted
-H.vim_system = vim.async.wrap(3, vim.system)
+H.vim_system = vim.async.wrap(3, H.system_scheduled)
 
 -- ======================================================
 -- == Frecency ==========================================
@@ -1418,14 +1426,15 @@ local find_inner = function()
 
   L.benchmark_step("end", "M.find (total init)")
 
+  local was_empty = false
   if P.is_find_cache_empty() then
+    was_empty = true
     P.input_state.is_refreshing = true
     P.refresh_files_cache()
     P.input_state.is_refreshing = false
-    vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, { P.input_state.line_during_refresh })
   end
 
-  render_find_files_for_query(P.input_state.line_during_refresh)
+  render_find_files_for_query(was_empty and P.input_state.line_during_refresh or "")
 end
 
 --- @return vim.async.Task
