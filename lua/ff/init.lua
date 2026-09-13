@@ -543,9 +543,12 @@ P.caches = {
 
   --- @type FFOpts
   gopts = {},
+}
 
-  --- @type string
-  input_line = "",
+P.input_state = {
+  line_during_refresh = "",
+
+  is_refreshing = false,
 }
 
 P.is_find_cache_empty = function()
@@ -1176,14 +1179,9 @@ P.print_mean_benchmarks = function()
   L.benchmark_mean_closing()
 end
 
---- @class FFFindOpts
---- @field resume? boolean
-
 --- @async
---- @param opts? FFFindOpts
-local find_inner = function(opts)
+local find_inner = function()
   opts = H.default(opts, {})
-  opts.resume = H.default(opts.resume, false)
 
   P.reset_benchmarks()
   P.preview_active = false
@@ -1229,12 +1227,6 @@ local find_inner = function(opts)
   vim.api.nvim_set_current_win(input_win)
 
   vim.cmd "startinsert"
-  if opts.resume then
-    vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, { P.caches.input_line })
-    local col_1i = #P.caches.input_line + 1
-    local col_0i = col_1i - 1
-    vim.api.nvim_win_set_cursor(input_win, { 1, col_0i })
-  end
 
   --- @async
   --- @param query string
@@ -1396,6 +1388,11 @@ local find_inner = function(opts)
     group = vim.api.nvim_create_augroup("FFPicker", { clear = true }),
     buffer = input_buf,
     callback = function()
+      if P.input_state.is_refreshing then
+        P.input_state.line_during_refresh = vim.api.nvim_get_current_line()
+        return
+      end
+
       P.tick = P.tick + 1
       if P.preview_active then
         keymap_fns["PreviewToggle"]()
@@ -1405,7 +1402,6 @@ local find_inner = function(opts)
         vim.cmd "redraw"
       end)
       local curr_line = vim.api.nvim_get_current_line()
-      P.caches.input_line = curr_line
       vim.async.run("render_find_files_for_query_task", function()
         render_find_files_for_query(curr_line)
       end)
@@ -1423,10 +1419,13 @@ local find_inner = function(opts)
   L.benchmark_step("end", "M.find (total init)")
 
   if P.is_find_cache_empty() then
+    P.input_state.is_refreshing = true
     P.refresh_files_cache()
-    vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, {})
+    P.input_state.is_refreshing = false
+    vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, { P.input_state.line_during_refresh })
   end
-  render_find_files_for_query(opts.resume and P.caches.input_line or "")
+
+  render_find_files_for_query(P.input_state.line_during_refresh)
 end
 
 --- @return vim.async.Task

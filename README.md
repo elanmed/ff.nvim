@@ -127,11 +127,8 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 ### `find`
 
 ```lua
---- `opts` defaults to `{}`
---- `opts.resume` defaults to `false`
-local opts = { resume = true }
 -- returns a vim.async.Task
-require "ff".find(opts)
+require "ff".find()
 ```
 
 ### `refresh_files_cache`
