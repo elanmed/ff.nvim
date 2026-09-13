@@ -118,6 +118,9 @@ H.readable = function(abs_path)
   return stat_result ~= nil and stat_result.type == "file"
 end
 
+--- @type fun(cmd: string[], opts: vim.SystemOpts?): vim.SystemCompleted
+H.vim_system = vim.async.wrap(3, vim.system)
+
 -- ======================================================
 -- == Frecency ==========================================
 -- ======================================================
@@ -397,8 +400,7 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field preview_win_opts? vim.wo
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
---- @field find_cmd? string
---- @field auto_setup? boolean
+--- @field find_cmd? string[]
 
 --- @class Weights
 --- @field open_buf_boost? number
@@ -474,8 +476,7 @@ M.defaulted_gopts = function()
 
   opts.benchmark_step = H.default(opts.benchmark_step, false)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
-  opts.find_cmd = H.default(opts.find_cmd, "fd --absolute-path --type f")
-  opts.auto_setup = H.default(opts.auto_setup, true)
+  opts.find_cmd = H.default(opts.find_cmd, { "fd", "--absolute-path", "--type", "f" })
   return opts
 end
 
@@ -547,15 +548,21 @@ P.caches = {
   input_line = "",
 }
 
+P.is_find_cache_empty = function()
+  return #P.caches.find_abs_paths == 0 or #P.caches.find_rel_paths == 0
+end
+
 --- @async
 P.refresh_files_cache = function()
   L.benchmark_step_heading "refresh_files_cache"
   P.caches.find_abs_paths = {}
   P.caches.find_rel_paths = {}
 
-  L.benchmark_step("start", "find_cmd vim.fn.systemlist")
-  local lines = vim.fn.systemlist(P.caches.gopts.find_cmd)
-  L.benchmark_step("end", "find_cmd vim.fn.systemlist")
+  -- TODO: swap to vim.system?
+  L.benchmark_step("start", "find_cmd vim.system")
+  local out = H.vim_system(P.caches.gopts.find_cmd)
+  local lines = vim.split(out.stdout, "\n")
+  L.benchmark_step("end", "find_cmd vim.system")
 
   L.benchmark_step("start", "refresh_files_cache (entire loop)")
   A.throttled_iterator {
@@ -1089,14 +1096,9 @@ P.set_opts = function(win, opts)
   end
 end
 
-P.setup_called = false
-
 --- @async
-local setup_inner = function()
+M.setup = function()
   P.caches.gopts = M.defaulted_gopts()
-  if P.setup_called then
-    return
-  end
 
   local timer_id = nil
   local last_updated_abs_file = nil
@@ -1141,24 +1143,11 @@ local setup_inner = function()
   })
   vim.api.nvim_set_hl(0, "FFPickerFuzzyHighlightChar", { default = true, link = "Search" })
   vim.api.nvim_set_hl(0, "FFPickerCursorLine", { default = true, link = "CursorLine" })
-
-  P.refresh_files_cache()
-  P.setup_called = true
-end
-
---- @return vim.async.Task
-M.setup = function()
-  return vim.async.run("setup_task", function()
-    setup_inner()
-  end)
 end
 
 --- @return vim.async.Task
 M.refresh_files_cache = function()
   return vim.async.run("refresh_files_cache_task", function()
-    if not P.setup_called then
-      H.notify(vim.log.levels.ERROR, "`setup` must be called before `refresh_files_cache`")
-    end
     P.refresh_files_cache()
   end)
 end
@@ -1196,10 +1185,6 @@ local find_inner = function(opts)
   opts = H.default(opts, {})
   opts.resume = H.default(opts.resume, false)
 
-  if not P.setup_called then
-    H.notify(vim.log.levels.ERROR, "`setup` must be called before `find`")
-    return
-  end
   P.reset_benchmarks()
   P.preview_active = false
 
@@ -1437,6 +1422,10 @@ local find_inner = function(opts)
 
   L.benchmark_step("end", "M.find (total init)")
 
+  if P.is_find_cache_empty() then
+    P.refresh_files_cache()
+    vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, {})
+  end
   render_find_files_for_query(opts.resume and P.caches.input_line or "")
 end
 

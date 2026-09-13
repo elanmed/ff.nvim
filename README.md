@@ -37,24 +37,19 @@ A small, fast fuzzy finder with intelligent weights.
 - Only the icons for the top `vim.g.ff.max_results_rendered` results are calculated
 - Icons and highlights can be disabled for especially large codebases
 
-With these optimizations in place, I average around 20ms per keystroke on a codebase of 60k files.
-Enable the `vim.g.ff.benchmark_step` and `vim.g.ff.benchmark_mean` options to try yourself
+With these optimizations in place, I average around 20ms per keystroke on the linux kernel codebase - enable the `vim.g.ff.benchmark_step` and `vim.g.ff.benchmark_mean` options to try yourself
 
 ## Configuration example
 
 ```lua
 -- defaults:
 vim.g.ff = {
-  -- automatically call `setup()` on startup
-  auto_setup = true,
-  -- "setup"|"find"
-  refresh_files_cache = "setup",
   -- benchmark each keystroke
   benchmark_step = false,
   -- benchmark the mean of all keystrokes in a session
   benchmark_mean = false,
   -- defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
-  find_cmd = "fd --absolute-path --type f",
+  find_cmd = { "fd", "--absolute-path", "--type f" },
   -- configuration options for the sigmoid function that scales the result of matchfuzzypos
   -- to a range of [0, max_frecency_score + max_weights_score]
   matchfuzzypos_sigmoid = {
@@ -127,37 +122,7 @@ vim.api.nvim_create_autocmd({ "FileType", }, {
 })
 ```
 
-## Lazy-loading
-
-To lazy-load `ff.nvim`, set `auto_setup = false` and run `setup()` and `find()` inside a `vim.async.run` task:
-
-```lua
-vim.g.ff = { auto_setup = false }
-
-vim.keymap.set("n", "<leader>f", function()
-  local ff = require "ff"
-  vim.async.run(function()
-    vim.async.await(ff.setup())
-    ff.find()
-  end)
-end)
-```
-
-`setup()` is a no-op after the first call, so subsequent keypresses open the picker immediately.
-
 ## API
-
-`setup()`, `find()`, and `refresh_files_cache()` each return a `vim.async.Task`. Call `Task:wait()` from synchronous code to block until completion, or `vim.async.await(task)` from within another async task. See `:help vim.async.run()` for the full task API.
-
-### `setup`
-
-```lua
--- returns a vim.async.Task
-require "ff".setup()
-```
-
-By default, `setup()` is automatically on startup. This can be disabled by setting `vim.g.ff.auto_setup = false`. Note that if `auto_setup` is disabled,
-`setup()` still needs to be called manually.
 
 ### `find`
 
@@ -176,18 +141,17 @@ require "ff".find(opts)
 require "ff".refresh_files_cache()
 ```
 
-By default, `refresh_files_cache()` is called once when `setup()` is run. When performing actions on the file system,
-it can be helpful to refresh the cache so the picker shows the latest files. The returned task can be awaited in an
-autocommand like:
+By default, `refresh_files_cache()` is called once when `find()` is first run. When performing actions on the file system,
+it can be helpful to refresh the cache so the picker shows the latest files:
 
 ```lua
 vim.api.nvim_create_autocmd("User", {
   pattern = {
-    "MiniFilesActionCreate",
-    "MiniFilesActionDelete",
-    "MiniFilesActionRename",
-    "MiniFilesActionCopy",
-    "MiniFilesActionMove",
+    "TreeCreate",
+    "TreeDelete",
+    "TreeRename",
+    "TreeMove",
+    "TreeCopy",
   },
   callback = function()
     require "ff".refresh_files_cache()
