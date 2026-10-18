@@ -7,9 +7,14 @@ local H = ff._internal.H
 local F = ff._internal.F
 local P = ff._internal.P
 
+local function cleanup_H()
+  H.cwd = nil
+end
+
 T["H"] = MiniTest.new_set()
 
 T["H"]["#default"] = MiniTest.new_set()
+
 T["H"]["#default"]["returns default when value is nil"] = function()
   MiniTest.expect.equality(H.default(nil, "fallback"), "fallback")
   MiniTest.expect.equality(H.default(nil, false), false)
@@ -20,9 +25,7 @@ T["H"]["#rel_path"] = MiniTest.new_set {
     pre_case = function()
       H.cwd = "path/to/dir"
     end,
-    post_case = function()
-      H.cwd = nil
-    end,
+    post_case = cleanup_H,
   },
 }
 
@@ -33,6 +36,7 @@ T["H"]["#rel_path"]["returns the rel file path when able"] = function()
     "path/to/another_dir/file.txt"
   )
 end
+
 T["H"]["#rel_path"]["returns the abs file path as a fallback"] = function()
   MiniTest.expect.equality(
     H.rel_path "path/to/another_dir/file.txt",
@@ -41,6 +45,7 @@ T["H"]["#rel_path"]["returns the abs file path as a fallback"] = function()
 end
 
 T["H"]["#get_ext"] = MiniTest.new_set()
+
 T["H"]["#get_ext"]["returns the extension"] = function()
   MiniTest.expect.equality(H.get_ext "path/to/file.txt", "txt")
   MiniTest.expect.equality(H.get_ext "path/to/file.min.txt", "txt")
@@ -50,6 +55,7 @@ T["H"]["#get_ext"]["returns the extension"] = function()
 end
 
 T["H"]["#basename"] = MiniTest.new_set()
+
 T["H"]["#basename"]["returns the basename with and without an extension"] = function()
   MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = true }), "file.txt")
   MiniTest.expect.equality(H.basename("path/to/file.txt", { with_ext = false }), "file")
@@ -71,6 +77,7 @@ T["H"]["#default"]["returns original value when not nil"] = function()
 end
 
 T["H"]["#pad_str"] = MiniTest.new_set()
+
 T["H"]["#pad_str"]["returns original string when longer than or equal to len"] = function()
   MiniTest.expect.equality(H.pad_str("abc", 2), "abc")
   MiniTest.expect.equality(H.pad_str("abc", 3), "abc")
@@ -81,6 +88,7 @@ T["H"]["#pad_str"]["pads string with spaces when shorter than len"] = function()
 end
 
 T["H"]["#max_decimals"] = MiniTest.new_set()
+
 T["H"]["#max_decimals"]["truncates to max decimals without rounding"] = function()
   MiniTest.expect.equality(H.max_decimals(3.456, 2), 3.45)
   MiniTest.expect.equality(H.max_decimals(9.999, 1), 9.9)
@@ -88,6 +96,7 @@ T["H"]["#max_decimals"]["truncates to max decimals without rounding"] = function
 end
 
 T["H"]["#min_decimals"] = MiniTest.new_set()
+
 T["H"]["#min_decimals"]["formats number with minimum decimals"] = function()
   MiniTest.expect.equality(H.min_decimals(3.4, 2), "3.40")
   MiniTest.expect.equality(H.min_decimals(5, 3), "5.000")
@@ -95,6 +104,7 @@ T["H"]["#min_decimals"]["formats number with minimum decimals"] = function()
 end
 
 T["H"]["#exact_decimals"] = MiniTest.new_set()
+
 T["H"]["#exact_decimals"]["truncates then formats to exact decimals"] = function()
   MiniTest.expect.equality(H.exact_decimals(3.456, 2), "3.45")
   MiniTest.expect.equality(H.exact_decimals(9.999, 1), "9.9")
@@ -102,19 +112,53 @@ T["H"]["#exact_decimals"]["truncates then formats to exact decimals"] = function
 end
 
 T["H"]["#fit_decimals"] = MiniTest.new_set()
+
 T["H"]["#fit_decimals"]["returns two decimals when it fits within max_len"] = function()
   MiniTest.expect.equality(H.fit_decimals(1.23, 5), "1.23")
   MiniTest.expect.equality(H.fit_decimals(12.34, 5), "12.34")
 end
+
 T["H"]["#fit_decimals"]["returns one decimal when two decimals are too long but one decimal fits"] = function()
   MiniTest.expect.equality(H.fit_decimals(123.45, 5), "123.4")
 end
+
 T["H"]["#fit_decimals"]["returns no decimals when two decimals are too long"] = function()
   MiniTest.expect.equality(H.fit_decimals(1234.56, 5), "1234")
   MiniTest.expect.equality(H.fit_decimals(12345.67, 5), "12345")
 end
 
 T["F"] = MiniTest.new_set()
+
+T["F"]["#compute_score"] = MiniTest.new_set()
+
+T["F"]["#compute_score"]["returns one at the reference date"] = function()
+  MiniTest.expect.equality(F.compute_score { now = 1000, date_at_score_one = 1000 }, 1)
+end
+
+T["F"]["#compute_score"]["decays to one half after one half-life"] = function()
+  MiniTest.expect.equality(
+    F.compute_score { now = 1000 + F.half_life_sec, date_at_score_one = 1000 },
+    0.5
+  )
+end
+
+T["F"]["#compute_score"]["returns more than one for a future reference date"] = function()
+  MiniTest.expect.equality(F.compute_score { now = 1000, date_at_score_one = 1001 } > 1, true)
+end
+
+T["F"]["#compute_date_at_score_one"] = MiniTest.new_set()
+
+T["F"]["#compute_date_at_score_one"]["returns now for score one"] = function()
+  MiniTest.expect.equality(F.compute_date_at_score_one { now = 1000, score = 1 }, 1000)
+end
+
+T["F"]["#compute_date_at_score_one"]["roundtrips scores to their reference date"] = function()
+  local reference_date = 1000
+  local now = reference_date + F.half_life_sec
+  local score = F.compute_score { now = now, date_at_score_one = reference_date }
+  local roundtrip_date = F.compute_date_at_score_one { now = now, score = score }
+  MiniTest.expect.equality(math.abs(roundtrip_date - reference_date) < 1e-9, true)
+end
 
 local root_dir = vim.fs.joinpath(vim.fn.getcwd(), "test-ff")
 local db_dir = vim.fs.joinpath(root_dir, "db-dir")
@@ -136,32 +180,74 @@ local function create_file(path)
   vim.fn.writefile({ "content" }, path)
 end
 
-local function cleanup()
-  F._now = function()
-    return os.time()
-  end
+local original_os_time = os.time
+local original_now = F._now
+local original_default_db_dir = F.default_db_dir
+local test_bufs = {}
+
+local function cleanup_fs()
   vim.fn.delete(root_dir, "rf")
+end
+
+local function setup_fs()
   create_file(test_file_a)
   create_file(test_file_b)
   vim.fn.mkdir(test_dir_a, "p")
 end
 
+local function cleanup_F()
+  os.time = original_os_time
+  F.default_db_dir = original_default_db_dir
+  F._now = original_now
+end
+
+local function cleanup_P()
+  for _, buf in ipairs(test_bufs) do
+    vim.cmd("bwipeout! " .. tostring(buf))
+  end
+  test_bufs = {}
+
+  vim.g.ff = nil
+  vim.o.lines = 24
+  P.caches = {
+    find_abs_paths = {},
+    find_rel_paths = {},
+    frecency_abs_paths = {},
+    frecency_rel_paths = {},
+    frecency_abs_path_to_score = {},
+    icon_cache = {},
+    open_buffer_to_modified = {},
+    weighted_files_per_query = {},
+    gopts = ff.defaulted_gopts(),
+  }
+  P.input_state = { line_during_refresh = "", is_refreshing = false }
+  P.tick = 0
+  P.preview_active = false
+  P.MAX_FRECENCY_SCORE = 99
+  P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
+end
+
+local function cleanup()
+  cleanup_fs()
+  cleanup_H()
+  cleanup_F()
+  cleanup_P()
+end
+
 T["F"]["#update_file_score"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
+      cleanup()
+      setup_fs()
       H.cwd = cwd
-      cleanup()
     end,
-    post_case = function()
-      H.cwd = nil
-      cleanup()
-    end,
-    post_once = function()
-      vim.fn.delete(root_dir, "rf")
-    end,
+    post_case = cleanup,
+    post_once = cleanup_fs,
   },
 }
+
 T["F"]["#update_file_score"]["update_type=increase"] = MiniTest.new_set()
+
 T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new file"] = function()
   F._now = function()
     return now
@@ -321,6 +407,7 @@ T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories 
 end
 
 T["F"]["#update_file_score"]["update_type=remove"] = MiniTest.new_set()
+
 T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing file"] = function()
   F._now = function()
     return now
@@ -349,18 +436,8 @@ end
 
 T["P"] = MiniTest.new_set {
   hooks = {
-    pre_case = function()
-      P.caches.find_abs_paths = {}
-      P.caches.find_rel_paths = {}
-      P.caches.frecency_abs_paths = {}
-      P.caches.frecency_rel_paths = {}
-      P.caches.frecency_abs_path_to_score = {}
-      P.caches.icon_cache = {}
-      P.caches.open_buffer_to_modified = {}
-      P.caches.weighted_files_per_query = {}
-      vim.g.ff = nil
-      P.caches.gopts = ff.defaulted_gopts()
-    end,
+    pre_case = cleanup_P,
+    post_case = cleanup_P,
   },
 }
 
@@ -369,9 +446,7 @@ T["P"]["format_filename"] = MiniTest.new_set {
     pre_case = function()
       H.cwd = "path/to/dir"
     end,
-    post_case = function()
-      H.cwd = nil
-    end,
+    post_case = cleanup_H,
   },
 }
 
@@ -379,25 +454,30 @@ T["P"]["format_filename"]["formats with score, icon, and relative path"] = funct
   local res = P.format_filename("path/to/dir/src/file.lua", 12.34, "📄")
   MiniTest.expect.equality(res, "12.34 📄 |src/file.lua")
 end
+
 T["P"]["format_filename"]["formats without icon when icon_char is nil"] = function()
   local res = P.format_filename("path/to/dir/src/file.lua", 12.34, nil)
   MiniTest.expect.equality(res, "12.34 |src/file.lua")
 end
+
 T["P"]["format_filename"]["pads score to MAX_SCORE_LEN"] = function()
   local res = P.format_filename("path/to/dir/file.lua", 1.2, nil)
   MiniTest.expect.equality(res, " 1.20 |file.lua")
 end
+
 T["P"]["format_filename"]["uses fit_decimals for score formatting"] = function()
   local res = P.format_filename("path/to/dir/file.lua", 123.456789, nil)
   MiniTest.expect.equality(res, "123.4 |file.lua")
 end
 
 T["P"]["get_icon_info"] = MiniTest.new_set()
+
 T["P"]["get_icon_info"]["returns nil icon when icons_enabled is false"] = function()
   local res = P.get_icon_info { abs_path = "path/to/file.lua", icons_enabled = false }
   MiniTest.expect.equality(res.icon_char, nil)
   MiniTest.expect.equality(res.icon_hl, nil)
 end
+
 T["P"]["get_icon_info"]["returns cached icon when extension exists in cache"] = function()
   P.caches.icon_cache["lua"] = {
     icon_char = "🌙",
@@ -450,6 +530,7 @@ local weighted_file_ts = {
 }
 
 T["P"]["get_weighted_file"] = MiniTest.new_set()
+
 T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches including the extension"] = function()
   vim.g.ff = { weights = { basename_boost = 100 } }
   P.caches.gopts = ff.defaulted_gopts()
@@ -463,6 +544,7 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the basename m
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
+
 T["P"]["get_weighted_file"]["should apply the basename_boost when the basename matches excluding the extension"] = function()
   vim.g.ff = { weights = { basename_boost = 400 } }
   P.caches.gopts = ff.defaulted_gopts()
@@ -476,6 +558,7 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the basename m
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, 400)
 end
+
 T["P"]["get_weighted_file"]["should apply the basename_boost when the alphabetic basename matches excluding the extension"] = function()
   vim.g.ff = { weights = { basename_boost = 400 } }
   P.caches.gopts = ff.defaulted_gopts()
@@ -489,6 +572,7 @@ T["P"]["get_weighted_file"]["should apply the basename_boost when the alphabetic
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, 400)
 end
+
 T["P"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false }
   vim.g.ff = { weights = { current_buf_boost = -90 } }
@@ -503,6 +587,7 @@ T["P"]["get_weighted_file"]["should apply the current_buf_boost"] = function()
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, -90)
 end
+
 T["P"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false }
   vim.g.ff = { weights = { alternate_buf_boost = 300 } }
@@ -517,6 +602,7 @@ T["P"]["get_weighted_file"]["should apply the alternate_buf_boost"] = function()
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, 300)
 end
+
 T["P"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = true }
   vim.g.ff = { weights = { modified_buf_boost = 200 } }
@@ -531,6 +617,7 @@ T["P"]["get_weighted_file"]["should apply the modified_buf_boost"] = function()
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, 200)
 end
+
 T["P"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
   P.caches.open_buffer_to_modified = { [weighted_file_lua.abs_path] = false }
   vim.g.ff = { weights = { open_buf_boost = 100 } }
@@ -545,6 +632,7 @@ T["P"]["get_weighted_file"]["should apply the open_buf_boost"] = function()
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
+
 T["P"]["get_weighted_file"]["should apply the frecency score"] = function()
   P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 100 }
   local res = P.get_weighted_file {
@@ -557,6 +645,7 @@ T["P"]["get_weighted_file"]["should apply the frecency score"] = function()
   }
   MiniTest.expect.equality(res.buf_and_frecency_score, 100)
 end
+
 T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_multiple and file_score_multiple"] = function()
   P.caches.frecency_abs_path_to_score = { [weighted_file_lua.abs_path] = 20 }
   vim.g.ff = { fuzzy_score_multiple = 0.8, file_score_multiple = 0.2 }
@@ -580,13 +669,10 @@ end
 T["P"]["render_find_files"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      P.MAX_FRECENCY_SCORE = 99
-      P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
       cleanup()
+      setup_fs()
     end,
-    post_once = function()
-      vim.fn.delete(root_dir, "rf")
-    end,
+    post_once = cleanup_fs,
   },
 }
 
@@ -816,13 +902,7 @@ T["P"]["render_find_files"]["highlights icon and fuzzy match characters"] = func
   MiniTest.expect.equality(observed, expected)
 end
 
-T["P"]["scale_fuzzy_to_frecency"] = MiniTest.new_set {
-  hooks = {
-    pre_case = function()
-      P.MAX_FRECENCY_SCORE = 99
-    end,
-  },
-}
+T["P"]["scale_fuzzy_to_frecency"] = MiniTest.new_set()
 
 local default_weights = {
   open_buf_boost = 10,
@@ -895,18 +975,7 @@ T["P"]["scale_fuzzy_to_frecency"]["honors custom midpoint, steepness, and weight
   )
 end
 
-T["P"]["defaulted_gopts"] = MiniTest.new_set {
-  hooks = {
-    pre_case = function()
-      vim.g.ff = nil
-      vim.o.lines = 24
-    end,
-    post_case = function()
-      vim.g.ff = nil
-      vim.o.lines = 24
-    end,
-  },
-}
+T["P"]["defaulted_gopts"] = MiniTest.new_set()
 
 T["P"]["defaulted_gopts"]["fills defaults when the option is unset"] = function()
   MiniTest.expect.equality(ff.defaulted_gopts(), {
@@ -995,30 +1064,19 @@ T["P"]["defaulted_gopts"]["fills defaults for partially provided values without 
   MiniTest.expect.equality(gopts.hl_enabled, false)
 end
 
-local original_os_time = os.time
-local original_default_db_dir = F.default_db_dir
-
 T["P"]["refresh_frecency_cache"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      P.MAX_FRECENCY_SCORE = 99
-      P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
       cleanup()
+      setup_fs()
       F.default_db_dir = vim.fs.joinpath(root_dir, "db-dir")
       H.cwd = cwd
       os.time = function()
         return now
       end
     end,
-    post_case = function()
-      os.time = original_os_time
-      F.default_db_dir = original_default_db_dir
-      H.cwd = nil
-      cleanup()
-    end,
-    post_once = function()
-      vim.fn.delete(root_dir, "rf")
-    end,
+    post_case = cleanup,
+    post_once = cleanup_fs,
   },
 }
 
@@ -1088,15 +1146,11 @@ T["P"]["refresh_files_cache"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
       cleanup()
+      setup_fs()
       H.cwd = cwd
     end,
-    post_case = function()
-      H.cwd = nil
-      cleanup()
-    end,
-    post_once = function()
-      vim.fn.delete(root_dir, "rf")
-    end,
+    post_case = cleanup,
+    post_once = cleanup_fs,
   },
 }
 
@@ -1144,25 +1198,15 @@ T["P"]["refresh_files_cache"]["normalizes paths from the find output"] = functio
   MiniTest.expect.equality(P.caches.find_abs_paths, { abs_a, abs_b })
 end
 
-local test_bufs = {}
-
 T["P"]["refresh_open_buffers_cache"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
       cleanup()
-      test_bufs = {}
+      setup_fs()
       H.cwd = cwd
     end,
-    post_case = function()
-      H.cwd = nil
-      for _, buf in ipairs(test_bufs) do
-        pcall(vim.cmd, "bwipeout! " .. tostring(buf))
-      end
-      cleanup()
-    end,
-    post_once = function()
-      vim.fn.delete(root_dir, "rf")
-    end,
+    post_case = cleanup,
+    post_once = cleanup_fs,
   },
 }
 
@@ -1209,18 +1253,63 @@ T["P"]["refresh_open_buffers_cache"]["clears the weighted_files_per_query cache"
   MiniTest.expect.equality(P.caches.weighted_files_per_query, {})
 end
 
+local setup_child = MiniTest.new_child_neovim()
+
+T["M"] = MiniTest.new_set()
+
+T["M"]["#setup"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      setup_child.restart { "-u", "scripts/minimal_init.lua" }
+      setup_child.lua_func(function()
+        require("ff").setup()
+      end)
+    end,
+    post_once = setup_child.stop,
+  },
+}
+
+T["M"]["#setup"]["defines picker highlight links"] = function()
+  MiniTest.expect.equality(
+    setup_child.lua_func(function()
+      return vim.api.nvim_get_hl(0, { name = "FFPickerFuzzyHighlightChar", link = true }).link
+    end),
+    "Search"
+  )
+  MiniTest.expect.equality(
+    setup_child.lua_func(function()
+      return vim.api.nvim_get_hl(0, { name = "FFPickerCursorLine", link = true }).link
+    end),
+    "CursorLine"
+  )
+end
+
 local child = MiniTest.new_child_neovim()
+local picker_db_dir = vim.fn.tempname()
+
+local function cleanup_picker_db()
+  vim.fn.delete(picker_db_dir, "rf")
+end
+
+local function cleanup_find_child()
+  cleanup_picker_db()
+  child.stop()
+end
 
 T["find"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      vim.fn.delete(vim.fs.joinpath(vim.fn.getcwd(), "test-ff"), "rf")
-      child.restart { "-u", "scripts/minimal_init.lua" }
-      child.lua_func(function()
-        require "ff"
-      end)
+      cleanup_fs()
+      cleanup_picker_db()
+      child.restart { "--noplugin", "-u", "scripts/minimal_init.lua" }
+      child.lua_func(function(db_dir)
+        _G.FF_TEST = true
+        _G.ff_modules = require "ff"
+        _G.ff_modules._internal.F.default_db_dir = db_dir
+        _G.ff_modules.setup()
+      end, picker_db_dir)
     end,
-    post_once = child.stop,
+    post_once = cleanup_find_child,
   },
 }
 
@@ -1256,6 +1345,184 @@ local function run_find()
   child.lua_func(function()
     require("ff").find():wait()
   end)
+end
+
+local function run_find_with_events(patterns)
+  child.g.ff = { icons_enabled = false }
+  return child.lua_func(function(event_patterns)
+    local events = {}
+    for _, pattern in ipairs(event_patterns) do
+      vim.api.nvim_create_autocmd("User", {
+        pattern = pattern,
+        callback = function(ev)
+          table.insert(events, {
+            pattern = pattern,
+            data = { winnr = ev.data.winnr, bufnr = ev.data.bufnr },
+          })
+        end,
+      })
+    end
+    require("ff").find():wait()
+    return events
+  end, patterns)
+end
+
+local function open_picker(lines)
+  local events = run_find_with_events { "FFResultsOpen", "FFInputOpen" }
+  local results_buf = events[1].data.bufnr
+  child.api.nvim_buf_set_lines(results_buf, 0, -1, false, lines)
+  return {
+    results_win = events[1].data.winnr,
+    results_buf = results_buf,
+    input_win = events[2].data.winnr,
+    input_buf = events[2].data.bufnr,
+  }
+end
+
+local function feed_picker_action(action)
+  child.api.nvim_feedkeys(
+    child.api.nvim_replace_termcodes("<Plug>FF" .. action, true, false, true),
+    "m",
+    false
+  )
+end
+
+local function set_results_cursor(win, row)
+  child.lua_func(function(winid, line)
+    vim.api.nvim_win_call(winid, function()
+      vim.api.nvim_win_set_cursor(winid, { line, 0 })
+    end)
+  end, win, row)
+end
+
+T["find"]["picker keymaps"] = MiniTest.new_set()
+
+T["find"]["picker keymaps"]["ResultSelect opens the selected file and closes the picker"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua" }
+  feed_picker_action "ResultSelect"
+  MiniTest.expect.equality(
+    child.api.nvim_buf_get_name(0),
+    vim.fs.joinpath(vim.fn.getcwd(), "lua/ff/init.lua")
+  )
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.input_win), false)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.results_win), false)
+end
+
+T["find"]["picker keymaps"]["ResultSelect does nothing on an empty result"] = function()
+  local picker = open_picker { "" }
+  feed_picker_action "ResultSelect"
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.input_win), true)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.results_win), true)
+end
+
+T["find"]["picker keymaps"]["ResultSelect and navigation do nothing while preview is active"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua", "1.00 |README.md" }
+  set_results_cursor(picker.results_win, 1)
+  child.lua_func(function()
+    _G.ff_modules._internal.P.preview_active = true
+  end)
+  feed_picker_action "ResultSelect"
+  feed_picker_action "ResultNext"
+  feed_picker_action "ResultPrev"
+  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1], 1)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.input_win), true)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.results_win), true)
+end
+
+T["find"]["picker keymaps"]["ResultNext and ResultPrev wrap at the ends"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua", "1.00 |README.md" }
+  set_results_cursor(picker.results_win, 2)
+  feed_picker_action "ResultNext"
+  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1], 1)
+  feed_picker_action "ResultPrev"
+  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1], 2)
+end
+
+T["find"]["picker keymaps"]["ResultDeleteFrecencyScore leaves caches alone without a score entry"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua" }
+  child.lua_func(function()
+    _G.ff_modules._internal.P.caches.weighted_files_per_query = { marker = { true } }
+  end)
+  feed_picker_action "ResultDeleteFrecencyScore"
+  MiniTest.expect.equality(
+    child.lua_func(function()
+      return vim.wait(2000, function()
+        return _G.ff_modules._internal.P.caches.weighted_files_per_query.marker ~= nil
+      end, 10)
+    end),
+    true
+  )
+  MiniTest.expect.equality(
+    child.lua_func(function()
+      return _G.ff_modules._internal.P.caches.weighted_files_per_query
+    end),
+    { marker = { true } }
+  )
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.input_win), true)
+end
+
+T["find"]["picker keymaps"]["ResultDeleteFrecencyScore removes stored scores and refreshes caches"] = function()
+  child.lua_func(function()
+    local internal = _G.ff_modules._internal
+    local file = vim.fs.joinpath(vim.uv.cwd(), "lua/ff/init.lua")
+    internal.F.write(
+      internal.F.get_dated_files_path(),
+      { [internal.H.cwd] = { [file] = os.time() } }
+    )
+  end)
+  local picker = open_picker { "1.00 |lua/ff/init.lua" }
+  child.lua_func(function()
+    _G.ff_modules._internal.P.caches.weighted_files_per_query = { marker = { true } }
+  end)
+  feed_picker_action "ResultDeleteFrecencyScore"
+  MiniTest.expect.equality(
+    child.lua_func(function()
+      return vim.wait(3000, function()
+        return _G.ff_modules._internal.P.caches.weighted_files_per_query.marker == nil
+      end, 10)
+    end),
+    true
+  )
+  MiniTest.expect.equality(
+    child.lua_func(function()
+      local internal = _G.ff_modules._internal
+      return internal.F.read(internal.F.get_dated_files_path())[internal.H.cwd][vim.fs.joinpath(
+        vim.uv.cwd(),
+        "lua/ff/init.lua"
+      )]
+    end),
+    vim.NIL
+  )
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.input_win), true)
+end
+
+T["find"]["picker keymaps"]["Close closes both windows and exits insert mode"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua" }
+  feed_picker_action "Close"
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.input_win), false)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.results_win), false)
+  MiniTest.expect.equality(child.fn.mode(), "n")
+end
+
+T["find"]["picker keymaps"]["InputClear empties the input buffer"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua" }
+  child.api.nvim_buf_set_lines(picker.input_buf, 0, -1, false, { "query" })
+  feed_picker_action "InputClear"
+  MiniTest.expect.equality(child.api.nvim_buf_get_lines(picker.input_buf, 0, -1, true), { "" })
+end
+
+T["find"]["picker keymaps"]["WinClosed on the input window closes the results window"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua" }
+  child.api.nvim_win_close(picker.input_win, true)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.results_win), false)
+end
+
+T["find"]["picker keymaps"]["preview scrolling does nothing when preview is inactive"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua", "1.00 |README.md" }
+  set_results_cursor(picker.results_win, 2)
+  feed_picker_action "PreviewScrollDown"
+  feed_picker_action "PreviewScrollUp"
+  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1], 2)
 end
 
 T["find"]["fires the FFResultsOpen and FFInputOpen user events"] = function()
