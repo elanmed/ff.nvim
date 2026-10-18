@@ -20,7 +20,7 @@ A small, fast fuzzy finder with intelligent weights.
 
 `ff.nvim` prioritizes performance in a few ways:
 
-- Large tables are iterated in batches w/coroutines to avoid blocking the picker UI
+- Large tables are iterated in batches with coroutines to avoid blocking the picker UI
 - New searches interrupt ongoing processing for previous searches
 - A max of `vim.g.ff.max_results_considered` files with a fuzzy match are processed
   - `matchfuzzypos` is quick to exclude entries without a match but slow(er) to calculate a match's score. For shorter
@@ -33,7 +33,7 @@ A small, fast fuzzy finder with intelligent weights.
   - Info on open buffers are pulled once and cached when `find()` is called
   - Results are cached for each user input (instant backspace search)
   - Icons are cached by extension to avoid calling the icon library when possible
-- A max of `vim.g.ff.max_results_rendered` results are rendered in the results window, preventing unecessary highlighting
+- A max of `vim.g.ff.max_results_rendered` results are rendered in the results window, preventing unnecessary highlighting
 - Only the icons for the top `vim.g.ff.max_results_rendered` results are calculated
 - Icons and highlights can be disabled for especially large codebases
 
@@ -49,7 +49,7 @@ vim.g.ff = {
   -- benchmark the mean of all keystrokes in a session
   benchmark_mean = false,
   -- defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
-  find_cmd = { "fd", "--absolute-path", "--type f" },
+  find_cmd = { "fd", "--absolute-path", "--type", "f" },
   -- configuration options for the sigmoid function that scales the result of matchfuzzypos
   -- to a range of [0, max_frecency_score + max_weights_score]
   matchfuzzypos_sigmoid = {
@@ -105,7 +105,7 @@ vim.g.ff = {
   preview_win_opts = {},
 }
 
-vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff", })
+vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff" })
 
 vim.api.nvim_create_autocmd({ "FileType", }, {
   pattern = "ff-picker",
@@ -165,43 +165,43 @@ vim.api.nvim_create_autocmd("User", {
 
 ## Plug remaps
 
-#### `<Plug>FFResultSelect`
+### `<Plug>FFResultSelect`
 
 - Select a result, close the picker, and edit the selected file
 
-#### `<Plug>FFResultNext`
+### `<Plug>FFResultNext`
 
 - Move the cursor to the next result
 
-#### `<Plug>FFResultPrev`
+### `<Plug>FFResultPrev`
 
 - Move the cursor to the prev result
 
-#### `<Plug>FFResultDeleteFrecencyScore`
+### `<Plug>FFResultDeleteFrecencyScore`
 
 - Delete the frecency score of the current result and reload the search results
 
-#### `<Plug>FFClose`
+### `<Plug>FFClose`
 
 - Close the picker
 
-#### `<Plug>FFPreviewToggle`
+### `<Plug>FFPreviewToggle`
 
 - Toggle the preview for the file under the cursor
 
-#### `<Plug>FFPreviewScrollDown`
+### `<Plug>FFPreviewScrollDown`
 
 - Scroll the preview down half a page
 
-#### `<Plug>FFPreviewScrollUp`
+### `<Plug>FFPreviewScrollUp`
 
 - Scroll the preview up half a page
 
-#### `<Plug>FFInputClear`
+### `<Plug>FFInputClear`
 
 - Clear the input
 
-## Deps
+## Dependencies
 
 - [`mini.icons`](https://github.com/echasnovski/mini.icons) or [`nvim-web-devicons`](https://github.com/nvim-tree/nvim-web-devicons)
   - Or `false` passed as `vim.g.ff.icons_enabled`
