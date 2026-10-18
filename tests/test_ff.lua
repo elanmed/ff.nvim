@@ -895,6 +895,106 @@ T["P"]["scale_fuzzy_to_frecency"]["honors custom midpoint, steepness, and weight
   )
 end
 
+T["P"]["defaulted_gopts"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      vim.g.ff = nil
+      vim.o.lines = 24
+    end,
+    post_case = function()
+      vim.g.ff = nil
+      vim.o.lines = 24
+    end,
+  },
+}
+
+T["P"]["defaulted_gopts"]["fills defaults when the option is unset"] = function()
+  MiniTest.expect.equality(ff.defaulted_gopts(), {
+    weights = {
+      open_buf_boost = 10,
+      modified_buf_boost = 20,
+      alternate_buf_boost = 30,
+      basename_boost = 40,
+      current_buf_boost = -1000,
+    },
+    matchfuzzypos_sigmoid = { steepness = 0.02, midpoint = 900 },
+    matchfuzzypos_batch_size = 250,
+    hl_enabled = true,
+    icons_enabled = true,
+    max_results_considered = 1000,
+    fuzzy_score_multiple = 0.7,
+    benchmark_step = false,
+    benchmark_mean = false,
+    find_cmd = { "fd", "--absolute-path", "--type", "f" },
+    -- editor_height 24 gives results_height 12, doubled into max_results_rendered
+    max_results_rendered = 24,
+  })
+end
+
+T["P"]["defaulted_gopts"]["derives max_results_rendered from the window height"] = function()
+  vim.o.lines = 30
+  MiniTest.expect.equality(ff.defaulted_gopts().max_results_rendered, 30)
+end
+
+T["P"]["defaulted_gopts"]["uses explicit values over defaults"] = function()
+  vim.g.ff = {
+    weights = {
+      open_buf_boost = 1,
+      modified_buf_boost = 2,
+      alternate_buf_boost = 3,
+      basename_boost = 4,
+      current_buf_boost = 5,
+    },
+    matchfuzzypos_sigmoid = { steepness = 1, midpoint = 2 },
+    matchfuzzypos_batch_size = 3,
+    hl_enabled = false,
+    icons_enabled = false,
+    max_results_considered = 4,
+    fuzzy_score_multiple = 0.5,
+    benchmark_step = true,
+    benchmark_mean = true,
+    find_cmd = { "rg", "--files" },
+    max_results_rendered = 7,
+  }
+
+  MiniTest.expect.equality(ff.defaulted_gopts(), {
+    weights = {
+      open_buf_boost = 1,
+      modified_buf_boost = 2,
+      alternate_buf_boost = 3,
+      basename_boost = 4,
+      current_buf_boost = 5,
+    },
+    matchfuzzypos_sigmoid = { steepness = 1, midpoint = 2 },
+    matchfuzzypos_batch_size = 3,
+    hl_enabled = false,
+    icons_enabled = false,
+    max_results_considered = 4,
+    fuzzy_score_multiple = 0.5,
+    benchmark_step = true,
+    benchmark_mean = true,
+    find_cmd = { "rg", "--files" },
+    max_results_rendered = 7,
+  })
+end
+
+T["P"]["defaulted_gopts"]["fills defaults for partially provided values without mutating vim.g.ff"] = function()
+  vim.g.ff = { weights = { open_buf_boost = 1 }, hl_enabled = false }
+  local original_gopts = vim.deepcopy(vim.g.ff)
+
+  local gopts = ff.defaulted_gopts()
+
+  MiniTest.expect.equality(vim.g.ff, original_gopts)
+  MiniTest.expect.equality(gopts.weights, {
+    open_buf_boost = 1,
+    modified_buf_boost = 20,
+    alternate_buf_boost = 30,
+    basename_boost = 40,
+    current_buf_boost = -1000,
+  })
+  MiniTest.expect.equality(gopts.hl_enabled, false)
+end
+
 local child = MiniTest.new_child_neovim()
 
 T["find"] = MiniTest.new_set {
