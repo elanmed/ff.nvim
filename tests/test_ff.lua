@@ -816,6 +816,85 @@ T["P"]["render_find_files"]["highlights icon and fuzzy match characters"] = func
   MiniTest.expect.equality(observed, expected)
 end
 
+T["P"]["scale_fuzzy_to_frecency"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      P.MAX_FRECENCY_SCORE = 99
+    end,
+  },
+}
+
+local default_weights = {
+  open_buf_boost = 10,
+  modified_buf_boost = 20,
+  alternate_buf_boost = 30,
+  basename_boost = 40,
+  current_buf_boost = -1000,
+}
+local default_sigmoid = { steepness = 0.02, midpoint = 900 }
+local default_max_score = math.max(
+  default_weights.alternate_buf_boost,
+  default_weights.basename_boost,
+  default_weights.current_buf_boost,
+  default_weights.modified_buf_boost,
+  default_weights.open_buf_boost
+) + 99
+
+local function scale_fuzzy_to_frecency(fuzzy_score, query, weights, sigmoid)
+  return P.scale_fuzzy_to_frecency {
+    fuzzy_score = fuzzy_score,
+    query = query,
+    weights = weights or default_weights,
+    matchfuzzypos_sigmoid = sigmoid or default_sigmoid,
+  }
+end
+
+T["P"]["scale_fuzzy_to_frecency"]["increases monotonically with fuzzy_score"] = function()
+  local low = scale_fuzzy_to_frecency(100, "abc")
+  local mid = scale_fuzzy_to_frecency(500, "abc")
+  local high = scale_fuzzy_to_frecency(1000, "abc")
+
+  MiniTest.expect.equality(low < mid, true)
+  MiniTest.expect.equality(mid < high, true)
+end
+
+T["P"]["scale_fuzzy_to_frecency"]["returns near 0 for very low fuzzy scores"] = function()
+  MiniTest.expect.equality(scale_fuzzy_to_frecency(1, "abc") < 0.001, true)
+end
+
+T["P"]["scale_fuzzy_to_frecency"]["saturates to exactly max_score for very high fuzzy scores"] = function()
+  MiniTest.expect.equality(scale_fuzzy_to_frecency(100000, "a"), default_max_score)
+end
+
+T["P"]["scale_fuzzy_to_frecency"]["returns half of max_score when the per char score equals midpoint"] = function()
+  -- query "ab" with fuzzy_score 1800 gives a per char score of 900, the default midpoint
+  MiniTest.expect.equality(scale_fuzzy_to_frecency(1800, "ab"), default_max_score / 2)
+end
+
+T["P"]["scale_fuzzy_to_frecency"]["returns equal results for equal per char scores across query lengths"] = function()
+  MiniTest.expect.equality(scale_fuzzy_to_frecency(900, "a"), scale_fuzzy_to_frecency(1800, "ab"))
+end
+
+T["P"]["scale_fuzzy_to_frecency"]["honors custom midpoint, steepness, and weights"] = function()
+  MiniTest.expect.equality(
+    scale_fuzzy_to_frecency(200, "ab", default_weights, { steepness = 0.05, midpoint = 100 }),
+    default_max_score / 2
+  )
+
+  local custom_weights = {
+    open_buf_boost = 100,
+    modified_buf_boost = 200,
+    alternate_buf_boost = 300,
+    basename_boost = 400,
+    current_buf_boost = -1000,
+  }
+  -- steepness 1000 saturates the sigmoid to exactly 1 for large fuzzy scores
+  MiniTest.expect.equality(
+    scale_fuzzy_to_frecency(100000, "a", custom_weights, { steepness = 1000, midpoint = 0 }),
+    499
+  )
+end
+
 local child = MiniTest.new_child_neovim()
 
 T["find"] = MiniTest.new_set {
