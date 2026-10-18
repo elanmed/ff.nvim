@@ -1,16 +1,23 @@
+local original_ff_test = rawget(_G, "FF_TEST")
 _G.FF_TEST = true
-require("mini.test").setup()
-local T = MiniTest.new_set()
+local ff_ok, ff = pcall(require, "ff")
+_G.FF_TEST = original_ff_test
+assert(ff_ok, ff)
 
-local ff = require "ff"
+local T = MiniTest.new_set()
 local H = ff._internal.H
 local F = ff._internal.F
 local P = ff._internal.P
 local original_H_readable = H.readable
+local original_H_vim_system = H.vim_system
+local original_H_cwd = H.cwd
+local original_g_ff = vim.deepcopy(vim.g.ff)
+local original_lines = vim.o.lines
 
 local function cleanup_H()
-  H.cwd = nil
+  H.cwd = original_H_cwd
   H.readable = original_H_readable
+  H.vim_system = original_H_vim_system
 end
 
 T["H"] = MiniTest.new_set()
@@ -44,6 +51,10 @@ T["H"]["#rel_path"]["returns the abs file path as a fallback"] = function()
     H.rel_path "path/to/another_dir/file.txt",
     "path/to/another_dir/file.txt"
   )
+end
+
+T["H"]["#rel_path"]["preserves paths outside cwd that share its string prefix"] = function()
+  MiniTest.expect.equality(H.rel_path "path/to/dir2/file.txt", "path/to/dir2/file.txt")
 end
 
 T["H"]["#get_ext"] = MiniTest.new_set()
@@ -162,7 +173,8 @@ T["F"]["#compute_date_at_score_one"]["roundtrips scores to their reference date"
   MiniTest.expect.equality(math.abs(roundtrip_date - reference_date) < 1e-9, true)
 end
 
-local root_dir = vim.fs.joinpath(vim.fn.getcwd(), "test-ff")
+local root_dir =
+  vim.fs.joinpath(vim.fn.getcwd(), ".ff-test-" .. vim.fn.tempname():gsub("[^%w]", "-"))
 local db_dir = vim.fs.joinpath(root_dir, "db-dir")
 local dated_files_path = F.get_dated_files_path(db_dir)
 
@@ -175,7 +187,14 @@ local now = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 0, sec = 
 local now_after_30_min = os.time { year = 2025, month = 1, day = 1, hour = 0, min = 30, sec = 0 }
 local score_when_adding = 1
 local date_at_score_one_now = F.compute_date_at_score_one { now = now, score = score_when_adding }
-local score_decayed_after_30_min = 0.99951876362267
+local score_decayed_after_30_min = F.compute_score {
+  now = now_after_30_min,
+  date_at_score_one = date_at_score_one_now,
+}
+local date_at_score_one_after_repeated_increase = F.compute_date_at_score_one {
+  now = now_after_30_min,
+  score = score_decayed_after_30_min + 1,
+}
 
 local function create_file(path)
   vim.fn.mkdir(vim.fs.dirname(path), "p")
@@ -191,6 +210,43 @@ local function cleanup_fs()
   vim.fn.delete(root_dir, "rf")
 end
 
+T["F"]["#read"] = MiniTest.new_set {
+  hooks = {
+    pre_case = cleanup_fs,
+    post_case = cleanup_fs,
+    post_once = cleanup_fs,
+  },
+}
+
+T["F"]["#read"]["returns an empty table when the database file does not exist"] = function()
+  MiniTest.expect.equality(F.read(dated_files_path), {})
+end
+
+T["F"]["#read"]["decodes a previously written database"] = function()
+  local dated_files = { [cwd] = { [test_file_a] = now } }
+  F.write(dated_files_path, dated_files)
+
+  MiniTest.expect.equality(F.read(dated_files_path), dated_files)
+end
+
+T["F"]["#write"] = MiniTest.new_set {
+  hooks = {
+    pre_case = cleanup_fs,
+    post_case = cleanup_fs,
+    post_once = cleanup_fs,
+  },
+}
+
+T["F"]["#write"]["creates parent directories and writes the complete database"] = function()
+  local path = vim.fs.joinpath(root_dir, "nested", "database.json")
+  local dated_files = { [cwd] = { [test_file_a] = now, [test_file_b] = now_after_30_min } }
+
+  F.write(path, dated_files)
+
+  MiniTest.expect.equality(vim.fn.filereadable(path), 1)
+  MiniTest.expect.equality(F.read(path), dated_files)
+end
+
 local function setup_fs()
   create_file(test_file_a)
   create_file(test_file_b)
@@ -204,10 +260,13 @@ local function cleanup_F()
 end
 
 local function cleanup_P()
-  for _, buf in ipairs(test_bufs) do
-    vim.cmd("bwipeout! " .. tostring(buf))
+  for index = #test_bufs, 1, -1 do
+    local buf = test_bufs[index]
+    if vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end
+    test_bufs[index] = nil
   end
-  test_bufs = {}
 
   vim.g.ff = nil
   vim.o.lines = 24
@@ -229,6 +288,11 @@ local function cleanup_P()
   P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 end
 
+local function restore_test_globals()
+  vim.g.ff = vim.deepcopy(original_g_ff)
+  vim.o.lines = original_lines
+end
+
 local function cleanup_fs_H_F()
   cleanup_fs()
   cleanup_H()
@@ -238,6 +302,7 @@ end
 local function cleanup()
   cleanup_fs_H_F()
   cleanup_P()
+  restore_test_globals()
 end
 
 T["F"]["#update_file_score"] = MiniTest.new_set {
@@ -247,7 +312,11 @@ T["F"]["#update_file_score"] = MiniTest.new_set {
       setup_fs()
       H.cwd = cwd
     end,
-    post_case = cleanup_fs_H_F,
+    post_case = function()
+      cleanup_fs_H_F()
+      cleanup_P()
+      restore_test_globals()
+    end,
     post_once = cleanup_fs,
   },
 }
@@ -293,11 +362,11 @@ T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeat
     })
     :wait()
 
-  -- TODO: passes, precision issue
-  -- MiniTest.expect.equality(
-  --   F.read(dated_files_path)[test_file_a],
-  --   F.compute_date_at_score_one { now = now_after_30_min, score = score_decayed_after_30_min + 1, }
-  -- )
+  local date_at_score_one = F.read(dated_files_path)[cwd][test_file_a]
+  MiniTest.expect.equality(
+    math.abs(date_at_score_one - date_at_score_one_after_repeated_increase) < 1e-6,
+    true
+  )
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores when adding a new file"] = function()
@@ -503,7 +572,6 @@ local health = require "ff.health"
 local health_modules = { "mini.icons", "nvim-web-devicons" }
 local original_vim_health = vim.health
 local original_executable = vim.fn.executable
-local original_g_ff = vim.g.ff
 local original_package_loaded = {}
 local original_package_preload = {}
 local health_reports
@@ -542,7 +610,7 @@ end
 local function cleanup_health()
   vim.health = original_vim_health
   vim.fn.executable = original_executable
-  vim.g.ff = original_g_ff
+  vim.g.ff = vim.deepcopy(original_g_ff)
   for _, name in ipairs(health_modules) do
     package.loaded[name] = original_package_loaded[name]
     package.preload[name] = original_package_preload[name]
@@ -632,7 +700,10 @@ end
 T["P"] = MiniTest.new_set {
   hooks = {
     pre_case = cleanup_P,
-    post_case = cleanup_P,
+    post_case = function()
+      cleanup_P()
+      restore_test_globals()
+    end,
   },
 }
 
@@ -866,6 +937,7 @@ T["P"]["render_find_files"] = MiniTest.new_set {
     pre_case = function()
       cleanup_fs_H_F()
       setup_fs()
+      H.cwd = cwd
     end,
     post_once = cleanup_fs,
   },
@@ -1384,13 +1456,39 @@ T["P"]["refresh_files_cache"]["normalizes paths from the find output"] = functio
   local abs_a = create_sandbox_file "alpha.txt"
   local abs_b = create_sandbox_file "beta.md"
   use_find_cmd {
-    vim.fs.joinpath(cwd, "test-ff", "files", "..", "files", ".", "alpha.txt"),
+    vim.fs.joinpath(cwd, "test-dir-a", "..", ".", "alpha.txt"),
     abs_b,
   }
 
   vim.async.run(P.refresh_files_cache):wait()
 
   MiniTest.expect.equality(P.caches.find_abs_paths, { abs_a, abs_b })
+end
+
+T["P"]["refresh_files_cache"]["clears stale caches when the command fails"] = function()
+  P.caches.find_abs_paths = { "stale-abs" }
+  P.caches.find_rel_paths = { "stale-rel" }
+  H.vim_system = function()
+    return { code = 1, stdout = nil, stderr = "command failed" }
+  end
+
+  vim.async.run(P.refresh_files_cache):wait()
+
+  MiniTest.expect.equality(P.caches.find_abs_paths, {})
+  MiniTest.expect.equality(P.caches.find_rel_paths, {})
+end
+
+T["P"]["refresh_files_cache"]["handles empty command output"] = function()
+  P.caches.find_abs_paths = { "stale-abs" }
+  P.caches.find_rel_paths = { "stale-rel" }
+  H.vim_system = function()
+    return { code = 0, stdout = "", stderr = "" }
+  end
+
+  vim.async.run(P.refresh_files_cache):wait()
+
+  MiniTest.expect.equality(P.caches.find_abs_paths, {})
+  MiniTest.expect.equality(P.caches.find_rel_paths, {})
 end
 
 T["P"]["refresh_open_buffers_cache"] = MiniTest.new_set {
@@ -1436,6 +1534,15 @@ T["P"]["refresh_open_buffers_cache"]["caches open listed buffers under cwd with 
     [abs_a] = false,
     [abs_b] = true,
   })
+end
+
+T["P"]["refresh_open_buffers_cache"]["excludes sibling paths that share the cwd string prefix"] = function()
+  local sibling_path = vim.fs.joinpath(root_dir, "files-sibling", "outside.txt")
+  create_test_buffer(sibling_path, { listed = true })
+
+  vim.async.run(P.refresh_open_buffers_cache):wait()
+
+  MiniTest.expect.equality(P.caches.open_buffer_to_modified, {})
 end
 
 T["P"]["refresh_open_buffers_cache"]["clears the weighted_files_per_query cache"] = function()

@@ -30,11 +30,14 @@ end
 
 --- @param abs_path string
 H.rel_path = function(abs_path)
-  --- @type string
-  if not vim.startswith(abs_path, H.cwd) then
+  local rel_path = vim.fs.relpath(H.cwd, abs_path)
+  if rel_path == nil then
     return abs_path
   end
-  return abs_path:sub(#H.cwd + 2)
+  if rel_path == "." then
+    return ""
+  end
+  return rel_path
 end
 
 --- @param path string
@@ -546,8 +549,12 @@ P.refresh_files_cache = function()
   -- TODO: swap to vim.system?
   L.benchmark_step("start", "find_cmd vim.system")
   local out = H.vim_system(P.caches.gopts.find_cmd)
-  local lines = vim.split(out.stdout, "\n")
   L.benchmark_step("end", "find_cmd vim.system")
+  if out.code ~= 0 then
+    L.benchmark_step_closing()
+    return
+  end
+  local lines = vim.split(out.stdout or "", "\n")
 
   L.benchmark_step("start", "refresh_files_cache (entire loop)")
   A.throttled_iterator {
@@ -662,7 +669,7 @@ P.refresh_open_buffers_cache = function()
       if buf_name == "" then
         return
       end
-      if not vim.startswith(buf_name, H.cwd) then
+      if vim.fs.relpath(H.cwd, buf_name) == nil then
         return
       end
 
