@@ -16,7 +16,7 @@ Current coverage in `tests/test_ff.lua`: most `H` helpers, `F.update_file_score`
      - Slices rendered results to `max_results_rendered`
    - **Caching & staleness**
      - Reuses `weighted_files_per_query` cache on repeated query (no re-rank)
-     - Stale tick (`P.tick` changed) → `render_results` not called
+     - Stale tick (`P.tick` changed) → renders empty results (cancel empties the weighted/decorated lists)
    - **Output**
      - Decorated files carry `rel_path`, `icon_char`, `formatted_filename`
      - `hl_enabled=false` → decorated files have empty `match_idxs`

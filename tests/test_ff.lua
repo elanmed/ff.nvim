@@ -577,54 +577,299 @@ T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_mu
   MiniTest.expect.equality(res.weighted_score, expected_weighted)
 end
 
-local original_cwd
-
-T["find"] = MiniTest.new_set {
+T["P"]["render_find_files"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      original_cwd = H.cwd
-      H.cwd = vim.fn.getcwd()
-      P.caches.find_abs_paths = {}
-      P.caches.find_rel_paths = {}
-      P.caches.frecency_abs_paths = {}
-      P.caches.frecency_rel_paths = {}
-      P.caches.frecency_abs_path_to_score = {}
-      P.caches.icon_cache = {}
-      P.caches.open_buffer_to_modified = {}
-      P.caches.weighted_files_per_query = {}
-      vim.g.ff = nil
-      P.caches.gopts = ff.defaulted_gopts()
+      P.MAX_FRECENCY_SCORE = 99
+      P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
+      cleanup()
     end,
-    post_case = function()
-      vim.cmd "stopinsert"
-      for _, win_id in ipairs(vim.api.nvim_list_wins()) do
-        if
-          vim.api.nvim_win_is_valid(win_id) and vim.api.nvim_win_get_config(win_id).relative ~= ""
-        then
-          vim.api.nvim_win_close(win_id, true)
-        end
-      end
-
-      H.cwd = original_cwd
+    post_once = function()
+      vim.fn.delete(root_dir, "rf")
     end,
   },
 }
 
-T["find"]["fires the FFResultsOpen and FFInputOpen user events"] = function()
-  local events = {}
-  local group = vim.api.nvim_create_augroup("FFTestFindEvents", { clear = true })
-  for _, pattern in ipairs { "FFResultsOpen", "FFInputOpen" } do
-    vim.api.nvim_create_autocmd("User", {
-      group = group,
-      pattern = pattern,
-      callback = function(ev)
-        table.insert(events, { pattern = ev.pattern, data = ev.data })
+local function create_sandbox_file(name)
+  local abs_path = vim.fs.joinpath(cwd, name)
+  create_file(abs_path)
+  return abs_path
+end
+
+local function rel_path_of(abs_path)
+  return vim.fs.relpath(vim.fn.getcwd(), abs_path)
+end
+
+local function render_find_files(query, opts_overrides)
+  opts_overrides = opts_overrides or {}
+  vim.g.ff = vim.tbl_extend("force", { icons_enabled = false }, opts_overrides)
+  P.caches.gopts = ff.defaulted_gopts()
+  local results_buf = vim.api.nvim_create_buf(false, true)
+  local decorated_files
+  vim.async
+    .run(P.render_find_files, {
+      query = query,
+      results_buf = results_buf,
+      curr_bufname = "",
+      alternate_bufname = "",
+      curr_tick = opts_overrides.curr_tick or P.tick,
+      render_results = function(files)
+        decorated_files = files
+        vim.api.nvim_buf_set_lines(
+          results_buf,
+          0,
+          -1,
+          false,
+          vim.tbl_map(function(f)
+            return f.formatted_filename
+          end, files)
+        )
       end,
     })
-  end
+    :wait()
+  return results_buf, decorated_files
+end
 
-  vim.g.ff = { icons_enabled = false }
-  ff.find():wait()
+local function populate_find_cache(abs_paths)
+  P.caches.find_abs_paths = abs_paths
+  P.caches.find_rel_paths = vim.tbl_map(rel_path_of, abs_paths)
+end
+
+T["P"]["render_find_files"]["renders frecency paths before find paths for the empty query"] = function()
+  local frecency_abs = create_sandbox_file "alpha.txt"
+  local find_abs_one = create_sandbox_file "f1.txt"
+  local find_abs_two = create_sandbox_file "f2.txt"
+
+  P.caches.frecency_abs_paths = { frecency_abs }
+  P.caches.frecency_rel_paths = { rel_path_of(frecency_abs) }
+  P.caches.frecency_abs_path_to_score = { [frecency_abs] = 10 }
+  populate_find_cache { find_abs_one, find_abs_two }
+
+  local _, decorated_files = render_find_files ""
+
+  MiniTest.expect.equality(#decorated_files, 3)
+  MiniTest.expect.equality(decorated_files[1].abs_path, frecency_abs)
+  MiniTest.expect.equality(decorated_files[1].weighted_score, 10)
+  local find_results = { decorated_files[2].abs_path, decorated_files[3].abs_path }
+  table.sort(find_results)
+  MiniTest.expect.equality(find_results, { find_abs_one, find_abs_two })
+end
+
+T["P"]["render_find_files"]["dedups files present in both frecency and find caches"] = function()
+  local abs_path = create_sandbox_file "alpha.txt"
+  local other_abs = create_sandbox_file "f1.txt"
+
+  P.caches.frecency_abs_paths = { abs_path }
+  P.caches.frecency_rel_paths = { rel_path_of(abs_path) }
+  P.caches.frecency_abs_path_to_score = { [abs_path] = 5 }
+  populate_find_cache { abs_path, other_abs }
+
+  local _, decorated_files = render_find_files ""
+
+  MiniTest.expect.equality(#decorated_files, 2)
+  local found_abs_paths = { decorated_files[1].abs_path, decorated_files[2].abs_path }
+  table.sort(found_abs_paths)
+  MiniTest.expect.equality(found_abs_paths, { abs_path, other_abs })
+end
+
+T["P"]["render_find_files"]["matches rel paths with matchfuzzypos for a populated query"] = function()
+  local alpha_abs = create_sandbox_file "alpha.txt"
+  local beta_abs = create_sandbox_file "beta.md"
+  populate_find_cache { alpha_abs, beta_abs }
+
+  local _, decorated_files = render_find_files "alpha"
+
+  MiniTest.expect.equality(#decorated_files, 1)
+  MiniTest.expect.equality(decorated_files[1].abs_path, alpha_abs)
+  MiniTest.expect.equality(decorated_files[1].fuzzy_score > 0, true)
+  MiniTest.expect.equality(decorated_files[1].buf_and_frecency_score, 40)
+end
+
+T["P"]["render_find_files"]["stops considering results at max_results_considered"] = function()
+  local abs_paths = {}
+  for i = 1, 5 do
+    table.insert(abs_paths, create_sandbox_file(("f%d.txt"):format(i)))
+  end
+  populate_find_cache(abs_paths)
+
+  local _, decorated_files =
+    render_find_files("txt", { max_results_considered = 3, max_results_rendered = 10 })
+
+  MiniTest.expect.equality(#decorated_files, 3)
+end
+
+T["P"]["render_find_files"]["slices rendered results to max_results_rendered"] = function()
+  local abs_paths = {}
+  for i = 1, 5 do
+    table.insert(abs_paths, create_sandbox_file(("f%d.txt"):format(i)))
+  end
+  populate_find_cache(abs_paths)
+
+  local _, decorated_files = render_find_files("txt", { max_results_rendered = 2 })
+
+  MiniTest.expect.equality(#decorated_files, 2)
+end
+
+T["P"]["render_find_files"]["caps the empty query at max_results_rendered"] = function()
+  local abs_paths = {}
+  for i = 1, 5 do
+    table.insert(abs_paths, create_sandbox_file(("f%d.txt"):format(i)))
+  end
+  populate_find_cache(abs_paths)
+
+  local _, decorated_files = render_find_files("", { max_results_rendered = 2 })
+
+  MiniTest.expect.equality(#decorated_files, 2)
+end
+
+T["P"]["render_find_files"]["reuses the weighted_files_per_query cache"] = function()
+  local cached_abs = create_sandbox_file "zzz-cached.txt"
+  local find_abs = create_sandbox_file "cached-foo.txt"
+  populate_find_cache { find_abs }
+  P.caches.weighted_files_per_query["cached"] = {
+    {
+      abs_path = cached_abs,
+      weighted_score = 7,
+      buf_and_frecency_score = 0,
+      fuzzy_score = 0,
+      match_idxs = {},
+    },
+  }
+
+  local _, decorated_files = render_find_files "cached"
+
+  MiniTest.expect.equality(#decorated_files, 1)
+  MiniTest.expect.equality(decorated_files[1].abs_path, cached_abs)
+  MiniTest.expect.equality(
+    decorated_files[1].formatted_filename,
+    (" 7.00 |%s"):format(rel_path_of(cached_abs))
+  )
+end
+
+T["P"]["render_find_files"]["renders empty results when the tick is stale"] = function()
+  local alpha_abs = create_sandbox_file "alpha.txt"
+  populate_find_cache { alpha_abs }
+
+  local _, decorated_files = render_find_files("", { curr_tick = P.tick + 1 })
+
+  MiniTest.expect.equality(decorated_files, {})
+end
+
+T["P"]["render_find_files"]["decorates files with rel_path and formatted filename"] = function()
+  local alpha_abs = create_sandbox_file "alpha.txt"
+  populate_find_cache { alpha_abs }
+
+  local _, decorated_files = render_find_files ""
+
+  local rel_path = rel_path_of(alpha_abs)
+  MiniTest.expect.equality(decorated_files[1], {
+    abs_path = alpha_abs,
+    weighted_score = 0,
+    fuzzy_score = 0,
+    buf_and_frecency_score = 0,
+    match_idxs = {},
+    rel_path = rel_path,
+    icon_char = nil,
+    icon_hl = nil,
+    formatted_filename = (" 0.00 |%s"):format(rel_path),
+  })
+end
+
+T["P"]["render_find_files"]["leaves match_idxs empty when hl_enabled=false"] = function()
+  local alpha_abs = create_sandbox_file "alpha.txt"
+  populate_find_cache { alpha_abs }
+
+  local results_buf, decorated_files = render_find_files("alpha", { hl_enabled = false })
+
+  MiniTest.expect.equality(decorated_files[1].match_idxs, {})
+  MiniTest.expect.equality(vim.api.nvim_buf_get_extmarks(results_buf, P.ns_id, 0, -1, {}), {})
+end
+
+T["P"]["render_find_files"]["highlights icon and fuzzy match characters"] = function()
+  local alpha_abs = create_sandbox_file "alpha.txt"
+  local rel_path = rel_path_of(alpha_abs)
+  populate_find_cache { alpha_abs }
+  P.caches.icon_cache["txt"] = { icon_char = "T", icon_hl = "TxtIcon" }
+
+  local results_buf, decorated_files = render_find_files("alpha", { icons_enabled = true })
+
+  local match_idxs = vim.fn.matchfuzzypos({ rel_path }, "alpha")[2][1]
+  local file_offset = decorated_files[1].formatted_filename:find "|"
+  local expected = { { 0, 6, "TxtIcon" } }
+  for _, hl_idx in ipairs(match_idxs) do
+    table.insert(expected, { 0, hl_idx + file_offset, "FFPickerFuzzyHighlightChar" })
+  end
+  table.sort(expected, function(a, b)
+    return a[2] < b[2]
+  end)
+
+  local observed = {}
+  for _, extmark in
+    ipairs(vim.api.nvim_buf_get_extmarks(results_buf, P.ns_id, 0, -1, { details = true }))
+  do
+    table.insert(observed, { extmark[2], extmark[3], extmark[4].hl_group })
+  end
+  table.sort(observed, function(a, b)
+    return a[2] < b[2]
+  end)
+
+  MiniTest.expect.equality(observed, expected)
+end
+
+local child = MiniTest.new_child_neovim()
+
+T["find"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      vim.fn.delete(vim.fs.joinpath(vim.fn.getcwd(), "test-ff"), "rf")
+      child.restart { "-u", "scripts/minimal_init.lua" }
+      child.lua_func(function()
+        require "ff"
+      end)
+    end,
+    post_once = child.stop,
+  },
+}
+
+local function add_event_capture(patterns, list_name)
+  child.lua_func(function(patterns, list_name)
+    _G[list_name] = {}
+    for _, pattern in ipairs(patterns) do
+      vim.api.nvim_create_autocmd("User", {
+        pattern = pattern,
+        callback = function(ev)
+          table.insert(_G[list_name], {
+            pattern = pattern,
+            data = { winnr = ev.data.winnr, bufnr = ev.data.bufnr },
+          })
+        end,
+      })
+    end
+  end, patterns, list_name)
+end
+
+local function get_child_state()
+  return child.lua_func(function()
+    return {
+      events = _G.ff_events,
+      opens = _G.ff_opens,
+      previews = _G.ff_previews,
+    }
+  end)
+end
+
+local function run_find()
+  child.g.ff = { icons_enabled = false }
+  child.lua_func(function()
+    require("ff").find():wait()
+  end)
+end
+
+T["find"]["fires the FFResultsOpen and FFInputOpen user events"] = function()
+  add_event_capture({ "FFResultsOpen", "FFInputOpen" }, "ff_events")
+  run_find()
+
+  local events = get_child_state().events
 
   MiniTest.expect.equality(#events, 2)
   MiniTest.expect.equality(events[1].pattern, "FFResultsOpen")
@@ -632,63 +877,71 @@ T["find"]["fires the FFResultsOpen and FFInputOpen user events"] = function()
 
   local results_win = events[1].data.winnr
   local input_win = events[2].data.winnr
-  MiniTest.expect.truthy(vim.api.nvim_win_is_valid(results_win))
-  MiniTest.expect.truthy(vim.api.nvim_win_is_valid(input_win))
-  MiniTest.expect.equality(events[1].data.bufnr, vim.api.nvim_win_get_buf(results_win))
-  MiniTest.expect.equality(events[2].data.bufnr, vim.api.nvim_win_get_buf(input_win))
-  MiniTest.expect.equality(vim.api.nvim_get_current_win(), input_win)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(results_win), true)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(input_win), true)
+  MiniTest.expect.equality(child.api.nvim_win_get_buf(results_win), events[1].data.bufnr)
+  MiniTest.expect.equality(child.api.nvim_win_get_buf(input_win), events[2].data.bufnr)
+  MiniTest.expect.equality(child.api.nvim_get_current_win(), input_win)
 end
 
 T["find"]["fires FFPreviewOpen with the preview buffer when the preview is toggled on"] = function()
-  local opens = {}
-  local previews = {}
-  local group = vim.api.nvim_create_augroup("FFTestPreviewEvents", { clear = true })
-  vim.api.nvim_create_autocmd("User", {
-    group = group,
-    pattern = "FFResultsOpen",
-    callback = function(ev)
-      table.insert(opens, { winnr = ev.data.winnr, bufnr = ev.data.bufnr })
-    end,
-  })
-  vim.api.nvim_create_autocmd("User", {
-    group = group,
-    pattern = "FFPreviewOpen",
-    callback = function(ev)
-      table.insert(previews, { winnr = ev.data.winnr, bufnr = ev.data.bufnr })
-    end,
-  })
+  add_event_capture({ "FFResultsOpen" }, "ff_opens")
+  add_event_capture({ "FFPreviewOpen" }, "ff_previews")
+  run_find()
 
-  vim.g.ff = { icons_enabled = false }
-  ff.find():wait()
+  local state = get_child_state()
+  MiniTest.expect.equality(#state.opens, 1)
 
-  MiniTest.expect.equality(#opens, 1)
+  local results_win = state.opens[1].data.winnr
+  local results_buf = state.opens[1].data.bufnr
+  child.lua_func(function(win)
+    vim.api.nvim_win_call(win, function()
+      vim.cmd "normal! gg"
+    end)
+  end, results_win)
+  local first_result_line = child.lua_func(function(win)
+    return vim.api.nvim_win_call(win, vim.api.nvim_get_current_line)
+  end, results_win)
+  MiniTest.expect.equality(#first_result_line > 0, true)
 
-  local results_win = opens[1].winnr
-  vim.api.nvim_win_call(results_win, function()
-    vim.cmd "normal! gg"
-  end)
-  vim.api.nvim_feedkeys(
-    vim.api.nvim_replace_termcodes("<Plug>FFPreviewToggle", true, false, true),
-    "m",
-    false
+  local feed_toggle = function()
+    child.api.nvim_feedkeys(
+      child.api.nvim_replace_termcodes("<Plug>FFPreviewToggle", true, false, true),
+      "m",
+      false
+    )
+  end
+
+  feed_toggle()
+  MiniTest.expect.equality(
+    child.lua_func(function()
+      return vim.wait(2000, function()
+        return #_G.ff_previews >= 1
+      end, 10)
+    end),
+    true
   )
-
-  MiniTest.expect.equality(#previews, 1)
-  MiniTest.expect.equality(previews[1].winnr, results_win)
-  MiniTest.expect.equality(previews[1].bufnr, vim.api.nvim_win_get_buf(results_win))
-  MiniTest.expect.truthy(previews[1].bufnr ~= opens[1].bufnr)
+  state = get_child_state()
+  MiniTest.expect.equality(#state.previews, 1)
+  MiniTest.expect.equality(state.previews[1].data.winnr, results_win)
+  MiniTest.expect.equality(child.api.nvim_win_get_buf(results_win), state.previews[1].data.bufnr)
+  MiniTest.expect.equality(state.previews[1].data.bufnr ~= results_buf, true)
 
   -- toggling the preview off shows the results buffer again and re-fires FFResultsOpen
-  vim.api.nvim_feedkeys(
-    vim.api.nvim_replace_termcodes("<Plug>FFPreviewToggle", true, false, true),
-    "m",
-    false
+  feed_toggle()
+  MiniTest.expect.equality(
+    child.lua_func(function()
+      return vim.wait(2000, function()
+        return #_G.ff_opens >= 2
+      end, 10)
+    end),
+    true
   )
-
-  MiniTest.expect.equality(#opens, 2)
-  MiniTest.expect.equality(opens[2].winnr, results_win)
-  MiniTest.expect.equality(opens[2].bufnr, opens[1].bufnr)
-  MiniTest.expect.equality(#previews, 1)
+  state = get_child_state()
+  MiniTest.expect.equality(#state.opens, 2)
+  MiniTest.expect.equality(state.opens[2].data.winnr, results_win)
+  MiniTest.expect.equality(state.opens[2].data.bufnr, results_buf)
+  MiniTest.expect.equality(#state.previews, 1)
 end
 
 return T
