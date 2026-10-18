@@ -74,35 +74,6 @@ vim.g.ff = {
   max_results_considered = 1000,
   -- a max of `max_results_rendered` sorted files are rendered in the results buffer
   max_results_rendered = results_height * 2,
-  -- vim.api.keyset.win_config
-  input_win_config = {
-    style = "minimal",
-    anchor = "SW",
-    relative = "editor",
-    width = vim.o.columns,
-    height = 1,
-    row = input_row,
-    col = 0,
-    border = "rounded",
-    title = "Input",
-  },
-  -- vim.api.keyset.win_config
-  results_win_config = {
-    style = "minimal",
-    anchor = "SW",
-    relative = "editor",
-    width = vim.o.columns,
-    height = results_height,
-    row = results_row,
-    col = 0,
-    border = "rounded",
-    title = "Results",
-    focusable = false,
-  },
-  -- vim.wo
-  results_win_opts = {},
-  -- vim.wo
-  preview_win_opts = {},
 }
 
 vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff" })
@@ -200,6 +171,38 @@ vim.api.nvim_create_autocmd("User", {
 ### `<Plug>FFInputClear`
 
 - Clear the input
+
+## User events
+
+The picker fires a `User` event when it opens each of its windows. Use them to customize the windows, e.g. to set
+window-local options:
+
+```lua
+vim.api.nvim_create_autocmd("User", {
+  pattern = "FFResultsOpen",
+  callback = function(event)
+    vim.wo[event.data.winnr].number = true
+  end,
+})
+```
+
+### `FFResultsOpen`
+
+- Fired when the results window is opened
+- `event.data.winnr`: the results window
+- `event.data.bufnr`: the results buffer
+
+### `FFPreviewOpen`
+
+- Fired when the preview is toggled on (the preview is shown in the results window)
+- `event.data.winnr`: the results window
+- `event.data.bufnr`: the preview buffer
+
+### `FFInputOpen`
+
+- Fired when the input window is opened
+- `event.data.winnr`: the input window
+- `event.data.bufnr`: the input buffer
 
 ## Dependencies
 

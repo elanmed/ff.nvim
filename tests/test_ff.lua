@@ -577,4 +577,118 @@ T["P"]["get_weighted_file"]["should weight the score according to fuzzy_score_mu
   MiniTest.expect.equality(res.weighted_score, expected_weighted)
 end
 
+local original_cwd
+
+T["find"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      original_cwd = H.cwd
+      H.cwd = vim.fn.getcwd()
+      P.caches.find_abs_paths = {}
+      P.caches.find_rel_paths = {}
+      P.caches.frecency_abs_paths = {}
+      P.caches.frecency_rel_paths = {}
+      P.caches.frecency_abs_path_to_score = {}
+      P.caches.icon_cache = {}
+      P.caches.open_buffer_to_modified = {}
+      P.caches.weighted_files_per_query = {}
+      vim.g.ff = nil
+      P.caches.gopts = ff.defaulted_gopts()
+    end,
+    post_case = function()
+      vim.cmd "stopinsert"
+      for _, win_id in ipairs(vim.api.nvim_list_wins()) do
+        if
+          vim.api.nvim_win_is_valid(win_id) and vim.api.nvim_win_get_config(win_id).relative ~= ""
+        then
+          vim.api.nvim_win_close(win_id, true)
+        end
+      end
+
+      H.cwd = original_cwd
+    end,
+  },
+}
+
+T["find"]["fires the FFResultsOpen and FFInputOpen user events"] = function()
+  local events = {}
+  local group = vim.api.nvim_create_augroup("FFTestFindEvents", { clear = true })
+  for _, pattern in ipairs { "FFResultsOpen", "FFInputOpen" } do
+    vim.api.nvim_create_autocmd("User", {
+      group = group,
+      pattern = pattern,
+      callback = function(ev)
+        table.insert(events, { pattern = ev.pattern, data = ev.data })
+      end,
+    })
+  end
+
+  vim.g.ff = { icons_enabled = false }
+  ff.find():wait()
+
+  MiniTest.expect.equality(#events, 2)
+  MiniTest.expect.equality(events[1].pattern, "FFResultsOpen")
+  MiniTest.expect.equality(events[2].pattern, "FFInputOpen")
+
+  local results_win = events[1].data.winnr
+  local input_win = events[2].data.winnr
+  MiniTest.expect.truthy(vim.api.nvim_win_is_valid(results_win))
+  MiniTest.expect.truthy(vim.api.nvim_win_is_valid(input_win))
+  MiniTest.expect.equality(events[1].data.bufnr, vim.api.nvim_win_get_buf(results_win))
+  MiniTest.expect.equality(events[2].data.bufnr, vim.api.nvim_win_get_buf(input_win))
+  MiniTest.expect.equality(vim.api.nvim_get_current_win(), input_win)
+end
+
+T["find"]["fires FFPreviewOpen with the preview buffer when the preview is toggled on"] = function()
+  local opens = {}
+  local previews = {}
+  local group = vim.api.nvim_create_augroup("FFTestPreviewEvents", { clear = true })
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "FFResultsOpen",
+    callback = function(ev)
+      table.insert(opens, { winnr = ev.data.winnr, bufnr = ev.data.bufnr })
+    end,
+  })
+  vim.api.nvim_create_autocmd("User", {
+    group = group,
+    pattern = "FFPreviewOpen",
+    callback = function(ev)
+      table.insert(previews, { winnr = ev.data.winnr, bufnr = ev.data.bufnr })
+    end,
+  })
+
+  vim.g.ff = { icons_enabled = false }
+  ff.find():wait()
+
+  MiniTest.expect.equality(#opens, 1)
+
+  local results_win = opens[1].winnr
+  vim.api.nvim_win_call(results_win, function()
+    vim.cmd "normal! gg"
+  end)
+  vim.api.nvim_feedkeys(
+    vim.api.nvim_replace_termcodes("<Plug>FFPreviewToggle", true, false, true),
+    "m",
+    false
+  )
+
+  MiniTest.expect.equality(#previews, 1)
+  MiniTest.expect.equality(previews[1].winnr, results_win)
+  MiniTest.expect.equality(previews[1].bufnr, vim.api.nvim_win_get_buf(results_win))
+  MiniTest.expect.truthy(previews[1].bufnr ~= opens[1].bufnr)
+
+  -- toggling the preview off shows the results buffer again and re-fires FFResultsOpen
+  vim.api.nvim_feedkeys(
+    vim.api.nvim_replace_termcodes("<Plug>FFPreviewToggle", true, false, true),
+    "m",
+    false
+  )
+
+  MiniTest.expect.equality(#opens, 2)
+  MiniTest.expect.equality(opens[2].winnr, results_win)
+  MiniTest.expect.equality(opens[2].bufnr, opens[1].bufnr)
+  MiniTest.expect.equality(#previews, 1)
+end
+
 return T

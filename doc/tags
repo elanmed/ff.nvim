@@ -12,6 +12,9 @@ ff-configuration-example	ff.txt	/*ff-configuration-example*
 ff-dependencies	ff.txt	/*ff-dependencies*
 ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
+ff-ffinputopen	ff.txt	/*ff-ffinputopen*
+ff-ffpreviewopen	ff.txt	/*ff-ffpreviewopen*
+ff-ffresultsopen	ff.txt	/*ff-ffresultsopen*
 ff-find	ff.txt	/*ff-find*
 ff-highlight-groups	ff.txt	/*ff-highlight-groups*
 ff-performance	ff.txt	/*ff-performance*
@@ -19,4 +22,5 @@ ff-plug-remaps	ff.txt	/*ff-plug-remaps*
 ff-refresh_files_cache	ff.txt	/*ff-refresh_files_cache*
 ff-similar-plugins	ff.txt	/*ff-similar-plugins*
 ff-table-of-contents	ff.txt	/*ff-table-of-contents*
+ff-user-events	ff.txt	/*ff-user-events*
 ff.txt	ff.txt	/*ff.txt*

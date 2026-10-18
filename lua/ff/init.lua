@@ -454,18 +454,8 @@ M.defaulted_gopts = function()
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
 
-  opts.results_win_opts = H.default(opts.results_win_opts, {})
-  opts.preview_win_opts = H.default(opts.preview_win_opts, {})
-
-  local editor_height = vim.o.lines
-  local input_height = 1
-  local border_height = 1
-  local results_height = math.floor(editor_height / 2)
-  local input_row = editor_height
-  local results_row = input_row - input_height - (border_height * 2) - 1
-
-  opts.max_results_rendered = H.default(opts.max_results_rendered, results_height * 2)
-
+  local open_win_info = P.get_open_win_info()
+  opts.max_results_rendered = H.default(opts.max_results_rendered, open_win_info.results_height * 2)
   opts.benchmark_step = H.default(opts.benchmark_step, false)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
   opts.find_cmd = H.default(opts.find_cmd, { "fd", "--absolute-path", "--type", "f" })
@@ -1228,7 +1218,7 @@ local find_inner = function()
     P.set_opts(results_win, minimal_opts)
 
     vim.api.nvim_exec_autocmds("User", {
-      pattern = "FFResultsOpen",
+      pattern = "FFPreviewOpen",
       data = {
         winnr = results_win,
         bufnr = preview_buf,
