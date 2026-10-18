@@ -393,6 +393,21 @@ P.ns_id = vim.api.nvim_create_namespace "FFPicker"
 P.MAX_FRECENCY_SCORE = 99 -- decent default
 P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 
+P.get_open_win_info = function()
+  local editor_height = vim.o.lines
+  local input_height = 1
+  local border_height = 1
+  local results_height = math.floor(editor_height / 2)
+  local input_row = editor_height
+  local results_row = input_row - input_height - (border_height * 2) - 1
+
+  return {
+    input_row = input_row,
+    results_row = results_row,
+    results_height = results_height,
+  }
+end
+
 --- @class FFOpts
 --- @field weights? Weights
 --- @field matchfuzzypos_sigmoid? MatchFuzzyPosSigmoid
@@ -402,10 +417,6 @@ P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 --- @field max_results_considered? number
 --- @field max_results_rendered? number
 --- @field fuzzy_score_multiple? number
---- @field input_win_config? vim.api.keyset.win_config
---- @field results_win_config? vim.api.keyset.win_config
---- @field results_win_opts? vim.wo
---- @field preview_win_opts? vim.wo
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field find_cmd? string[]
@@ -454,33 +465,6 @@ M.defaulted_gopts = function()
   local results_row = input_row - input_height - (border_height * 2) - 1
 
   opts.max_results_rendered = H.default(opts.max_results_rendered, results_height * 2)
-
-  opts.input_win_config = H.default(opts.input_win_config, {})
-  opts.input_win_config = vim.tbl_deep_extend("force", {
-    style = "minimal",
-    anchor = "SW",
-    relative = "editor",
-    width = vim.o.columns,
-    height = 1,
-    row = input_row,
-    col = 0,
-    border = "rounded",
-    title = "Input",
-  }, opts.input_win_config)
-
-  opts.results_win_config = H.default(opts.results_win_config, {})
-  opts.results_win_config = vim.tbl_deep_extend("force", {
-    style = "minimal",
-    anchor = "SW",
-    relative = "editor",
-    width = vim.o.columns,
-    height = results_height,
-    row = results_row,
-    col = 0,
-    border = "rounded",
-    title = "Results",
-    focusable = false,
-  }, opts.results_win_config)
 
   opts.benchmark_step = H.default(opts.benchmark_step, false)
   opts.benchmark_mean = H.default(opts.benchmark_mean, false)
@@ -1189,8 +1173,6 @@ end
 
 --- @async
 local find_inner = function()
-  opts = H.default(opts, {})
-
   P.reset_benchmarks()
   P.preview_active = false
 
@@ -1211,28 +1193,76 @@ local find_inner = function()
   local preview_buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = preview_buf })
 
+  local open_win_info = P.get_open_win_info()
+
   local results_buf = vim.api.nvim_create_buf(false, true)
-  local results_win = vim.api.nvim_open_win(results_buf, false, P.caches.gopts.results_win_config)
+  local results_win = vim.api.nvim_open_win(results_buf, false, {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = open_win_info.results_height,
+    row = open_win_info.results_row,
+    col = 0,
+    border = "rounded",
+    title = "Results",
+    focusable = false,
+  })
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = results_buf })
   local minimal_opts = P.save_minimal_opts(results_win)
 
   local function set_results_win_opts()
     P.set_opts(results_win, minimal_opts)
     P.set_opts(results_win, cursorline_opts)
-    P.set_opts(results_win, P.caches.gopts.results_win_opts)
+
+    vim.api.nvim_exec_autocmds("User", {
+      pattern = "FFResultsOpen",
+      data = {
+        winnr = results_win,
+        bufnr = results_buf,
+      },
+    })
   end
 
   local function set_preview_win_opts()
     P.set_opts(results_win, minimal_opts)
-    P.set_opts(results_win, P.caches.gopts.preview_win_opts)
+
+    vim.api.nvim_exec_autocmds("User", {
+      pattern = "FFResultsOpen",
+      data = {
+        winnr = results_win,
+        bufnr = preview_buf,
+      },
+    })
   end
 
   set_results_win_opts()
 
   local input_buf = vim.api.nvim_create_buf(false, true)
-  local input_win = vim.api.nvim_open_win(input_buf, false, P.caches.gopts.input_win_config)
+  local input_win = vim.api.nvim_open_win(input_buf, false, {
+    style = "minimal",
+    anchor = "SW",
+    relative = "editor",
+    width = vim.o.columns,
+    height = 1,
+    row = open_win_info.input_row,
+    col = 0,
+    border = "rounded",
+    title = "Input",
+  })
   vim.api.nvim_set_option_value("buftype", "nofile", { buf = input_buf })
   vim.api.nvim_set_current_win(input_win)
+
+  local function set_input_win_opts()
+    vim.api.nvim_exec_autocmds("User", {
+      pattern = "FFInputOpen",
+      data = {
+        winnr = input_win,
+        bufnr = input_buf,
+      },
+    })
+  end
+  set_input_win_opts()
 
   vim.cmd "startinsert"
 
@@ -1438,10 +1468,9 @@ local find_inner = function()
 end
 
 --- @return vim.async.Task
---- @param opts? FFFindOpts
-M.find = function(opts)
+M.find = function()
   return vim.async.run("find_task", function()
-    find_inner(opts)
+    find_inner()
   end)
 end
 
