@@ -51,9 +51,3 @@ Following the existing conventions in `tests/test_ff.lua`:
   `tests/test_health.lua`) — mini.test collects all `tests/test_*.lua` files.
 - Keep helpers local to `tests/test_ff.lua` until they are genuinely shared
   across multiple test files.
-
-## Planned test cases
-
-- `T["find"]["picker keymaps"]`
-  - `opens a matching sandbox file selected from rendered search results`
-  - `scrolls an active preview without moving the result selection`

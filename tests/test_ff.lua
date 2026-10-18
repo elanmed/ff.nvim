@@ -1649,8 +1649,8 @@ local function run_find()
   end)
 end
 
-local function run_find_with_events(patterns)
-  child.g.ff = { icons_enabled = false }
+local function run_find_with_events(patterns, opts)
+  child.g.ff = vim.tbl_extend("force", { icons_enabled = false }, opts or {})
   return child.lua_func(function(event_patterns)
     local events = {}
     for _, pattern in ipairs(event_patterns) do
@@ -1667,6 +1667,18 @@ local function run_find_with_events(patterns)
     require("ff").find():wait()
     return events
   end, patterns)
+end
+
+local function set_find_output(abs_paths)
+  child.lua_func(function(paths)
+    local stdout = table.concat(paths, "\n")
+    if #paths > 0 then
+      stdout = stdout .. "\n"
+    end
+    _G.ff_modules._internal.H.vim_system = function()
+      return { code = 0, stdout = stdout, stderr = "" }
+    end
+  end, abs_paths)
 end
 
 local function open_picker(lines)
@@ -1698,6 +1710,40 @@ local function set_results_cursor(win, row)
 end
 
 T["find"]["picker keymaps"] = MiniTest.new_set()
+
+T["find"]["picker keymaps"]["opens a matching sandbox file from rendered search results"] = function()
+  local file_name = "ff-integration-unique-marker.lua"
+  local abs_path = vim.fs.joinpath(cwd, file_name)
+  create_file(abs_path)
+  set_find_output { abs_path, create_sandbox_file "unrelated-file.txt" }
+
+  local events = run_find_with_events({ "FFResultsOpen", "FFInputOpen" }, { find_cmd = { "stub" } })
+  local results_buf = events[1].data.bufnr
+  local input_buf = events[2].data.bufnr
+  local results_win = events[1].data.winnr
+  local expected_rel_path = vim.fs.relpath(vim.fn.getcwd(), abs_path)
+
+  child.type_keys(file_name)
+  MiniTest.expect.equality(
+    child.lua_func(function(bufnr, marker)
+      return vim.wait(2000, function()
+        local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, true)
+        return #lines == 1 and lines[1]:find(marker, 1, true) ~= nil
+      end, 10)
+    end, results_buf, file_name),
+    true
+  )
+
+  local result_line = child.api.nvim_buf_get_lines(results_buf, 0, -1, true)[1]
+  local separator = result_line:find("|", 1, true)
+  MiniTest.expect.equality(result_line:sub(separator + 1), expected_rel_path)
+
+  feed_picker_action "ResultSelect"
+
+  MiniTest.expect.equality(child.api.nvim_buf_get_name(0), abs_path)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(input_buf), false)
+  MiniTest.expect.equality(child.api.nvim_win_is_valid(results_win), false)
+end
 
 T["find"]["picker keymaps"]["ResultSelect opens the selected file and closes the picker"] = function()
   local picker = open_picker { "1.00 |lua/ff/init.lua" }
@@ -1817,6 +1863,24 @@ T["find"]["picker keymaps"]["WinClosed on the input window closes the results wi
   local picker = open_picker { "1.00 |lua/ff/init.lua" }
   child.api.nvim_win_close(picker.input_win, true)
   MiniTest.expect.equality(child.api.nvim_win_is_valid(picker.results_win), false)
+end
+
+T["find"]["picker keymaps"]["scrolls an active preview without moving the result selection"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua", "1.00 |README.md" }
+  set_results_cursor(picker.results_win, 2)
+
+  feed_picker_action "PreviewToggle"
+  MiniTest.expect.equality(
+    child.api.nvim_win_get_buf(picker.results_win) ~= picker.results_buf,
+    true
+  )
+
+  feed_picker_action "PreviewScrollDown"
+  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1] > 1, true)
+
+  feed_picker_action "PreviewToggle"
+  MiniTest.expect.equality(child.api.nvim_win_get_buf(picker.results_win), picker.results_buf)
+  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1], 2)
 end
 
 T["find"]["picker keymaps"]["preview scrolling does nothing when preview is inactive"] = function()
