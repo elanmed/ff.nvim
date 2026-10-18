@@ -9,7 +9,7 @@ ff-<plug>ffresultprev	ff.txt	/*ff-<plug>ffresultprev*
 ff-<plug>ffresultselect	ff.txt	/*ff-<plug>ffresultselect*
 ff-api	ff.txt	/*ff-api*
 ff-configuration-example	ff.txt	/*ff-configuration-example*
-ff-deps	ff.txt	/*ff-deps*
+ff-dependencies	ff.txt	/*ff-dependencies*
 ff-features-excluded-for-simplicity	ff.txt	/*ff-features-excluded-for-simplicity*
 ff-ff.nvim	ff.txt	/*ff-ff.nvim*
 ff-find	ff.txt	/*ff-find*

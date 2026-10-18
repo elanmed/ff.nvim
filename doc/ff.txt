@@ -1,4 +1,4 @@
-*ff.txt*                                        Last change: 2026 September 12
+*ff.txt*                                          Last change: 2026 October 18
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
@@ -19,7 +19,7 @@ Plug remaps ................................................. |ff-plug-remaps|
 `<Plug>FFPreviewScrollDown` ................... |ff-<plug>ffpreviewscrolldown|
 `<Plug>FFPreviewScrollUp` ....................... |ff-<plug>ffpreviewscrollup|
 `<Plug>FFInputClear` ................................. |ff-<plug>ffinputclear|
-Deps ............................................................... |ff-deps|
+Dependencies ............................................... |ff-dependencies|
 Features excluded for simplicity ....... |ff-features-excluded-for-simplicity|
 Similar plugins ......................................... |ff-similar-plugins|
 
@@ -46,7 +46,7 @@ PERFORMANCE                                                   *ff-performance*
 
 `ff.nvim` prioritizes performance in a few ways:
 
-- Large tables are iterated in batches w/coroutines to avoid blocking the
+- Large tables are iterated in batches with coroutines to avoid blocking the
   picker UI
 - New searches interrupt ongoing processing for previous searches
 - A max of `vim.g.ff.max_results_considered` files with a fuzzy match are
@@ -63,7 +63,7 @@ PERFORMANCE                                                   *ff-performance*
   Icons are cached by extension to avoid calling the icon library when
   possible
 - A max of `vim.g.ff.max_results_rendered` results are rendered in the results
-  window, preventing unecessary highlighting
+  window, preventing unnecessary highlighting
 - Only the icons for the top `vim.g.ff.max_results_rendered` results are
   calculated
 - Icons and highlights can be disabled for especially large codebases
@@ -84,7 +84,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       -- benchmark the mean of all keystrokes in a session
       benchmark_mean = false,
       -- defaults to use `fd`. Replace with `rg`, `find`, or another cli command of your choice
-      find_cmd = { "fd", "--absolute-path", "--type f" },
+      find_cmd = { "fd", "--absolute-path", "--type", "f" },
       -- configuration options for the sigmoid function that scales the result of matchfuzzypos
       -- to a range of [0, max_frecency_score + max_weights_score]
       matchfuzzypos_sigmoid = {
@@ -140,7 +140,7 @@ CONFIGURATION EXAMPLE                               *ff-configuration-example*
       preview_win_opts = {},
     }
     
-    vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff", })
+    vim.keymap.set("n", "<leader>ff", require "ff".find, { desc = "Fuzzy find with ff" })
     
     vim.api.nvim_create_autocmd({ "FileType", }, {
       pattern = "ff-picker",
@@ -257,7 +257,7 @@ PLUG REMAPS                                                   *ff-plug-remaps*
 - Clear the input
 
 ------------------------------------------------------------------------------
-DEPS                                                                 *ff-deps*
+DEPENDENCIES                                                 *ff-dependencies*
 
 
 - `mini.icons` <https://github.com/echasnovski/mini.icons> or
