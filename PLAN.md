@@ -6,7 +6,7 @@ Current coverage in `tests/test_ff.lua`: most `H` helpers, `F.update_file_score`
 
 ## High priority — core logic with zero coverage
 
-1. **`P.render_find_files`**
+1. **`P.render_find_files`** ✅ (done)
    - **Ranking inputs**
      - Empty query renders frecency paths before find paths
      - Dedups paths present in both frecency and find caches
@@ -21,15 +21,15 @@ Current coverage in `tests/test_ff.lua`: most `H` helpers, `F.update_file_score`
      - Decorated files carry `rel_path`, `icon_char`, `formatted_filename`
      - `hl_enabled=false` → decorated files have empty `match_idxs`
      - `hl_enabled=true` → icon highlight + fuzzy char highlights at expected columns
-2. **`P.scale_fuzzy_to_frecency`**
+2. **`P.scale_fuzzy_to_frecency`** ✅ (done)
    - **Shape of the sigmoid**
      - Score increases monotonically with `fuzzy_score`
-     - Very low score → near 0; very high score → near max_score
+     - Very low score → near 0; very high score → saturates exactly to max_score
      - `score_per_char == midpoint` → ~half of max_score
    - **Opts**
      - Normalizes per char: same per-char score for different query lengths
      - Custom `steepness`/`midpoint` opts are honored
-3. **`M.defaulted_gopts`**
+3. **`M.defaulted_gopts`** ✅ (done)
    - **Defaults when `vim.g.ff` unset**
      - Weights (open/modified/alternate/current buf, basename boosts)
      - Sigmoid (steepness, midpoint), `matchfuzzypos_batch_size`
@@ -40,7 +40,7 @@ Current coverage in `tests/test_ff.lua`: most `H` helpers, `F.update_file_score`
    - **User overrides**
      - Explicit `vim.g.ff` values win over defaults
      - Does not mutate `vim.g.ff` (deepcopy)
-4. **`P.refresh_frecency_cache`**
+4. **`P.refresh_frecency_cache`** ✅ (done)
    - **Cache population**
      - Populates `frecency_abs_path_to_score` from dated-files.json for cwd
      - Populates `frecency_rel_paths`
@@ -49,7 +49,7 @@ Current coverage in `tests/test_ff.lua`: most `H` helpers, `F.update_file_score`
      - Sorts `frecency_abs_paths` by score descending
    - **Score display state**
      - Updates `MAX_FRECENCY_SCORE` and `MAX_SCORE_LEN` when a score exceeds 99
-5. **`P.refresh_files_cache`**
+5. **`P.refresh_files_cache`** ✅ (done)
    - **Find command**
      - Runs `gopts.find_cmd`, splits stdout into lines
      - Skips empty lines
@@ -57,7 +57,7 @@ Current coverage in `tests/test_ff.lua`: most `H` helpers, `F.update_file_score`
      - Normalizes each abs path
      - Fills `find_abs_paths` + `find_rel_paths`
      - `P.is_find_cache_empty` true before, false after refresh
-6. **`P.refresh_open_buffers_cache`**
+6. **`P.refresh_open_buffers_cache`** ✅ (done)
    - **Buffer filtering**
      - Only loaded + buflisted buffers with names under cwd are cached
    - **Cache population**

@@ -995,6 +995,220 @@ T["P"]["defaulted_gopts"]["fills defaults for partially provided values without 
   MiniTest.expect.equality(gopts.hl_enabled, false)
 end
 
+local original_os_time = os.time
+local original_default_db_dir = F.default_db_dir
+
+T["P"]["refresh_frecency_cache"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      P.MAX_FRECENCY_SCORE = 99
+      P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
+      cleanup()
+      F.default_db_dir = vim.fs.joinpath(root_dir, "db-dir")
+      H.cwd = cwd
+      os.time = function()
+        return now
+      end
+    end,
+    post_case = function()
+      os.time = original_os_time
+      F.default_db_dir = original_default_db_dir
+      H.cwd = nil
+      cleanup()
+    end,
+    post_once = function()
+      vim.fn.delete(root_dir, "rf")
+    end,
+  },
+}
+
+local function score_for(date_at_score_one)
+  return F.compute_score { now = now, date_at_score_one = date_at_score_one }
+end
+
+local function write_dated_files(entries)
+  F.write(F.get_dated_files_path(F.default_db_dir), { [cwd] = entries })
+end
+
+T["P"]["refresh_frecency_cache"]["populates scored paths and rel paths from the db"] = function()
+  local abs_a = create_sandbox_file "alpha.txt"
+  local abs_b = create_sandbox_file "beta.md"
+  write_dated_files {
+    [abs_a] = now,
+    [abs_b] = now + F.half_life_sec,
+  }
+
+  vim.async.run(P.refresh_frecency_cache):wait()
+
+  MiniTest.expect.equality(P.caches.frecency_abs_path_to_score[abs_a], 1)
+  MiniTest.expect.equality(
+    P.caches.frecency_abs_path_to_score[abs_b],
+    score_for(now + F.half_life_sec)
+  )
+  MiniTest.expect.equality(P.caches.frecency_abs_paths, { abs_b, abs_a })
+  MiniTest.expect.equality(P.caches.frecency_rel_paths, {
+    vim.fs.relpath(H.cwd, abs_b),
+    vim.fs.relpath(H.cwd, abs_a),
+  })
+end
+
+T["P"]["refresh_frecency_cache"]["skips unreadable files and sorts paths by score descending"] = function()
+  local abs_a = create_sandbox_file "alpha.txt"
+  local abs_b = create_sandbox_file "beta.md"
+  local abs_c = create_sandbox_file "gamma.txt"
+  write_dated_files {
+    [vim.fs.joinpath(cwd, "deleted.txt")] = now,
+    [abs_a] = now,
+    [abs_b] = now + 2 * F.half_life_sec,
+    [abs_c] = now + F.half_life_sec,
+  }
+
+  vim.async.run(P.refresh_frecency_cache):wait()
+
+  MiniTest.expect.equality(P.caches.frecency_abs_path_to_score, {
+    [abs_a] = score_for(now),
+    [abs_b] = score_for(now + 2 * F.half_life_sec),
+    [abs_c] = score_for(now + F.half_life_sec),
+  })
+  MiniTest.expect.equality(P.caches.frecency_abs_paths, { abs_b, abs_c, abs_a })
+end
+
+T["P"]["refresh_frecency_cache"]["raises MAX_FRECENCY_SCORE and MAX_SCORE_LEN above the cap"] = function()
+  local abs_d = create_sandbox_file "delta.txt"
+  write_dated_files { [abs_d] = now + 7 * F.half_life_sec }
+
+  vim.async.run(P.refresh_frecency_cache):wait()
+
+  MiniTest.expect.equality(P.MAX_FRECENCY_SCORE, score_for(now + 7 * F.half_life_sec))
+  MiniTest.expect.equality(P.MAX_FRECENCY_SCORE > 99, true)
+  MiniTest.expect.equality(P.MAX_SCORE_LEN, 6)
+end
+
+T["P"]["refresh_files_cache"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      cleanup()
+      H.cwd = cwd
+    end,
+    post_case = function()
+      H.cwd = nil
+      cleanup()
+    end,
+    post_once = function()
+      vim.fn.delete(root_dir, "rf")
+    end,
+  },
+}
+
+local function use_find_cmd(paths)
+  vim.g.ff = { find_cmd = vim.list_extend({ "printf", "%s\n" }, paths) }
+  P.caches.gopts = ff.defaulted_gopts()
+end
+
+T["P"]["refresh_files_cache"]["populates find caches and reports emptiness around the refresh"] = function()
+  local abs_a = create_sandbox_file "alpha.txt"
+  local abs_b = create_sandbox_file "beta.md"
+  use_find_cmd { abs_a, abs_b }
+
+  MiniTest.expect.equality(P.is_find_cache_empty(), true)
+  vim.async.run(P.refresh_files_cache):wait()
+
+  MiniTest.expect.equality(P.caches.find_abs_paths, { abs_a, abs_b })
+  MiniTest.expect.equality(
+    P.caches.find_rel_paths,
+    { vim.fs.relpath(cwd, abs_a), vim.fs.relpath(cwd, abs_b) }
+  )
+  MiniTest.expect.equality(P.is_find_cache_empty(), false)
+end
+
+T["P"]["refresh_files_cache"]["skips empty lines from the find output"] = function()
+  local abs_a = create_sandbox_file "alpha.txt"
+  local abs_b = create_sandbox_file "beta.md"
+  use_find_cmd { "", abs_a, abs_b, "" }
+
+  vim.async.run(P.refresh_files_cache):wait()
+
+  MiniTest.expect.equality(P.caches.find_abs_paths, { abs_a, abs_b })
+end
+
+T["P"]["refresh_files_cache"]["normalizes paths from the find output"] = function()
+  local abs_a = create_sandbox_file "alpha.txt"
+  local abs_b = create_sandbox_file "beta.md"
+  use_find_cmd {
+    vim.fs.joinpath(cwd, "test-ff", "files", "..", "files", ".", "alpha.txt"),
+    abs_b,
+  }
+
+  vim.async.run(P.refresh_files_cache):wait()
+
+  MiniTest.expect.equality(P.caches.find_abs_paths, { abs_a, abs_b })
+end
+
+local test_bufs = {}
+
+T["P"]["refresh_open_buffers_cache"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      cleanup()
+      test_bufs = {}
+      H.cwd = cwd
+    end,
+    post_case = function()
+      H.cwd = nil
+      for _, buf in ipairs(test_bufs) do
+        pcall(vim.cmd, "bwipeout! " .. tostring(buf))
+      end
+      cleanup()
+    end,
+    post_once = function()
+      vim.fn.delete(root_dir, "rf")
+    end,
+  },
+}
+
+local function create_test_buffer(abs_path, opts)
+  local buf = vim.api.nvim_create_buf(opts.listed, false)
+  if abs_path then
+    vim.api.nvim_buf_set_name(buf, abs_path)
+  end
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "content" })
+  if opts.modified == false then
+    vim.api.nvim_set_option_value("modified", false, { buf = buf })
+  end
+  table.insert(test_bufs, buf)
+  return buf
+end
+
+T["P"]["refresh_open_buffers_cache"]["caches open listed buffers under cwd with their modified flags"] = function()
+  local abs_a = create_sandbox_file "alpha.txt"
+  local abs_b = create_sandbox_file "beta.md"
+  create_test_buffer(abs_a, { listed = true, modified = false })
+  create_test_buffer(abs_b, { listed = true })
+  create_test_buffer(vim.fs.joinpath(cwd, "requires-listing.txt"), { listed = false })
+  create_test_buffer("/tmp/ff-outside-cwd.txt", { listed = true })
+  create_test_buffer(nil, { listed = true })
+
+  local buf_unloaded = create_test_buffer(vim.fs.joinpath(cwd, "unloaded.txt"), { listed = true })
+  vim.cmd("bunload! " .. tostring(buf_unloaded))
+
+  vim.async.run(P.refresh_open_buffers_cache):wait()
+
+  MiniTest.expect.equality(P.caches.open_buffer_to_modified, {
+    [abs_a] = false,
+    [abs_b] = true,
+  })
+end
+
+T["P"]["refresh_open_buffers_cache"]["clears the weighted_files_per_query cache"] = function()
+  P.caches.weighted_files_per_query = { cached_query = { { abs_path = "x" } } }
+  create_test_buffer(nil, { listed = true })
+
+  vim.async.run(P.refresh_open_buffers_cache):wait()
+
+  MiniTest.expect.equality(P.caches.open_buffer_to_modified, {})
+  MiniTest.expect.equality(P.caches.weighted_files_per_query, {})
+end
+
 local child = MiniTest.new_child_neovim()
 
 T["find"] = MiniTest.new_set {
