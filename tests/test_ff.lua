@@ -6,9 +6,11 @@ local ff = require "ff"
 local H = ff._internal.H
 local F = ff._internal.F
 local P = ff._internal.P
+local original_H_readable = H.readable
 
 local function cleanup_H()
   H.cwd = nil
+  H.readable = original_H_readable
 end
 
 T["H"] = MiniTest.new_set()
@@ -227,10 +229,14 @@ local function cleanup_P()
   P.MAX_SCORE_LEN = #H.exact_decimals(P.MAX_FRECENCY_SCORE, 2)
 end
 
-local function cleanup()
+local function cleanup_fs_H_F()
   cleanup_fs()
   cleanup_H()
   cleanup_F()
+end
+
+local function cleanup()
+  cleanup_fs_H_F()
   cleanup_P()
 end
 
@@ -241,7 +247,7 @@ T["F"]["#update_file_score"] = MiniTest.new_set {
       setup_fs()
       H.cwd = cwd
     end,
-    post_case = cleanup,
+    post_case = cleanup_fs_H_F,
     post_once = cleanup_fs,
   },
 }
@@ -432,6 +438,195 @@ T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing f
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
+end
+
+T["F"]["#update_file_score"]["update_type=remove"]["removes entry for an unknown file and creates the cwd entry"] = function()
+  local unknown_file = vim.fs.joinpath(cwd, "unknown.txt")
+  vim.async
+    .run(F.update_file_score, unknown_file, {
+      db_dir = db_dir,
+      update_type = "remove",
+    })
+    :wait()
+
+  MiniTest.expect.equality(F.read(dated_files_path), { [cwd] = {} })
+end
+
+T["F"]["#update_file_score"]["unknown update types remove the existing entry"] = function()
+  F._now = function()
+    return now
+  end
+  vim.async
+    .run(F.update_file_score, test_file_a, {
+      db_dir = db_dir,
+      update_type = "increase",
+    })
+    :wait()
+
+  vim.async
+    .run(F.update_file_score, test_file_a, {
+      db_dir = db_dir,
+      update_type = "unknown",
+    })
+    :wait()
+
+  MiniTest.expect.equality(F.read(dated_files_path), { [cwd] = {} })
+end
+
+T["F"]["#update_file_score"]["removes files that become unreadable while updating"] = function()
+  F._now = function()
+    return now
+  end
+  local num_readable_checks = 0
+  H.readable = function(path)
+    if path == test_file_a then
+      num_readable_checks = num_readable_checks + 1
+      if num_readable_checks == 2 then
+        vim.fn.delete(path)
+      end
+    end
+    return original_H_readable(path)
+  end
+
+  vim.async
+    .run(F.update_file_score, test_file_a, {
+      db_dir = db_dir,
+      update_type = "increase",
+    })
+    :wait()
+
+  MiniTest.expect.equality(num_readable_checks, 2)
+  MiniTest.expect.equality(F.read(dated_files_path), { [cwd] = {} })
+end
+
+local health = require "ff.health"
+local health_modules = { "mini.icons", "nvim-web-devicons" }
+local original_vim_health = vim.health
+local original_executable = vim.fn.executable
+local original_g_ff = vim.g.ff
+local original_package_loaded = {}
+local original_package_preload = {}
+local health_reports
+
+for _, name in ipairs(health_modules) do
+  original_package_loaded[name] = package.loaded[name]
+  original_package_preload[name] = package.preload[name]
+end
+
+local function setup_health(opts, fd_is_executable, icons_loaded)
+  health_reports = { errors = {}, oks = {} }
+  vim.health = {
+    error = function(message, details)
+      table.insert(health_reports.errors, { message = message, details = details })
+    end,
+    ok = function(message)
+      table.insert(health_reports.oks, message)
+    end,
+  }
+  vim.fn.executable = function()
+    return fd_is_executable and 1 or 0
+  end
+  vim.g.ff = opts
+
+  for index, name in ipairs(health_modules) do
+    package.loaded[name] = nil
+    package.preload[name] = function()
+      error "dependency disabled in test"
+    end
+    if icons_loaded and index == 1 then
+      package.loaded[name] = {}
+    end
+  end
+end
+
+local function cleanup_health()
+  vim.health = original_vim_health
+  vim.fn.executable = original_executable
+  vim.g.ff = original_g_ff
+  for _, name in ipairs(health_modules) do
+    package.loaded[name] = original_package_loaded[name]
+    package.preload[name] = original_package_preload[name]
+  end
+end
+
+T["health"] = MiniTest.new_set {
+  hooks = { post_case = cleanup_health },
+}
+
+T["health"]["icons_enabled=true reports an error when no icon library is loaded"] = function()
+  setup_health({ icons_enabled = true, find_cmd = { "fd" } }, false, false)
+  health.check()
+
+  MiniTest.expect.equality(health_reports.errors, {
+    {
+      message = "vim.g.ff.icons_enabled=true, but no icon library is installed",
+      details = {
+        "Install mini.icons: https://github.com/echasnovski/mini.icons",
+        "Install nvim-web-devicons: https://github.com/nvim-tree/nvim-web-devicons",
+      },
+    },
+  })
+  MiniTest.expect.equality(health_reports.oks, {
+    "vim.g.ff.find_cmd is set, the default executable fd is not required",
+  })
+end
+
+T["health"]["icons_enabled=true accepts a loaded icon library"] = function()
+  setup_health({ icons_enabled = true, find_cmd = { "fd" } }, false, true)
+  health.check()
+
+  MiniTest.expect.equality(health_reports.errors, {})
+  MiniTest.expect.equality(health_reports.oks, {
+    "vim.g.ff.find_cmd is set, the default executable fd is not required",
+  })
+end
+
+T["health"]["icons_enabled=false does not require an icon library"] = function()
+  setup_health({ icons_enabled = false, find_cmd = { "fd" } }, false, false)
+  health.check()
+
+  MiniTest.expect.equality(health_reports.errors, {})
+  MiniTest.expect.equality(health_reports.oks, {
+    "vim.g.ff.icons_enabled=false, no icon library is required",
+    "vim.g.ff.find_cmd is set, the default executable fd is not required",
+  })
+end
+
+T["health"]["reports an error when fd is missing and find_cmd is unset"] = function()
+  setup_health({ icons_enabled = false }, false, false)
+  health.check()
+
+  MiniTest.expect.equality(health_reports.errors, {
+    {
+      message = "vim.g.ff.find_cmd is not set, but the default executable fd is not installed",
+      details = { "Install fd: https://github.com/sharkdp/fd" },
+    },
+  })
+  MiniTest.expect.equality(health_reports.oks, {
+    "vim.g.ff.icons_enabled=false, no icon library is required",
+  })
+end
+
+T["health"]["accepts fd when find_cmd is unset"] = function()
+  setup_health({ icons_enabled = false }, true, false)
+  health.check()
+
+  MiniTest.expect.equality(health_reports.errors, {})
+  MiniTest.expect.equality(health_reports.oks, {
+    "vim.g.ff.icons_enabled=false, no icon library is required",
+    "fd is installed",
+  })
+end
+
+T["health"]["does not require fd when find_cmd is set"] = function()
+  setup_health({ icons_enabled = false, find_cmd = { "rg", "--files" } }, false, false)
+  health.check()
+
+  MiniTest.expect.equality(health_reports.errors, {})
+  MiniTest.expect.equality(health_reports.oks, {
+    "vim.g.ff.icons_enabled=false, no icon library is required",
+    "vim.g.ff.find_cmd is set, the default executable fd is not required",
+  })
 end
 
 T["P"] = MiniTest.new_set {
@@ -669,7 +864,7 @@ end
 T["P"]["render_find_files"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      cleanup()
+      cleanup_fs_H_F()
       setup_fs()
     end,
     post_once = cleanup_fs,
@@ -1067,7 +1262,7 @@ end
 T["P"]["refresh_frecency_cache"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      cleanup()
+      cleanup_fs_H_F()
       setup_fs()
       F.default_db_dir = vim.fs.joinpath(root_dir, "db-dir")
       H.cwd = cwd
@@ -1145,11 +1340,11 @@ end
 T["P"]["refresh_files_cache"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      cleanup()
+      cleanup_fs_H_F()
       setup_fs()
       H.cwd = cwd
     end,
-    post_case = cleanup,
+    post_case = cleanup_fs_H_F,
     post_once = cleanup_fs,
   },
 }
@@ -1201,11 +1396,11 @@ end
 T["P"]["refresh_open_buffers_cache"] = MiniTest.new_set {
   hooks = {
     pre_case = function()
-      cleanup()
+      cleanup_fs_H_F()
       setup_fs()
       H.cwd = cwd
     end,
-    post_case = cleanup,
+    post_case = cleanup_fs_H_F,
     post_once = cleanup_fs,
   },
 }
