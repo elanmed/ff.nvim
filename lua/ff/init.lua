@@ -245,7 +245,7 @@ F.update_file_score = function(abs_path, opts)
   dated_files[H.cwd][abs_path] = updated_date_at_score_one
 
   local readable_dated_files_cwd = {}
-  A.batched_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return pairs(dated_files[H.cwd])
     end,
@@ -557,7 +557,7 @@ P.refresh_files_cache = function()
   local lines = vim.split(out.stdout or "", "\n")
 
   L.benchmark_step("start", "refresh_files_cache (entire loop)")
-  A.batched_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(lines)
     end,
@@ -594,7 +594,7 @@ P.refresh_frecency_cache = function()
   L.benchmark_step("start", "Calculate frecency_abs_path_to_score (entire loop)")
   local frecency_paths_to_sort = {}
 
-  A.batched_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return pairs(dated_files[H.cwd])
     end,
@@ -653,7 +653,7 @@ P.refresh_open_buffers_cache = function()
   L.benchmark_step("start", "Calculate open_buffer_to_modified (entire loop)")
 
   local bufs = vim.api.nvim_list_bufs()
-  A.batched_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(bufs)
     end,
@@ -858,7 +858,7 @@ P.render_find_files = function(opts)
       L.benchmark_step("start", "Populate weighted_files for empty query")
 
       local should_break = false
-      A.batched_iterator {
+      A.throttled_iterator {
         iterator_factory = function()
           return ipairs(all_abs_paths)
         end,
@@ -900,7 +900,7 @@ P.render_find_files = function(opts)
         table.insert(batch_starts, start_idx)
       end
 
-      A.batched_iterator {
+      A.throttled_iterator {
         iterator_factory = function()
           return ipairs(batch_starts)
         end,
@@ -963,7 +963,7 @@ P.render_find_files = function(opts)
   --- @type DecoratedFile[]
   local decorated_files = {}
 
-  A.batched_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(sliced_weighted_files)
     end,
@@ -1014,7 +1014,7 @@ P.render_find_files = function(opts)
   local icon_char_idx = formatted_score_last_idx + 2
 
   L.benchmark_step("start", "Highlight results")
-  A.batched_iterator {
+  A.throttled_iterator {
     iterator_factory = function()
       return ipairs(decorated_files)
     end,
