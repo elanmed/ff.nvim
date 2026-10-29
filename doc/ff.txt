@@ -1,4 +1,4 @@
-*ff.txt*                                          Last change: 2026 October 18
+*ff.txt*                                          Last change: 2026 October 29
 
 ==============================================================================
 Table of Contents                                       *ff-table-of-contents*
