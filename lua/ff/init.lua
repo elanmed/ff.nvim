@@ -28,6 +28,15 @@ H.default = function(val, default_val)
   return val
 end
 
+H.async_cb = function(callback)
+  return function(...)
+    local arguments = { ... }
+    vim.async.run(function()
+      callback(unpack(arguments))
+    end)
+  end
+end
+
 --- @param abs_path string
 H.rel_path = function(abs_path)
   local rel_path = vim.fs.relpath(H.cwd, abs_path)
@@ -423,6 +432,7 @@ end
 --- @field benchmark_step? boolean
 --- @field benchmark_mean? boolean
 --- @field find_cmd? string[]
+--- @field smooth_scroll? boolean
 
 --- @class Weights
 --- @field open_buf_boost? number
@@ -454,6 +464,7 @@ M.defaulted_gopts = function()
   opts.matchfuzzypos_batch_size = H.default(opts.matchfuzzypos_batch_size, 250)
   opts.hl_enabled = H.default(opts.hl_enabled, true)
   opts.icons_enabled = H.default(opts.icons_enabled, true)
+  opts.smooth_scroll = H.default(opts.smooth_scroll, true)
   opts.max_results_considered = H.default(opts.max_results_considered, 1000)
   opts.fuzzy_score_multiple = H.default(opts.fuzzy_score_multiple, 0.7)
 
@@ -1261,6 +1272,59 @@ local find_inner = function()
   end
   set_input_win_opts()
 
+  --- @param direction "j"|"k"
+  --- @param ctrl_direction "<C-d>"|"<C-u>"
+  local function scroll_preview(direction, ctrl_direction)
+    if not P.preview_active then
+      return
+    end
+
+    if not vim.api.nvim_win_is_valid(results_win) then
+      return
+    end
+
+    if not P.caches.gopts.smooth_scroll then
+      vim.api.nvim_win_call(results_win, function()
+        vim.cmd.normal {
+          vim.api.nvim_replace_termcodes(ctrl_direction, true, false, true),
+          bang = true,
+        }
+        vim.cmd.normal { "zz", bang = true }
+      end)
+      return
+    end
+
+    local scroll = vim.wo[results_win].scroll
+
+    if scroll == 0 then
+      scroll = math.floor(vim.api.nvim_win_get_height(results_win) / 2)
+    end
+
+    for _ = 1, math.max(1, scroll) do
+      if
+        not vim.api.nvim_win_is_valid(results_win)
+        or not P.preview_active
+        or vim.api.nvim_win_get_buf(results_win) ~= preview_buf
+      then
+        return
+      end
+      vim.api.nvim_win_call(results_win, function()
+        vim.cmd.normal { direction, bang = true }
+      end)
+      vim.async.sleep(10)
+    end
+
+    if
+      vim.api.nvim_win_is_valid(results_win)
+      and P.preview_active
+      and vim.api.nvim_win_get_buf(results_win) == preview_buf
+    then
+      vim.api.nvim_win_call(results_win, function()
+        vim.cmd.normal { "zz", bang = true }
+      end)
+    end
+  end
+
   vim.cmd "startinsert"
 
   --- @async
@@ -1381,22 +1445,12 @@ local find_inner = function()
 
       pcall(vim.treesitter.start, preview_buf, lang)
     end,
-    PreviewScrollDown = function()
-      if not P.preview_active then
-        return
-      end
-      vim.api.nvim_win_call(results_win, function()
-        vim.cmd [[execute "normal! \<C-d>"]]
-      end)
-    end,
-    PreviewScrollUp = function()
-      if not P.preview_active then
-        return
-      end
-      vim.api.nvim_win_call(results_win, function()
-        vim.cmd [[execute "normal! \<C-u>"]]
-      end)
-    end,
+    PreviewScrollDown = H.async_cb(function()
+      scroll_preview("j", "<C-d>")
+    end),
+    PreviewScrollUp = H.async_cb(function()
+      scroll_preview("k", "<C-u>")
+    end),
     InputClear = function()
       vim.api.nvim_buf_set_lines(input_buf, 0, -1, false, {})
     end,

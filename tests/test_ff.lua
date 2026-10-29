@@ -1257,6 +1257,7 @@ T["P"]["defaulted_gopts"]["fills defaults when the option is unset"] = function(
     matchfuzzypos_batch_size = 250,
     hl_enabled = true,
     icons_enabled = true,
+    smooth_scroll = true,
     max_results_considered = 1000,
     fuzzy_score_multiple = 0.7,
     benchmark_step = false,
@@ -1285,6 +1286,7 @@ T["P"]["defaulted_gopts"]["uses explicit values over defaults"] = function()
     matchfuzzypos_batch_size = 3,
     hl_enabled = false,
     icons_enabled = false,
+    smooth_scroll = false,
     max_results_considered = 4,
     fuzzy_score_multiple = 0.5,
     benchmark_step = true,
@@ -1305,6 +1307,7 @@ T["P"]["defaulted_gopts"]["uses explicit values over defaults"] = function()
     matchfuzzypos_batch_size = 3,
     hl_enabled = false,
     icons_enabled = false,
+    smooth_scroll = false,
     max_results_considered = 4,
     fuzzy_score_multiple = 0.5,
     benchmark_step = true,
@@ -1876,11 +1879,30 @@ T["find"]["picker keymaps"]["scrolls an active preview without moving the result
   )
 
   feed_picker_action "PreviewScrollDown"
-  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1] > 1, true)
+  MiniTest.expect.equality(
+    child.lua_func(function(win)
+      return vim.wait(3000, function()
+        return vim.api.nvim_win_get_cursor(win)[1] > 1
+      end, 10)
+    end, picker.results_win),
+    true
+  )
 
   feed_picker_action "PreviewToggle"
   MiniTest.expect.equality(child.api.nvim_win_get_buf(picker.results_win), picker.results_buf)
   MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1], 2)
+end
+
+T["find"]["picker keymaps"]["uses page scrolling when smooth scrolling is disabled"] = function()
+  local picker = open_picker { "1.00 |lua/ff/init.lua", "1.00 |README.md" }
+  set_results_cursor(picker.results_win, 2)
+  feed_picker_action "PreviewToggle"
+  child.lua_func(function()
+    _G.ff_modules._internal.P.caches.gopts.smooth_scroll = false
+  end)
+
+  feed_picker_action "PreviewScrollDown"
+  MiniTest.expect.equality(child.api.nvim_win_get_cursor(picker.results_win)[1] > 1, true)
 end
 
 T["find"]["picker keymaps"]["preview scrolling does nothing when preview is inactive"] = function()

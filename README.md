@@ -65,6 +65,8 @@ vim.g.ff = {
   },
   matchfuzzypos_batch_size = 250,
   icons_enabled = true,
+  -- smoothly scroll the preview window
+  smooth_scroll = true,
   -- highlighting the fuzzy matched characters and icons
   hl_enabled = true,
   -- how much to weight the fuzzy match score vs the frecency + other weights
