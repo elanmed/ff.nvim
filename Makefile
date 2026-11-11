@@ -12,7 +12,8 @@ test:
 
 lint:
 	# https://luals.github.io/#install
-	lua-language-server --check=./lua --checklevel=Error
+	VIMRUNTIME="$$(nvim --headless --clean -c 'lua io.write(vim.env.VIMRUNTIME)' -c 'qa')" lua-language-server --check=./lua --checklevel=Warning --configpath=$(CURDIR)/.luarc.json
+	VIMRUNTIME="$$(nvim --headless --clean -c 'lua io.write(vim.env.VIMRUNTIME)' -c 'qa')" lua-language-server --check=./tests --checklevel=Warning --configpath=$(CURDIR)/.luarc.json
 
 format:
 	# https://github.com/JohnnyMorganz/StyLua#usage
