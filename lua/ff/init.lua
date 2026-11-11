@@ -28,11 +28,13 @@ H.default = function(val, default_val)
   return val
 end
 
+--- @param callback fun(...: any): any
+--- @return fun(...: any): nil
 H.async_cb = function(callback)
   return function(...)
     local arguments = { ... }
     vim.async.run(function()
-      callback(unpack(arguments))
+      return callback(unpack(arguments))
     end)
   end
 end
@@ -1525,7 +1527,7 @@ M.find = function()
   end)
 end
 
-if _G.FF_TEST then
+if rawget(_G, "FF_TEST") then
   M._internal = {
     H = H,
     F = F,
