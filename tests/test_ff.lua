@@ -1,3 +1,4 @@
+local MiniTest = require "mini.test"
 local original_ff_test = rawget(_G, "FF_TEST")
 _G.FF_TEST = true
 local ff_ok, ff = pcall(require, "ff")
@@ -324,14 +325,16 @@ T["F"]["#update_file_score"] = MiniTest.new_set {
 T["F"]["#update_file_score"]["update_type=increase"] = MiniTest.new_set()
 
 T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new file"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   local dated_files = F.read(dated_files_path)
@@ -340,26 +343,30 @@ T["F"]["#update_file_score"]["update_type=increase"]["adds score entry for new f
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeated calls"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
-  F._now = function()
+  rawset(F, "_now", function()
     return now_after_30_min
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   local date_at_score_one = F.read(dated_files_path)[cwd][test_file_a]
@@ -370,26 +377,30 @@ T["F"]["#update_file_score"]["update_type=increase"]["increments score on repeat
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores when adding a new file"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
-  F._now = function()
+  rawset(F, "_now", function()
     return now_after_30_min
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_b, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_b, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(
@@ -403,28 +414,32 @@ T["F"]["#update_file_score"]["update_type=increase"]["recalculates all scores wh
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
   vim.fn.delete(test_file_a)
 
-  F._now = function()
+  rawset(F, "_now", function()
     return now_after_30_min
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_b, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_b, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
@@ -435,47 +450,53 @@ T["F"]["#update_file_score"]["update_type=increase"]["filters deleted files"] = 
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding deleted files"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
 
   vim.fn.delete(test_file_a)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_dir_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_dir_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_dir_a], nil)
 end
 
 T["F"]["#update_file_score"]["update_type=increase"]["avoids adding directories when stat_file=true"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
 
   vim.fn.delete(test_dir_a)
   vim.async
-    .run(F.update_file_score, test_dir_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-      stat_file = true,
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_dir_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+        stat_file = true,
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_dir_a], nil)
@@ -484,26 +505,30 @@ end
 T["F"]["#update_file_score"]["update_type=remove"] = MiniTest.new_set()
 
 T["F"]["#update_file_score"]["update_type=remove"]["removes entry for existing file"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], date_at_score_one_now)
 
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "remove",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "remove",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path)[cwd][test_file_a], nil)
@@ -512,40 +537,46 @@ end
 T["F"]["#update_file_score"]["update_type=remove"]["removes entry for an unknown file and creates the cwd entry"] = function()
   local unknown_file = vim.fs.joinpath(cwd, "unknown.txt")
   vim.async
-    .run(F.update_file_score, unknown_file, {
-      db_dir = db_dir,
-      update_type = "remove",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(unknown_file, {
+        db_dir = db_dir,
+        update_type = "remove",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path), { [cwd] = {} })
 end
 
 T["F"]["#update_file_score"]["unknown update types remove the existing entry"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "unknown",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "unknown",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(F.read(dated_files_path), { [cwd] = {} })
 end
 
 T["F"]["#update_file_score"]["removes files that become unreadable while updating"] = function()
-  F._now = function()
+  rawset(F, "_now", function()
     return now
-  end
+  end)
   local num_readable_checks = 0
   H.readable = function(path)
     if path == test_file_a then
@@ -558,10 +589,12 @@ T["F"]["#update_file_score"]["removes files that become unreadable while updatin
   end
 
   vim.async
-    .run(F.update_file_score, test_file_a, {
-      db_dir = db_dir,
-      update_type = "increase",
-    })
+    .run("test_update_file_score", function()
+      F.update_file_score(test_file_a, {
+        db_dir = db_dir,
+        update_type = "increase",
+      })
+    end)
     :wait()
 
   MiniTest.expect.equality(num_readable_checks, 2)
@@ -591,9 +624,9 @@ local function setup_health(opts, fd_is_executable, icons_loaded)
       table.insert(health_reports.oks, message)
     end,
   }
-  vim.fn.executable = function()
+  rawset(vim.fn, "executable", function()
     return fd_is_executable and 1 or 0
-  end
+  end)
   vim.g.ff = opts
 
   for index, name in ipairs(health_modules) do
@@ -769,7 +802,6 @@ end
 
 local query = "in"
 
---- @type WeightedFile
 local weighted_file_lua = {
   abs_path = "path/to/dir/init.lua",
   rel_path = "init.lua",
@@ -782,7 +814,6 @@ local weighted_file_lua = {
   icon_hl = "MiniIconsGreen",
 }
 
---- @type WeightedFile
 local weighted_file_ts = {
   abs_path = "path/to/dir/mod_file.ts",
   rel_path = "mod_file.ts",
@@ -1341,9 +1372,9 @@ T["P"]["refresh_frecency_cache"] = MiniTest.new_set {
       setup_fs()
       F.default_db_dir = vim.fs.joinpath(root_dir, "db-dir")
       H.cwd = cwd
-      os.time = function()
+      rawset(os, "time", function()
         return now
-      end
+      end)
     end,
     post_case = cleanup,
     post_once = cleanup_fs,
@@ -1638,9 +1669,9 @@ end
 local function get_child_state()
   return child.lua_func(function()
     return {
-      events = _G.ff_events,
-      opens = _G.ff_opens,
-      previews = _G.ff_previews,
+      events = rawget(_G, "ff_events"),
+      opens = rawget(_G, "ff_opens"),
+      previews = rawget(_G, "ff_previews"),
     }
   end)
 end
@@ -1964,7 +1995,7 @@ T["find"]["fires FFPreviewOpen with the preview buffer when the preview is toggl
   MiniTest.expect.equality(
     child.lua_func(function()
       return vim.wait(2000, function()
-        return #_G.ff_previews >= 1
+        return #rawget(_G, "ff_previews") >= 1
       end, 10)
     end),
     true
@@ -1980,7 +2011,7 @@ T["find"]["fires FFPreviewOpen with the preview buffer when the preview is toggl
   MiniTest.expect.equality(
     child.lua_func(function()
       return vim.wait(2000, function()
-        return #_G.ff_opens >= 2
+        return #rawget(_G, "ff_opens") >= 2
       end, 10)
     end),
     true
